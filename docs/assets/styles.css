@@ -620,7 +620,7 @@ button,
 
 .trend-summary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1176,12 +1176,23 @@ tbody tr:last-child td {
     font-size: 1.42rem;
   }
 
-  .trend-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .trend-summary,
+  .arrival-board .trend-summary {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(190px, 28vw);
+    grid-template-columns: none;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
   }
 
-  .arrival-board .trend-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .trend-summary-item,
+  .arrival-board .trend-summary-item {
+    scroll-snap-align: start;
   }
 
   .chart-wrap {
@@ -1290,12 +1301,9 @@ tbody tr:last-child td {
     grid-auto-columns: minmax(188px, 56vw);
   }
 
-  .trend-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
+  .trend-summary,
   .arrival-board .trend-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-columns: minmax(188px, 56vw);
   }
 
   .arrival-board .trend-summary-item strong {
@@ -1380,7 +1388,8 @@ tbody tr:last-child td {
 
   .trend-summary,
   .arrival-board .trend-summary {
-    grid-template-columns: 1fr;
+    grid-auto-columns: minmax(184px, 78vw);
+    gap: 8px;
   }
 
   .trend-summary-item,
