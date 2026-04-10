@@ -4,6 +4,7 @@ const branchSwitcher = document.querySelector("#branch-switcher");
 const sectionNav = document.querySelector("#section-nav");
 const metaStrip = document.querySelector("#meta-strip");
 const reportDateHighlight = document.querySelector("#report-date-highlight");
+const opsGuideBody = document.querySelector("#ops-guide-body");
 const dashboardTemplate = document.querySelector("#dashboard-template");
 const sectionTemplate = document.querySelector("#section-template");
 const chartModal = createChartModal();
@@ -37,6 +38,12 @@ const state = {
   sectionObserver: null,
 };
 
+const deploymentLinks = {
+  actions: "https://github.com/Django604/AI_Digest/actions",
+  pages: "https://github.com/Django604/AI_Digest/settings/pages",
+  site: "https://django604.github.io/AI_Digest/",
+};
+
 void loadDashboard();
 
 async function loadDashboard() {
@@ -56,6 +63,7 @@ async function loadDashboard() {
     state.activeDashboard = payload.dashboards[state.activeDashboard] ? state.activeDashboard : dashboards[0].id;
 
     renderMeta(payload.meta ?? {});
+    renderOpsGuide();
     renderTabs(dashboards);
     renderDashboard(payload.dashboards[state.activeDashboard]);
   } catch (error) {
@@ -96,6 +104,32 @@ function renderTabs(dashboards) {
     });
     tabList.appendChild(button);
   });
+}
+
+function renderOpsGuide() {
+  if (!opsGuideBody) {
+    return;
+  }
+
+  opsGuideBody.innerHTML = `
+    <ol class="ops-guide-list">
+      <li>更新并保存 <code>NEV+ICE_xsai.xlsm</code> 和 <code>NEV+ICE_ldai.xlsx</code>。</li>
+      <li>确认 Excel 公式已重算完成，再执行发布脚本。</li>
+      <li>
+        运行命令：
+        <code class="ops-guide-command">powershell -ExecutionPolicy Bypass -File scripts/publish_dashboard.ps1</code>
+      </li>
+      <li>等待 GitHub Actions 发布完成，再让别人访问网页。</li>
+      <li>
+        检查入口：
+        <a href="${deploymentLinks.actions}" target="_blank" rel="noreferrer">Actions</a>
+        <span> / </span>
+        <a href="${deploymentLinks.pages}" target="_blank" rel="noreferrer">Pages</a>
+        <span> / </span>
+        <a href="${deploymentLinks.site}" target="_blank" rel="noreferrer">站点</a>
+      </li>
+    </ol>
+  `;
 }
 
 function renderDashboard(dashboard) {

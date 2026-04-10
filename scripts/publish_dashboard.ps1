@@ -66,7 +66,8 @@ try {
   }
 
   if (-not $AllowExistingStaged) {
-    $stagedFiles = @(Get-GitOutput -Arguments @("diff", "--cached", "--name-only") -split "\r?\n" | Where-Object { $_ })
+    $stagedOutput = Get-GitOutput -Arguments @("diff", "--cached", "--name-only")
+    $stagedFiles = @($stagedOutput -split "\r?\n" | Where-Object { $_ })
     if ($stagedFiles.Count -gt 0) {
       $allowedSet = New-Object "System.Collections.Generic.HashSet[string]" ([System.StringComparer]::OrdinalIgnoreCase)
       foreach ($item in $publishTargets) {
@@ -94,7 +95,8 @@ try {
   Invoke-Git -Arguments $gitAddArgs
 
   $gitDiffArgs = @("diff", "--cached", "--name-only", "--") + $publishTargets
-  $changedTargets = @(Get-GitOutput -Arguments $gitDiffArgs -split "\r?\n" | Where-Object { $_ })
+  $changedOutput = Get-GitOutput -Arguments $gitDiffArgs
+  $changedTargets = @($changedOutput -split "\r?\n" | Where-Object { $_ })
   if ($changedTargets.Count -eq 0) {
     Write-Host "No publishable changes detected. Nothing to commit." -ForegroundColor Yellow
     return
