@@ -688,6 +688,14 @@ button,
   letter-spacing: -0.03em;
 }
 
+.arrival-board .trend-summary-item strong.is-positive-value {
+  color: #d40000;
+}
+
+.arrival-board .trend-summary-item strong.is-negative-value {
+  color: var(--positive);
+}
+
 .arrival-board .trend-summary-item label {
   white-space: nowrap;
   font-size: 0.8rem;
@@ -1309,6 +1317,10 @@ tbody tr:last-child td {
   .arrival-board .trend-summary-item strong {
     font-size: 1.38rem;
   }
+
+  .arrival-board .trend-summary-item strong.is-negative-value {
+    color: var(--positive);
+  }
   .mixed-chart {
     min-width: 780px;
   }
@@ -1399,6 +1411,10 @@ tbody tr:last-child td {
 
   .arrival-board .trend-summary-item strong {
     font-size: 1.32rem;
+  }
+
+  .arrival-board .trend-summary-item strong.is-negative-value {
+    color: var(--positive);
   }
 
   .mixed-chart {
