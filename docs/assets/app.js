@@ -4,7 +4,6 @@ const branchSwitcher = document.querySelector("#branch-switcher");
 const sectionNav = document.querySelector("#section-nav");
 const metaStrip = document.querySelector("#meta-strip");
 const reportDateHighlight = document.querySelector("#report-date-highlight");
-const opsGuideBody = document.querySelector("#ops-guide-body");
 const dashboardTemplate = document.querySelector("#dashboard-template");
 const sectionTemplate = document.querySelector("#section-template");
 const chartModal = createChartModal();
@@ -38,12 +37,6 @@ const state = {
   sectionObserver: null,
 };
 
-const deploymentLinks = {
-  actions: "https://github.com/Django604/AI_Digest/actions",
-  pages: "https://github.com/Django604/AI_Digest/settings/pages",
-  site: "https://django604.github.io/AI_Digest/",
-};
-
 void loadDashboard();
 
 async function loadDashboard() {
@@ -63,7 +56,6 @@ async function loadDashboard() {
     state.activeDashboard = payload.dashboards[state.activeDashboard] ? state.activeDashboard : dashboards[0].id;
 
     renderMeta(payload.meta ?? {});
-    renderOpsGuide();
     renderTabs(dashboards);
     renderDashboard(payload.dashboards[state.activeDashboard]);
   } catch (error) {
@@ -104,32 +96,6 @@ function renderTabs(dashboards) {
     });
     tabList.appendChild(button);
   });
-}
-
-function renderOpsGuide() {
-  if (!opsGuideBody) {
-    return;
-  }
-
-  opsGuideBody.innerHTML = `
-    <ol class="ops-guide-list">
-      <li>更新并保存 <code>NEV+ICE_xsai.xlsm</code> 和 <code>NEV+ICE_ldai.xlsx</code>。</li>
-      <li>确认 Excel 公式已重算完成，再执行发布脚本。</li>
-      <li>
-        运行命令：
-        <code class="ops-guide-command">powershell -ExecutionPolicy Bypass -File scripts/publish_dashboard.ps1</code>
-      </li>
-      <li>等待 GitHub Actions 发布完成，再让别人访问网页。</li>
-      <li>
-        检查入口：
-        <a href="${deploymentLinks.actions}" target="_blank" rel="noreferrer">Actions</a>
-        <span> / </span>
-        <a href="${deploymentLinks.pages}" target="_blank" rel="noreferrer">Pages</a>
-        <span> / </span>
-        <a href="${deploymentLinks.site}" target="_blank" rel="noreferrer">站点</a>
-      </li>
-    </ol>
-  `;
 }
 
 function renderDashboard(dashboard) {
@@ -597,8 +563,15 @@ function renderTrendChart(trend, options = {}) {
 
   const wrapper = document.createElement("div");
   wrapper.className = "mixed-chart";
+  const viewport = getTrendChartViewport(chart, options);
   if (options.enlarged) {
     wrapper.classList.add("is-enlarged");
+  }
+  if (viewport.compact) {
+    wrapper.classList.add("is-compact");
+  }
+  if (viewport.scrollWidth) {
+    wrapper.style.minWidth = `${viewport.scrollWidth}px`;
   }
 
   if (!options.enlarged) {
@@ -613,11 +586,7 @@ function renderTrendChart(trend, options = {}) {
   wrapper.appendChild(tooltip);
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  const width = options.enlarged ? 1920 : 1560;
-  const height = options.enlarged ? 760 : 620;
-  const padding = options.enlarged
-    ? { top: 44, right: 112, bottom: 108, left: 88 }
-    : { top: 40, right: 90, bottom: 92, left: 72 };
+  const { width, height, padding } = viewport;
   const minX = padding.left;
   const maxX = width - padding.right;
   const minY = padding.top;
@@ -637,7 +606,7 @@ function renderTrendChart(trend, options = {}) {
       createText(minX - 12, y + 5, formatTick(value), {
         "text-anchor": "end",
         fill: "rgba(20,34,31,0.65)",
-        "font-size": options.enlarged ? "18" : "14",
+        "font-size": viewport.axisFontSize,
       }),
     );
   });
@@ -648,7 +617,7 @@ function renderTrendChart(trend, options = {}) {
       createText(maxX + 18, y + 5, formatTick(value), {
         "text-anchor": "start",
         fill: "rgba(20,34,31,0.65)",
-        "font-size": options.enlarged ? "18" : "14",
+        "font-size": viewport.axisFontSize,
       }),
     );
   });
@@ -678,7 +647,7 @@ function renderTrendChart(trend, options = {}) {
         createText(centerX + bandWidth * 0.18, Math.max(y, minY + 12), formatCompact(actualValue), {
           "text-anchor": "middle",
           fill: "rgba(20,34,31,0.72)",
-          "font-size": options.enlarged ? "16" : "12",
+          "font-size": viewport.valueFontSize,
         }),
       );
     }
@@ -687,7 +656,7 @@ function renderTrendChart(trend, options = {}) {
       createText(centerX, height - 28, label, {
         "text-anchor": "middle",
         fill: "rgba(20,34,31,0.68)",
-        "font-size": options.enlarged ? "16" : "13",
+        "font-size": viewport.labelFontSize,
       }),
     );
   });
@@ -721,7 +690,7 @@ function renderTrendChart(trend, options = {}) {
       circle.setAttribute("r", item.markerRadius ?? 4.5);
       circle.setAttribute("fill", item.markerFill ?? item.color);
       circle.setAttribute("stroke", item.markerStroke ?? "#ffffff");
-      circle.setAttribute("stroke-width", options.enlarged ? "2.5" : "2");
+      circle.setAttribute("stroke-width", viewport.markerStrokeWidth);
       svg.appendChild(circle);
     });
   });
@@ -801,16 +770,21 @@ function openChartModal(section) {
   const content = chartModal.querySelector(".chart-modal-content");
   const title = chartModal.querySelector(".chart-modal-title");
   const subtitle = chartModal.querySelector(".chart-modal-subtitle");
+  const compact = isCompactChartViewport();
   content.innerHTML = "";
   title.textContent = section.title ? `${section.title} 趋势图` : section.trend?.chartTitle ?? "趋势图";
-  subtitle.textContent = section.trend?.chartTitle ?? section.headline ?? "";
+  subtitle.textContent = compact
+    ? `${section.trend?.chartTitle ?? section.headline ?? ""} · 左右滑动查看`
+    : section.trend?.chartTitle ?? section.headline ?? "";
   content.appendChild(renderTrendChart(section.trend, { enlarged: true }));
+  chartModal.classList.toggle("is-compact", compact);
   chartModal.classList.add("visible");
   document.body.classList.add("modal-open");
 }
 
 function closeChartModal() {
   chartModal.classList.remove("visible");
+  chartModal.classList.remove("is-compact");
   document.body.classList.remove("modal-open");
 }
 
@@ -927,6 +901,56 @@ function moveTooltip(event, tooltip) {
 
 function hideTooltip(tooltip) {
   tooltip.classList.remove("visible");
+}
+
+function getTrendChartViewport(chart, options = {}) {
+  const compact = Boolean(options.enlarged && isCompactChartViewport());
+  const labelCount = Math.max(chart?.labels?.length ?? 0, 1);
+
+  if (compact) {
+    const width = Math.max(1080, labelCount * 52 + 280);
+    return {
+      compact: true,
+      width,
+      height: 640,
+      padding: { top: 36, right: 88, bottom: 100, left: 72 },
+      axisFontSize: "14",
+      valueFontSize: "12",
+      labelFontSize: "13",
+      markerStrokeWidth: "2",
+      scrollWidth: width,
+    };
+  }
+
+  if (options.enlarged) {
+    return {
+      compact: false,
+      width: 1920,
+      height: 760,
+      padding: { top: 44, right: 112, bottom: 108, left: 88 },
+      axisFontSize: "18",
+      valueFontSize: "16",
+      labelFontSize: "16",
+      markerStrokeWidth: "2.5",
+      scrollWidth: 0,
+    };
+  }
+
+  return {
+    compact: false,
+    width: 1560,
+    height: 620,
+    padding: { top: 40, right: 90, bottom: 92, left: 72 },
+    axisFontSize: "14",
+    valueFontSize: "12",
+    labelFontSize: "13",
+    markerStrokeWidth: "2",
+    scrollWidth: 0,
+  };
+}
+
+function isCompactChartViewport() {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 980px)").matches;
 }
 
 function getBandCenter(index, bandWidth, minX) {
