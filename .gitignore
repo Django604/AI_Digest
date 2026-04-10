@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+
+.serve_dashboard.pid
+*.log
+~$*.xls*
+
+.DS_Store
+Thumbs.db

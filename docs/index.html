@@ -1,0 +1,92 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>NEV / ICE 每日简报</title>
+    <script>
+      document.write('<link rel="stylesheet" href="./assets/styles.css?v=' + Date.now() + '" />');
+    </script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-topline">
+          <h1>NEV / ICE 线索及来店简报</h1>
+          <div class="report-date-highlight" id="report-date-highlight"></div>
+        </div>
+        <div class="meta-strip" id="meta-strip"></div>
+      </header>
+
+      <main class="workspace-layout">
+        <aside class="sidebar" aria-label="页面导航">
+          <div class="sidebar-sticky">
+            <section class="panel-switcher">
+              <p class="sidebar-title">页面导航</p>
+              <div class="tab-list sidebar-tab-list" id="tab-list"></div>
+            </section>
+            <section class="branch-switcher" id="branch-switcher" hidden>
+              <p class="sidebar-title">分支目录</p>
+              <nav class="section-nav" id="section-nav" aria-label="板块目录"></nav>
+            </section>
+          </div>
+        </aside>
+
+        <section id="dashboard-root" class="dashboard-root"></section>
+      </main>
+    </div>
+
+    <template id="dashboard-template">
+      <article class="dashboard">
+        <header class="dashboard-header">
+          <div>
+            <p class="dashboard-kicker"></p>
+            <h2 class="dashboard-title"></h2>
+          </div>
+          <p class="dashboard-headline"></p>
+        </header>
+        <div class="section-stack"></div>
+      </article>
+    </template>
+
+    <template id="section-template">
+      <section class="data-section">
+        <div class="section-topline">
+          <div>
+            <p class="section-label"></p>
+            <h3 class="section-title"></h3>
+          </div>
+          <p class="section-headline"></p>
+        </div>
+        <details class="summary-panel">
+          <summary class="summary-toggle">展开核心指标</summary>
+          <div class="card-grid"></div>
+        </details>
+        <div class="section-note"></div>
+        <div class="section-body">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h4>日趋势</h4>
+              <p>目标 / 实绩 / 前一日实绩</p>
+            </div>
+            <div class="chart-wrap"></div>
+          </div>
+          <div class="table-card">
+            <div class="chart-header">
+              <h4>明细表</h4>
+              <p>明细数据放在趋势图下方，便于对照查看。</p>
+            </div>
+            <div class="table-wrap"></div>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <script type="module">
+      import(`./assets/app.js?v=${Date.now()}`);
+    </script>
+  </body>
+</html>
