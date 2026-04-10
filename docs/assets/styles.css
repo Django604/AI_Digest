@@ -514,6 +514,10 @@ button,
   padding: 0 16px 16px;
 }
 
+.summary-panel[open] .card-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
 .section-note {
   padding: 14px 16px;
   border-radius: var(--radius-sm);
@@ -1148,6 +1152,30 @@ tbody tr:last-child td {
     grid-row: auto;
   }
 
+  .summary-panel .card-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(190px, 28vw);
+    grid-template-columns: none;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 0 14px;
+    margin-top: 2px;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+
+  .summary-panel .card-grid .metric-card {
+    min-height: 0;
+    padding: 14px;
+    scroll-snap-align: start;
+  }
+
+  .summary-panel .card-grid .metric-card strong {
+    font-size: 1.42rem;
+  }
+
   .trend-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1259,27 +1287,7 @@ tbody tr:last-child td {
   }
 
   .summary-panel .card-grid {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(210px, 72vw);
-    grid-template-columns: none;
-    gap: 10px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding: 0 0 14px;
-    margin-top: 2px;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x proximity;
-  }
-
-  .summary-panel .card-grid .metric-card {
-    min-height: 0;
-    padding: 14px;
-    scroll-snap-align: start;
-  }
-
-  .summary-panel .card-grid .metric-card strong {
-    font-size: 1.42rem;
+    grid-auto-columns: minmax(188px, 56vw);
   }
 
   .trend-summary {
