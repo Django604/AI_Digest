@@ -23,9 +23,27 @@ function Invoke-Git {
     [string[]]$Arguments
   )
 
-  & git @Arguments
+  $output = & git @Arguments 2>&1
   if ($LASTEXITCODE -ne 0) {
-    throw "Git command failed: git $($Arguments -join ' ')"
+    $details = ($output | Out-String).Trim()
+    $message = "Git command failed: git $($Arguments -join ' ')"
+    if ($details) {
+      $message += "`n$details"
+    }
+
+    $joinedArgs = $Arguments -join ' '
+    if ($joinedArgs -like "push *") {
+      $message += "`n`nPush troubleshooting hints:"
+      $message += "`n- Check whether this environment can reach GitHub over HTTPS (port 443)."
+      $message += "`n- Check whether your Git credentials still have permission to push to the target repository."
+      $message += "`n- Check whether the target branch is protected and rejects direct pushes."
+    }
+
+    throw $message
+  }
+
+  if ($output) {
+    $output | ForEach-Object { Write-Host $_ }
   }
 }
 
