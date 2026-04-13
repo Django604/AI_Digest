@@ -94,8 +94,16 @@ function renderTabs(dashboards) {
       state.activeAnchor = null;
       renderTabs(dashboards);
       renderDashboard(dashboard);
+      scrollToActiveDashboardTop();
     });
     tabList.appendChild(button);
+  });
+}
+
+function scrollToActiveDashboardTop() {
+  requestAnimationFrame(() => {
+    const topTarget = dashboardRoot.firstElementChild ?? dashboardRoot;
+    topTarget.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
 
