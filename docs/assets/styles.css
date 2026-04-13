@@ -63,7 +63,7 @@ body.modal-open {
 }
 
 .page-shell {
-  --sidebar-width: 260px;
+  --sidebar-width: 236px;
   --layout-gap: 22px;
   width: min(1360px, calc(100vw - 32px));
   margin: 0 auto;
