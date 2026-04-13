@@ -4,7 +4,7 @@
     "workbookName": "NEV+ICE_xsai.xlsm",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
-    "generatedAt": "2026-04-13T11:39:53",
+    "generatedAt": "2026-04-13T17:07:03",
     "workbookModifiedAt": "2026-04-13T10:39:46",
     "reportDate": "2026-04-12",
     "reportDateLabel": "2026-04-12",
@@ -75,9 +75,9 @@
             "kind": "arrival",
             "title": "【整体来店】",
             "lines": [
-              "ICE+NEV累计来店 49,254；当日来店 6,584",
-              "① ICE累计来店 19,154；当日来店 2,391",
-              "② NEV累计来店 30,100；当日来店 4,193"
+              "ICE+NEV累计来店 49,254；当日来店 6,583",
+              "① ICE累计来店 19,154；当日来店 2,382",
+              "② NEV累计来店 30,100；当日来店 4,201"
             ],
             "sourceCell": "来店简报!AG2"
           }
@@ -87,9 +87,9 @@
           "kind": "arrival",
           "title": "【整体来店】",
           "lines": [
-            "ICE+NEV累计来店 49,254；当日来店 6,584",
-            "① ICE累计来店 19,154；当日来店 2,391",
-            "② NEV累计来店 30,100；当日来店 4,193"
+            "ICE+NEV累计来店 49,254；当日来店 6,583",
+            "① ICE累计来店 19,154；当日来店 2,382",
+            "② NEV累计来店 30,100；当日来店 4,201"
           ],
           "sourceCell": "来店简报!AG2"
         }
