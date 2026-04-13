@@ -9,12 +9,12 @@ const sectionTemplate = document.querySelector("#section-template");
 const chartModal = createChartModal();
 
 const colors = {
-  previousBarStroke: "#a9c8ff",
-  targetBar: "#d7d7d7",
-  actualBar: "#d40000",
-  previousLine: "#bfd0ff",
-  targetLine: "#9f9f9f",
-  actualLine: "#d40000",
+  previousBarStroke: "#8da1b8",
+  targetBar: "#d8dee6",
+  actualBar: "#c20f2f",
+  previousLine: "#b6c2d0",
+  targetLine: "#8b95a1",
+  actualLine: "#c20f2f",
 };
 
 const trendAxisConfig = {
