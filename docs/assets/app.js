@@ -17,16 +17,17 @@ const colors = {
   actualLine: "#d40000",
 };
 
-const trendAxes = {
+const trendAxisConfig = {
   daily: {
-    min: 0,
-    max: 30000,
-    ticks: [0, 10000, 20000, 30000],
+    tickCount: 6,
+    topPaddingRatio: 0.12,
+    fallbackMax: 1000,
   },
   cumulative: {
-    min: -10000,
-    max: 600000,
-    ticks: [-10000, 0, 100000, 200000, 300000, 400000, 500000, 600000],
+    tickCount: 7,
+    topPaddingRatio: 0.1,
+    bottomPaddingRatio: 0.08,
+    fallbackMax: 1000,
   },
 };
 
@@ -115,7 +116,6 @@ function renderDashboard(dashboard) {
 
   if (isBriefDashboard(dashboard)) {
     dashboardRoot.appendChild(renderBriefPage(dashboard));
-    renderSectionDirectory();
     return;
   }
 
@@ -593,9 +593,9 @@ function renderTrendChart(trend, options = {}) {
   const maxY = height - padding.bottom;
   const plotHeight = maxY - minY;
   const bandWidth = (maxX - minX) / Math.max(chart.labels.length, 1);
-  const dailyAxis = trendAxes.daily;
-  const cumulativeAxis = trendAxes.cumulative;
   const defs = getSeriesDefinitions(chart);
+  const dailyAxis = buildDailyAxis(chart);
+  const cumulativeAxis = buildCumulativeAxis(chart, defs);
 
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
@@ -827,6 +827,135 @@ function getSeriesDefinitions(chart) {
   ];
 }
 
+function buildDailyAxis(chart) {
+  return buildAdaptiveAxis(collectNumericSeriesValues(chart, ["previousActual", "target", "actual"]), {
+    forceMinZero: true,
+    tickCount: trendAxisConfig.daily.tickCount,
+    topPaddingRatio: trendAxisConfig.daily.topPaddingRatio,
+    fallbackMax: trendAxisConfig.daily.fallbackMax,
+  });
+}
+
+function buildCumulativeAxis(chart, defs) {
+  const lineKeys = defs.filter((item) => item.type === "line").map((item) => item.key);
+  return buildAdaptiveAxis(collectNumericSeriesValues(chart, lineKeys), {
+    tickCount: trendAxisConfig.cumulative.tickCount,
+    topPaddingRatio: trendAxisConfig.cumulative.topPaddingRatio,
+    bottomPaddingRatio: trendAxisConfig.cumulative.bottomPaddingRatio,
+    fallbackMax: trendAxisConfig.cumulative.fallbackMax,
+  });
+}
+
+function collectNumericSeriesValues(chart, keys) {
+  return keys.flatMap((key) =>
+    (chart?.series?.[key] ?? []).filter((value) => typeof value === "number" && Number.isFinite(value)),
+  );
+}
+
+function buildAdaptiveAxis(values, options = {}) {
+  const numericValues = values.filter((value) => typeof value === "number" && Number.isFinite(value));
+  const forceMinZero = Boolean(options.forceMinZero);
+  const tickCount = Math.max(options.tickCount ?? 5, 2);
+  const fallbackMax = Math.max(options.fallbackMax ?? 1, 1);
+  const topPaddingRatio = Math.max(options.topPaddingRatio ?? 0.1, 0);
+  const bottomPaddingRatio = forceMinZero ? 0 : Math.max(options.bottomPaddingRatio ?? 0.06, 0);
+
+  if (!numericValues.length) {
+    return buildAxisFromBounds(0, fallbackMax, tickCount, forceMinZero);
+  }
+
+  const rawMin = Math.min(...numericValues);
+  const rawMax = Math.max(...numericValues);
+
+  if (rawMin === rawMax) {
+    const base = Math.max(Math.abs(rawMax), fallbackMax);
+    let singleMin = forceMinZero ? 0 : rawMin - base * Math.max(bottomPaddingRatio, 0.08);
+    let singleMax = rawMax + base * Math.max(topPaddingRatio, 0.12);
+    if (!forceMinZero && rawMin >= 0) {
+      singleMin = Math.max(singleMin, 0);
+    }
+    if (!forceMinZero && rawMax <= 0) {
+      singleMax = Math.min(singleMax, 0);
+    }
+    return buildAxisFromBounds(singleMin, singleMax, tickCount, forceMinZero);
+  }
+
+  const span = rawMax - rawMin;
+  let minValue = forceMinZero ? 0 : rawMin - span * bottomPaddingRatio;
+  let maxValue = rawMax + span * topPaddingRatio;
+  if (!forceMinZero && rawMin >= 0) {
+    minValue = Math.max(minValue, 0);
+  }
+  if (!forceMinZero && rawMax <= 0) {
+    maxValue = Math.min(maxValue, 0);
+  }
+  return buildAxisFromBounds(minValue, maxValue, tickCount, forceMinZero);
+}
+
+function buildAxisFromBounds(minValue, maxValue, tickCount, forceMinZero) {
+  const safeMin = Number.isFinite(minValue) ? minValue : 0;
+  const safeMax = Number.isFinite(maxValue) ? maxValue : 1;
+  const normalizedMin = forceMinZero ? 0 : Math.min(safeMin, safeMax);
+  const normalizedMax = Math.max(safeMax, normalizedMin + 1);
+  const step = getNiceStep(normalizedMin, normalizedMax, tickCount);
+  const axisMin = forceMinZero ? 0 : Math.floor(normalizedMin / step) * step;
+  const axisMax = Math.max(Math.ceil(normalizedMax / step) * step, axisMin + step);
+  const ticks = [];
+
+  for (let value = axisMin; value <= axisMax + step * 0.5; value += step) {
+    ticks.push(normalizeAxisValue(value));
+  }
+
+  return {
+    min: normalizeAxisValue(axisMin),
+    max: normalizeAxisValue(axisMax),
+    ticks,
+  };
+}
+
+function getNiceStep(minValue, maxValue, tickCount) {
+  const span = Math.max(Math.abs(maxValue - minValue), 1);
+  const roughStep = span / Math.max(tickCount - 1, 1);
+  return niceNumber(roughStep, true);
+}
+
+function niceNumber(value, round) {
+  const safeValue = Math.max(Math.abs(value), 1);
+  const exponent = Math.floor(Math.log10(safeValue));
+  const fraction = safeValue / 10 ** exponent;
+  let niceFraction;
+
+  if (round) {
+    if (fraction < 1.5) {
+      niceFraction = 1;
+    } else if (fraction < 2.25) {
+      niceFraction = 2;
+    } else if (fraction < 3.75) {
+      niceFraction = 2.5;
+    } else if (fraction < 7.5) {
+      niceFraction = 5;
+    } else {
+      niceFraction = 10;
+    }
+  } else if (fraction <= 1) {
+    niceFraction = 1;
+  } else if (fraction <= 2) {
+    niceFraction = 2;
+  } else if (fraction <= 2.5) {
+    niceFraction = 2.5;
+  } else if (fraction <= 5) {
+    niceFraction = 5;
+  } else {
+    niceFraction = 10;
+  }
+
+  return niceFraction * 10 ** exponent;
+}
+
+function normalizeAxisValue(value) {
+  return Number(value.toFixed(6));
+}
+
 function drawBar(svg, centerX, value, axis, minY, maxY, width, attrs) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return;
@@ -1026,7 +1155,25 @@ function formatTooltipValue(value) {
 }
 
 function formatTick(value) {
-  return `${Math.round(value / 1000)}k`;
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return "-";
+  }
+
+  const absValue = Math.abs(numericValue);
+  if (absValue >= 1000000) {
+    return `${formatTickNumber(numericValue / 1000000)}m`;
+  }
+  if (absValue >= 1000) {
+    return `${formatTickNumber(numericValue / 1000)}k`;
+  }
+  return formatTickNumber(numericValue);
+}
+
+function formatTickNumber(value) {
+  const absValue = Math.abs(value);
+  const digits = absValue >= 100 ? 0 : absValue >= 10 ? 1 : 2;
+  return Number(value.toFixed(digits)).toString();
 }
 
 function formatCompact(value) {
