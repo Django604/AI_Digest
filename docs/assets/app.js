@@ -159,7 +159,6 @@ function renderBriefPage(dashboard) {
         <h2 class="dashboard-title">${escapeHtml(dashboard.title ?? "")}</h2>
       </div>
       <div class="brief-page-meta">
-        <span class="brief-page-date">${escapeHtml(briefing.dateLabel ?? "")}</span>
         <p class="dashboard-headline">${escapeHtml(dashboard.headline ?? "")}</p>
       </div>
     </header>
@@ -316,7 +315,8 @@ function formatBriefLine(line) {
 
   const highlighted = protectedLine.replace(/(?<![A-Za-z])(-?\d[\d,]*(?:\.\d+)?%?)(?![A-Za-z])/g, (match) => {
     const className = match.startsWith("-") ? "brief-number is-negative" : "brief-number";
-    return `<span class="${className}">${match}</span>`;
+    const leadingSpace = match.startsWith("-") ? "" : " ";
+    return `${leadingSpace}<span class="${className}">${match}</span>`;
   });
 
   return placeholders.reduce(

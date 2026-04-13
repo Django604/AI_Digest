@@ -338,30 +338,18 @@ button,
 
 .brief-page {
   display: grid;
-  gap: 22px;
+  gap: 14px;
 }
 
 .brief-page-header {
   margin-bottom: 0;
-  align-items: end;
+  align-items: start;
 }
 
 .brief-page-meta {
   display: grid;
   justify-items: end;
-  gap: 10px;
-}
-
-.brief-page-date {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 96px;
-  padding: 10px 14px;
-  border-radius: 999px;
-  background: rgba(20, 34, 31, 0.08);
-  font-size: 1rem;
-  font-weight: 800;
+  gap: 6px;
 }
 
 .brief-page-grid {
