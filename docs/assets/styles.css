@@ -241,7 +241,7 @@ button,
 
 .tab-list button {
   border: 1px solid rgba(22, 28, 36, 0.06);
-  border-radius: 999px;
+  border-radius: 14px;
   padding: 11px 14px;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.78);
@@ -283,7 +283,7 @@ button,
   align-items: center;
   min-height: 42px;
   padding: 9px 9px;
-  border-radius: 14px;
+  border-radius: 10px;
   text-decoration: none;
   color: var(--muted);
   background: rgba(255, 255, 255, 0.78);
@@ -862,8 +862,8 @@ button,
   width: 14px;
   height: 10px;
   border-radius: 2px;
-  background: var(--swatch);
-  border: 1.5px solid var(--swatch-accent);
+  background: var(--swatch-fill, var(--swatch));
+  border: var(--swatch-border-width, 1.5px) solid var(--swatch-border, var(--swatch-accent, var(--swatch)));
 }
 
 .legend-swatch.line {

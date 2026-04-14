@@ -347,7 +347,8 @@ function renderTrendChart(trend, options = {}) {
   getSeriesDefinitions().forEach((item) => {
     const legendItem = document.createElement('span');
     legendItem.className = `legend-item ${hasNumericValues(chart.series?.[item.key]) ? '' : 'muted'}`.trim();
-    legendItem.innerHTML = `<span class="legend-swatch ${item.type === 'line' ? 'line' : 'bar'}" style="--swatch:${item.color}; --swatch-accent:${item.accent ?? item.color};"></span>${escapeHtml(item.label)}`;
+    const swatchStyle = getLegendSwatchStyle(item);
+    legendItem.innerHTML = `<span class="legend-swatch ${item.type === 'line' ? 'line' : 'bar'}" style="${swatchStyle}"></span>${escapeHtml(item.label)}`;
     legend.appendChild(legendItem);
   });
   wrapper.appendChild(legend);
@@ -357,7 +358,15 @@ function renderTrendChart(trend, options = {}) {
 
 function getSeriesDefinitions() {
   return [
-    { key: 'previousActual', label: '同期来店', type: 'bar', color: colors.previousBarStroke, accent: '#ffffff' },
+    {
+      key: 'previousActual',
+      label: '同期来店',
+      type: 'bar',
+      color: colors.previousBarStroke,
+      fill: 'rgba(255,255,255,0.95)',
+      stroke: colors.previousBarStroke,
+      strokeWidth: 1.4,
+    },
     { key: 'target', label: '本期目标', type: 'bar', color: colors.targetBar },
     { key: 'actual', label: '本期来店', type: 'bar', color: colors.actualBar },
     { key: 'cumulativeTarget', label: '本期累计目标', type: 'line', color: colors.targetLine, strokeWidth: '3', dashed: true },
@@ -407,9 +416,10 @@ function showTooltip(event, tooltip, chart, index) {
   const rows = getSeriesDefinitions()
     .map((item) => {
       const value = chart.series?.[item.key]?.[index];
+      const dotStyle = getTooltipDotStyle(item);
       return `
         <div class="chart-tooltip-row">
-          <span class="tooltip-series"><span class="tooltip-dot" style="background:${item.color}"></span>${escapeHtml(item.label)}</span>
+          <span class="tooltip-series"><span class="tooltip-dot" style="${dotStyle}"></span>${escapeHtml(item.label)}</span>
           <strong>${escapeHtml(formatTooltipValue(value))}</strong>
         </div>
       `;
@@ -432,6 +442,28 @@ function moveTooltip(event, tooltip) {
 
 function hideTooltip(tooltip) {
   tooltip.classList.remove('visible');
+}
+
+function getTooltipDotStyle(item) {
+  if (item.key === 'previousActual') {
+    return `background: rgba(255,255,255,0.96); border: 2px solid ${item.stroke ?? item.color};`;
+  }
+
+  return `background: ${item.color}; border: 2px solid ${item.color};`;
+}
+
+function getLegendSwatchStyle(item) {
+  if (item.type === 'line') {
+    return `--swatch:${item.color}; --swatch-accent:${item.accent ?? item.color};`;
+  }
+
+  return [
+    `--swatch:${item.color}`,
+    `--swatch-accent:${item.accent ?? item.color}`,
+    `--swatch-fill:${item.fill ?? item.color}`,
+    `--swatch-border:${item.stroke ?? item.accent ?? item.color}`,
+    `--swatch-border-width:${item.strokeWidth ?? 1.5}px`,
+  ].join('; ');
 }
 
 function drawBar(svg, centerX, value, axisMax, minY, maxY, width, attrs) {

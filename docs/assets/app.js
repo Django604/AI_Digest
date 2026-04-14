@@ -396,9 +396,10 @@ function renderSection(section, dashboardId, index) {
 
   const headers = fragment.querySelectorAll(".chart-header");
   headers[0].querySelector("h4").textContent = section.trend?.chartTitle ?? "月度趋势";
-  headers[0].querySelector("p").textContent = section.trend?.chartSubtitle ?? "上期实绩 / 本期目标 / 本期实绩 / 累计走势";
   headers[1].querySelector("h4").textContent = section.trend?.tableTitle ?? "月度对照表";
-  headers[1].querySelector("p").textContent = section.trend?.tableSubtitle ?? "上期 / 本期 / 累计 / 环比";
+
+  headers[0].querySelector("p")?.remove();
+  headers[1].querySelector("p")?.remove();
 
   const chartNode = renderTrendChart(section.trend);
   chartNode.classList.add("clickable-chart");
@@ -724,7 +725,8 @@ function renderTrendChart(trend, options = {}) {
   defs.forEach((item) => {
     const legendItem = document.createElement("span");
     legendItem.className = `legend-item ${hasNumericValues(chart.series?.[item.key]) ? "" : "muted"}`.trim();
-    legendItem.innerHTML = `<span class="legend-swatch ${item.type === "line" ? `line${item.dashed ? " is-dashed" : ""}` : "bar"}" style="--swatch:${item.color}; --swatch-accent:${item.accent ?? item.color};"></span><span>${escapeHtml(item.label)}</span>`;
+    const swatchStyle = getLegendSwatchStyle(item);
+    legendItem.innerHTML = `<span class="legend-swatch ${item.type === "line" ? `line${item.dashed ? " is-dashed" : ""}` : "bar"}" style="${swatchStyle}"></span><span>${escapeHtml(item.label)}</span>`;
     legend.appendChild(legendItem);
   });
   wrapper.appendChild(legend);
@@ -1251,6 +1253,20 @@ function getTooltipDotStyle(item) {
   }
 
   return `background: ${item.color}; border: 2px solid ${item.color};`;
+}
+
+function getLegendSwatchStyle(item) {
+  if (item.type === "line") {
+    return `--swatch:${item.color}; --swatch-accent:${item.accent ?? item.color};`;
+  }
+
+  return [
+    `--swatch:${item.color}`,
+    `--swatch-accent:${item.accent ?? item.color}`,
+    `--swatch-fill:${item.fill ?? item.color}`,
+    `--swatch-border:${item.stroke ?? item.accent ?? item.color}`,
+    `--swatch-border-width:${item.strokeWidth ?? 1.5}px`,
+  ].join("; ");
 }
 
 function isArrivalTrend(trend) {
