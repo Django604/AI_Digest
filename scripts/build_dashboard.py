@@ -81,7 +81,7 @@ def coerce_date(value: Any) -> date | None:
             return converted
     if isinstance(value, str):
         text = value.strip()
-        for fmt in ("%Y/%m/%d", "%Y-%m-%d", "%Y.%m.%d", "%m/%d/%Y"):
+        for fmt in ("%Y/%m/%d", "%Y-%m-%d", "%Y.%m.%d", "%m/%d/%Y", "%Y年%m月%d日"):
             try:
                 return datetime.strptime(text, fmt).date()
             except ValueError:
@@ -646,21 +646,44 @@ def build_line_brief(report_date: date, nev_daily, nev_targets, sylphy_daily, sy
     }
 
 
-def build_arrival_brief(arrival_wb) -> dict[str, Any]:
-    ws = arrival_wb["来店简报"]
-    overview = read_table_block(ws, "全国来店（ICE+NEV）整体情况")
-    rows = overview["rows"]
+def build_arrival_brief(report_date: date, arrival_maps: dict[str, dict[date, int | float]]) -> dict[str, Any]:
+    total_series = build_arrival_series(report_date, arrival_maps["total_current"], arrival_maps["total_previous"])
+    nev_series = build_arrival_series(report_date, arrival_maps["nev_current"], arrival_maps["nev_previous"])
+    ice_series = build_arrival_series(report_date, arrival_maps["ice_current"], arrival_maps["ice_previous"])
+
+    total_index = total_series["reportIndex"]
+    nev_index = nev_series["reportIndex"]
+    ice_index = ice_series["reportIndex"]
     lines = [
-        format_arrival_brief_line("全国", rows.get("全国", {})),
-        format_arrival_brief_line("NEV", rows.get("NEV", {}), marker="①"),
-        format_arrival_brief_line("ICE", rows.get("ICE", {}), marker="②"),
+        format_arrival_brief_line(
+            "全国",
+            total_series["currentCumulative"][total_index],
+            total_series["previousCumulative"][total_index],
+            total_series["currentDaily"][total_index],
+            total_series["previousDaily"][total_index],
+        ),
+        format_arrival_brief_line(
+            "NEV",
+            nev_series["currentCumulative"][nev_index],
+            nev_series["previousCumulative"][nev_index],
+            nev_series["currentDaily"][nev_index],
+            nev_series["previousDaily"][nev_index],
+            marker="①",
+        ),
+        format_arrival_brief_line(
+            "ICE",
+            ice_series["currentCumulative"][ice_index],
+            ice_series["previousCumulative"][ice_index],
+            ice_series["currentDaily"][ice_index],
+            ice_series["previousDaily"][ice_index],
+            marker="②",
+        ),
     ]
     return {
         "kind": "arrival",
         "title": "来店简报",
         "lines": [item for item in lines if item],
-        "sourceSheet": "来店简报",
-        "sourceBlock": "全国来店（ICE+NEV）整体情况",
+        "sourceSheets": ["NEV本期来店", "NEV同期来店", "ICE本期来店", "ICE同期来店"],
     }
 
 
@@ -761,14 +784,90 @@ def read_labeled_matrix_block(
     return {"anchorRow": anchor_row, "dates": dates, "series": series}
 
 
-def format_arrival_brief_line(label: str, metrics: dict[str, Any], marker: str = "") -> str:
+def aligned_previous_year_date(current_date: date) -> date:
+    return date(current_date.year - 1, current_date.month, current_date.day)
+
+
+def load_arrival_daily_sheet(ws) -> dict[date, int | float]:
+    result: dict[date, int | float] = {}
+    for row in range(2, ws.max_row + 1):
+        current_date = coerce_date(ws.cell(row, 1).value)
+        current_value = num(ws.cell(row, 2).value)
+        if current_date is None or current_value is None:
+            continue
+        result[current_date] = current_value
+    return result
+
+
+def build_arrival_daily_maps(arrival_wb) -> dict[str, dict[date, int | float]]:
+    nev_current = load_arrival_daily_sheet(arrival_wb["NEV本期来店"])
+    nev_previous = load_arrival_daily_sheet(arrival_wb["NEV同期来店"])
+    ice_current = load_arrival_daily_sheet(arrival_wb["ICE本期来店"])
+    ice_previous = load_arrival_daily_sheet(arrival_wb["ICE同期来店"])
+
+    total_current: dict[date, int | float] = {}
+    total_previous: dict[date, int | float] = {}
+    for current_date in sorted({*nev_current.keys(), *ice_current.keys()}):
+        total_current[current_date] = (nev_current.get(current_date) or 0) + (ice_current.get(current_date) or 0)
+    for current_date in sorted({*nev_previous.keys(), *ice_previous.keys()}):
+        total_previous[current_date] = (nev_previous.get(current_date) or 0) + (ice_previous.get(current_date) or 0)
+
+    return {
+        "total_current": total_current,
+        "total_previous": total_previous,
+        "nev_current": nev_current,
+        "nev_previous": nev_previous,
+        "ice_current": ice_current,
+        "ice_previous": ice_previous,
+    }
+
+
+def build_arrival_series(
+    report_date: date,
+    current_map: dict[date, int | float],
+    previous_map: dict[date, int | float],
+) -> dict[str, Any]:
+    dates = month_dates(report_date)
+    current_daily: list[int | float | None] = []
+    previous_daily: list[int | float | None] = []
+
+    for current_date in dates:
+        previous_date = aligned_previous_year_date(current_date)
+        current_daily.append(current_map.get(current_date) if current_date <= report_date else None)
+        previous_daily.append(previous_map.get(previous_date))
+
+    report_indexes = [index for index, value in enumerate(current_daily) if isinstance(value, (int, float))]
+    report_index = report_indexes[-1] if report_indexes else max(report_date.day - 1, 0)
+    chart_actual = [value if index <= report_index and value is not None else 0 for index, value in enumerate(current_daily)]
+    current_cumulative = build_running_totals(current_daily, stop_at=report_index)
+    previous_cumulative = build_running_totals(previous_daily)
+
+    return {
+        "dates": dates,
+        "reportIndex": report_index,
+        "currentDaily": current_daily,
+        "previousDaily": previous_daily,
+        "chartActual": chart_actual,
+        "currentCumulative": current_cumulative,
+        "previousCumulative": previous_cumulative,
+    }
+
+
+def format_arrival_brief_line(
+    label: str,
+    current_cumulative: int | float | None,
+    previous_cumulative: int | float | None,
+    daily_current: int | float | None,
+    daily_previous: int | float | None,
+    *,
+    marker: str = "",
+) -> str:
     prefix = f"{marker}{label}"
     return (
-        f"{prefix}累计来店{fmt_count(num(metrics.get('来店累计')))}，"
-        f"累计达成率{fmt_percent(ratio(num(metrics.get('来店累计')), num(metrics.get('来店管控目标'))))}；"
-        f"当日来店{fmt_count(num(metrics.get('当日来店')))}，"
-        f"同比{fmt_percent(num(metrics.get('同比')))}，"
-        f"环比{fmt_percent(num(metrics.get('环比')))}"
+        f"{prefix}累计来店{fmt_count(current_cumulative)}，"
+        f"累计同比{fmt_percent(delta_ratio(current_cumulative, previous_cumulative))}；"
+        f"当日来店{fmt_count(daily_current)}，"
+        f"当日同比{fmt_percent(delta_ratio(daily_current, daily_previous))}"
     )
 
 
@@ -789,39 +888,31 @@ def build_valid_leads_control_section(
     }
 
 
-def build_arrival_dashboard(arrival_wb) -> dict[str, Any]:
-    trend_ws = arrival_wb.worksheets[0]
-    matrix_block = read_labeled_matrix_block(
-        trend_ws,
-        "全国",
-        ["同期来店", "本期目标", "本期来店", "同比", "NEV本期实绩", "ICE本期实绩", "ICE同比"],
-        anchor_column=2,
-        data_start_col=3,
-    )
+def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date, int | float]]) -> dict[str, Any]:
+    total_series = build_arrival_series(report_date, arrival_maps["total_current"], arrival_maps["total_previous"])
+    nev_series = build_arrival_series(report_date, arrival_maps["nev_current"], arrival_maps["nev_previous"])
+    ice_series = build_arrival_series(report_date, arrival_maps["ice_current"], arrival_maps["ice_previous"])
 
-    current_dates = matrix_block["dates"]
-    previous_dates = [aligned_previous_date(item) for item in current_dates]
-    current_daily = [num(item) for item in matrix_block["series"]["本期来店"]]
-    previous_daily = [num(item) for item in matrix_block["series"]["同期来店"]]
-    current_target = [num(item) for item in matrix_block["series"]["本期目标"]]
-
-    report_indexes = [index for index, value in enumerate(current_daily) if isinstance(value, (int, float)) and value > 0]
-    report_index = report_indexes[-1] if report_indexes else 0
-    chart_actual = [value if index <= report_index and value is not None else 0 for index, value in enumerate(current_daily)]
-    current_cumulative = build_running_totals(current_daily, stop_at=report_index)
-    previous_cumulative = build_running_totals(previous_daily)
-    has_target = any(isinstance(value, (int, float)) for value in current_target)
-    target_cumulative = build_running_totals(current_target) if has_target else [None] * len(current_dates)
+    current_dates = total_series["dates"]
+    previous_dates = [aligned_previous_year_date(item) for item in current_dates]
+    current_daily = total_series["currentDaily"]
+    previous_daily = total_series["previousDaily"]
+    current_target = [None] * len(current_dates)
+    chart_actual = total_series["chartActual"]
+    current_cumulative = total_series["currentCumulative"]
+    previous_cumulative = total_series["previousCumulative"]
+    target_cumulative = [None] * len(current_dates)
+    report_index = total_series["reportIndex"]
     month_prefix = f"{current_dates[report_index].month}月" if current_dates and current_dates[report_index] else ""
 
     matrix_rows = [
         {"key": "previousActual", "label": "同期来店", "displayValues": [fmt_plain(item) for item in previous_daily]},
         {"key": "target", "label": "本期目标", "displayValues": [fmt_plain(item) for item in current_target]},
         {"key": "actual", "label": "本期来店", "displayValues": [fmt_plain(item) for item in current_daily]},
-        {"key": "dayDelta", "label": "同比", "displayValues": [fmt_percent(num(item)) for item in matrix_block["series"]["同比"]]},
-        {"key": "nevActual", "label": "NEV本期实绩", "displayValues": [fmt_plain(num(item)) for item in matrix_block["series"]["NEV本期实绩"]]},
-        {"key": "iceActual", "label": "ICE本期实绩", "displayValues": [fmt_plain(num(item)) for item in matrix_block["series"]["ICE本期实绩"]]},
-        {"key": "iceDelta", "label": "ICE同比", "displayValues": [fmt_percent(num(item)) for item in matrix_block["series"]["ICE同比"]]},
+        {"key": "dayDelta", "label": "同比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(current_daily, previous_daily)]},
+        {"key": "nevActual", "label": "NEV本期实绩", "displayValues": [fmt_plain(item) for item in nev_series["currentDaily"]]},
+        {"key": "iceActual", "label": "ICE本期实绩", "displayValues": [fmt_plain(item) for item in ice_series["currentDaily"]]},
+        {"key": "iceDelta", "label": "ICE同比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(ice_series["currentDaily"], ice_series["previousDaily"])]},
     ]
 
     trend = {
@@ -926,10 +1017,11 @@ def build_payload(leads_path: Path, arrival_path: Path) -> dict[str, Any]:
         sylphy_current = {dt: value for dt, value in sylphy_daily_all.items() if current_start <= dt <= report_date}
         sylphy_previous = {dt: value for dt, value in sylphy_daily_all.items() if previous_start <= dt <= previous_end}
         sylphy_targets = build_sylphy_target_series(report_date)
+        arrival_maps = build_arrival_daily_maps(arrival)
 
         line_brief = build_line_brief(report_date, nev_current, nev_targets, sylphy_current, sylphy_targets)
-        arrival_brief = build_arrival_brief(arrival)
-        arrival_dashboard = build_arrival_dashboard(arrival)
+        arrival_brief = build_arrival_brief(report_date, arrival_maps)
+        arrival_dashboard = build_arrival_dashboard(report_date, arrival_maps)
 
         nev_total_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_MODELS))
         nev_total_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in NEV_MODELS))
@@ -1000,7 +1092,7 @@ def build_payload(leads_path: Path, arrival_path: Path) -> dict[str, Any]:
                 "sheetNames": leads.sheetnames,
                 "issues": [
                     {"sheet": "每日NEV早报模板", "summary": "线索简报按底层数据重建，避免继续沿用历史模板文案。"},
-                    {"sheet": "来店简报", "summary": "来店简报与全国来店趋势改为按结构化标题块和标签行解析，不再依赖 AG2 缓存文案。"},
+                    {"sheet": "NEV+ICE_ldai", "summary": "全国来店简报与趋势改为基于 4 张来店底表聚合生成，不再依赖汇总页缓存结果。"},
                 ],
             },
             "dashboards": dashboards,

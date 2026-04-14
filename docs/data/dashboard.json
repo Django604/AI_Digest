@@ -4,7 +4,7 @@
     "workbookName": "NEV+ICE_xsai.xlsm",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
-    "generatedAt": "2026-04-14T17:53:38",
+    "generatedAt": "2026-04-14T18:19:50",
     "workbookModifiedAt": "2026-04-14T17:10:08",
     "reportDate": "2026-04-13",
     "reportDateLabel": "2026-04-13",
@@ -28,8 +28,8 @@
         "summary": "线索简报按底层数据重建，避免继续沿用历史模板文案。"
       },
       {
-        "sheet": "来店简报",
-        "summary": "来店简报与全国来店趋势改为按结构化标题块和标签行解析，不再依赖 AG2 缓存文案。"
+        "sheet": "NEV+ICE_ldai",
+        "summary": "全国来店简报与趋势改为基于 4 张来店底表聚合生成，不再依赖汇总页缓存结果。"
       }
     ]
   },
@@ -76,12 +76,16 @@
             "kind": "arrival",
             "title": "来店简报",
             "lines": [
-              "全国累计来店53,069，累计达成率23.2%；当日来店3,783，同比6.2%，环比11.3%",
-              "①NEV累计来店32,255，累计达成率32.1%；当日来店2,157，同比3425.1%，环比83.0%",
-              "②ICE累计来店20,814，累计达成率16.3%；当日来店1,626，同比-58.3%，环比-30.8%"
+              "全国累计来店53,069，累计同比4.3%；当日来店3,783，当日同比-32.1%",
+              "①NEV累计来店32,255，累计同比3425.1%；当日来店2,157，当日同比1668.0%",
+              "②ICE累计来店20,814，累计同比-58.3%；当日来店1,626，当日同比-70.1%"
             ],
-            "sourceSheet": "来店简报",
-            "sourceBlock": "全国来店（ICE+NEV）整体情况"
+            "sourceSheets": [
+              "NEV本期来店",
+              "NEV同期来店",
+              "ICE本期来店",
+              "ICE同期来店"
+            ]
           }
         ],
         "generatedText": "各位领导：\n请查收04.13线索&来店日报\n\n【NEV线索】\n车累计实绩167,009，累计达成率80.9%；当日实绩14,470，当日达成率75.3%\n①NX8累计实绩72,428，累计达成率100.7%；当日实绩7,544，当日达成率83.9%\n②N7累计实绩29,797，累计达成率70.3%；当日实绩2,307，当日达成率70.1%\n③N6累计实绩28,872，累计达成率65.0%；当日实绩1,864，当日达成率54.6%\n④天籁·鸿蒙座舱累计实绩35,912，累计达成率75.3%；当日实绩2,755，当日达成率78.4%\n\n【十五代轩逸线索】\n十五代轩逸累计实绩 13,889，累计达成率 59.1%；当日实绩 2,005，当日达成率 109.7%",
@@ -89,12 +93,16 @@
           "kind": "arrival",
           "title": "来店简报",
           "lines": [
-            "全国累计来店53,069，累计达成率23.2%；当日来店3,783，同比6.2%，环比11.3%",
-            "①NEV累计来店32,255，累计达成率32.1%；当日来店2,157，同比3425.1%，环比83.0%",
-            "②ICE累计来店20,814，累计达成率16.3%；当日来店1,626，同比-58.3%，环比-30.8%"
+            "全国累计来店53,069，累计同比4.3%；当日来店3,783，当日同比-32.1%",
+            "①NEV累计来店32,255，累计同比3425.1%；当日来店2,157，当日同比1668.0%",
+            "②ICE累计来店20,814，累计同比-58.3%；当日来店1,626，当日同比-70.1%"
           ],
-          "sourceSheet": "来店简报",
-          "sourceBlock": "全国来店（ICE+NEV）整体情况"
+          "sourceSheets": [
+            "NEV本期来店",
+            "NEV同期来店",
+            "ICE本期来店",
+            "ICE同期来店"
+          ]
         }
       },
       "sections": []
@@ -7978,28 +7986,28 @@
               "items": [
                 {
                   "label": "累计来店",
-                  "value": 36368,
-                  "displayValue": "36,368"
+                  "value": 53069,
+                  "displayValue": "53,069"
                 },
                 {
                   "label": "累计同期来店",
-                  "value": 36953,
-                  "displayValue": "36,953"
+                  "value": 50873,
+                  "displayValue": "50,873"
                 },
                 {
                   "label": "累计同期同比",
-                  "value": -0.015830920358292967,
-                  "displayValue": "-1.6%"
+                  "value": 0.04316631612053545,
+                  "displayValue": "4.3%"
                 },
                 {
                   "label": "当日来店",
-                  "value": 3853,
-                  "displayValue": "3,853"
+                  "value": 3783,
+                  "displayValue": "3,783"
                 },
                 {
                   "label": "同期来店",
-                  "value": 3464,
-                  "displayValue": "3,464"
+                  "value": 5569,
+                  "displayValue": "5,569"
                 }
               ]
             },
@@ -8040,17 +8048,17 @@
               "columnMeta": [
                 {
                   "currentDate": "2026-04-01",
-                  "previousDate": "2026-03-01",
+                  "previousDate": "2025-04-01",
                   "highlightCurrent": false,
-                  "highlightPrevious": true,
+                  "highlightPrevious": false,
                   "isCurrentHoliday": false,
-                  "isPreviousHoliday": true,
+                  "isPreviousHoliday": false,
                   "isCurrentWeekend": false,
-                  "isPreviousWeekend": true
+                  "isPreviousWeekend": false
                 },
                 {
                   "currentDate": "2026-04-02",
-                  "previousDate": "2026-03-02",
+                  "previousDate": "2025-04-02",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8060,7 +8068,7 @@
                 },
                 {
                   "currentDate": "2026-04-03",
-                  "previousDate": "2026-03-03",
+                  "previousDate": "2025-04-03",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8070,7 +8078,7 @@
                 },
                 {
                   "currentDate": "2026-04-04",
-                  "previousDate": "2026-03-04",
+                  "previousDate": "2025-04-04",
                   "highlightCurrent": true,
                   "highlightPrevious": false,
                   "isCurrentHoliday": true,
@@ -8080,47 +8088,47 @@
                 },
                 {
                   "currentDate": "2026-04-05",
-                  "previousDate": "2026-03-05",
+                  "previousDate": "2025-04-05",
                   "highlightCurrent": true,
-                  "highlightPrevious": false,
+                  "highlightPrevious": true,
                   "isCurrentHoliday": true,
-                  "isPreviousHoliday": false,
+                  "isPreviousHoliday": true,
                   "isCurrentWeekend": true,
-                  "isPreviousWeekend": false
+                  "isPreviousWeekend": true
                 },
                 {
                   "currentDate": "2026-04-06",
-                  "previousDate": "2026-03-06",
+                  "previousDate": "2025-04-06",
                   "highlightCurrent": true,
-                  "highlightPrevious": false,
+                  "highlightPrevious": true,
                   "isCurrentHoliday": true,
+                  "isPreviousHoliday": true,
+                  "isCurrentWeekend": false,
+                  "isPreviousWeekend": true
+                },
+                {
+                  "currentDate": "2026-04-07",
+                  "previousDate": "2025-04-07",
+                  "highlightCurrent": false,
+                  "highlightPrevious": false,
+                  "isCurrentHoliday": false,
                   "isPreviousHoliday": false,
                   "isCurrentWeekend": false,
                   "isPreviousWeekend": false
                 },
                 {
-                  "currentDate": "2026-04-07",
-                  "previousDate": "2026-03-07",
-                  "highlightCurrent": false,
-                  "highlightPrevious": true,
-                  "isCurrentHoliday": false,
-                  "isPreviousHoliday": true,
-                  "isCurrentWeekend": false,
-                  "isPreviousWeekend": true
-                },
-                {
                   "currentDate": "2026-04-08",
-                  "previousDate": "2026-03-08",
+                  "previousDate": "2025-04-08",
                   "highlightCurrent": false,
-                  "highlightPrevious": true,
+                  "highlightPrevious": false,
                   "isCurrentHoliday": false,
-                  "isPreviousHoliday": true,
+                  "isPreviousHoliday": false,
                   "isCurrentWeekend": false,
-                  "isPreviousWeekend": true
+                  "isPreviousWeekend": false
                 },
                 {
                   "currentDate": "2026-04-09",
-                  "previousDate": "2026-03-09",
+                  "previousDate": "2025-04-09",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8130,7 +8138,7 @@
                 },
                 {
                   "currentDate": "2026-04-10",
-                  "previousDate": "2026-03-10",
+                  "previousDate": "2025-04-10",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8140,7 +8148,7 @@
                 },
                 {
                   "currentDate": "2026-04-11",
-                  "previousDate": "2026-03-11",
+                  "previousDate": "2025-04-11",
                   "highlightCurrent": true,
                   "highlightPrevious": false,
                   "isCurrentHoliday": true,
@@ -8150,17 +8158,27 @@
                 },
                 {
                   "currentDate": "2026-04-12",
-                  "previousDate": "2026-03-12",
+                  "previousDate": "2025-04-12",
                   "highlightCurrent": true,
-                  "highlightPrevious": false,
+                  "highlightPrevious": true,
                   "isCurrentHoliday": true,
-                  "isPreviousHoliday": false,
+                  "isPreviousHoliday": true,
                   "isCurrentWeekend": true,
-                  "isPreviousWeekend": false
+                  "isPreviousWeekend": true
                 },
                 {
                   "currentDate": "2026-04-13",
-                  "previousDate": "2026-03-13",
+                  "previousDate": "2025-04-13",
+                  "highlightCurrent": false,
+                  "highlightPrevious": true,
+                  "isCurrentHoliday": false,
+                  "isPreviousHoliday": true,
+                  "isCurrentWeekend": false,
+                  "isPreviousWeekend": true
+                },
+                {
+                  "currentDate": "2026-04-14",
+                  "previousDate": "2025-04-14",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8169,28 +8187,18 @@
                   "isPreviousWeekend": false
                 },
                 {
-                  "currentDate": "2026-04-14",
-                  "previousDate": "2026-03-14",
-                  "highlightCurrent": false,
-                  "highlightPrevious": true,
-                  "isCurrentHoliday": false,
-                  "isPreviousHoliday": true,
-                  "isCurrentWeekend": false,
-                  "isPreviousWeekend": true
-                },
-                {
                   "currentDate": "2026-04-15",
-                  "previousDate": "2026-03-15",
+                  "previousDate": "2025-04-15",
                   "highlightCurrent": false,
-                  "highlightPrevious": true,
+                  "highlightPrevious": false,
                   "isCurrentHoliday": false,
-                  "isPreviousHoliday": true,
+                  "isPreviousHoliday": false,
                   "isCurrentWeekend": false,
-                  "isPreviousWeekend": true
+                  "isPreviousWeekend": false
                 },
                 {
                   "currentDate": "2026-04-16",
-                  "previousDate": "2026-03-16",
+                  "previousDate": "2025-04-16",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8200,7 +8208,7 @@
                 },
                 {
                   "currentDate": "2026-04-17",
-                  "previousDate": "2026-03-17",
+                  "previousDate": "2025-04-17",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8210,7 +8218,7 @@
                 },
                 {
                   "currentDate": "2026-04-18",
-                  "previousDate": "2026-03-18",
+                  "previousDate": "2025-04-18",
                   "highlightCurrent": true,
                   "highlightPrevious": false,
                   "isCurrentHoliday": true,
@@ -8220,17 +8228,27 @@
                 },
                 {
                   "currentDate": "2026-04-19",
-                  "previousDate": "2026-03-19",
+                  "previousDate": "2025-04-19",
                   "highlightCurrent": true,
-                  "highlightPrevious": false,
+                  "highlightPrevious": true,
                   "isCurrentHoliday": true,
-                  "isPreviousHoliday": false,
+                  "isPreviousHoliday": true,
                   "isCurrentWeekend": true,
-                  "isPreviousWeekend": false
+                  "isPreviousWeekend": true
                 },
                 {
                   "currentDate": "2026-04-20",
-                  "previousDate": "2026-03-20",
+                  "previousDate": "2025-04-20",
+                  "highlightCurrent": false,
+                  "highlightPrevious": true,
+                  "isCurrentHoliday": false,
+                  "isPreviousHoliday": true,
+                  "isCurrentWeekend": false,
+                  "isPreviousWeekend": true
+                },
+                {
+                  "currentDate": "2026-04-21",
+                  "previousDate": "2025-04-21",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8239,28 +8257,18 @@
                   "isPreviousWeekend": false
                 },
                 {
-                  "currentDate": "2026-04-21",
-                  "previousDate": "2026-03-21",
-                  "highlightCurrent": false,
-                  "highlightPrevious": true,
-                  "isCurrentHoliday": false,
-                  "isPreviousHoliday": true,
-                  "isCurrentWeekend": false,
-                  "isPreviousWeekend": true
-                },
-                {
                   "currentDate": "2026-04-22",
-                  "previousDate": "2026-03-22",
+                  "previousDate": "2025-04-22",
                   "highlightCurrent": false,
-                  "highlightPrevious": true,
+                  "highlightPrevious": false,
                   "isCurrentHoliday": false,
-                  "isPreviousHoliday": true,
+                  "isPreviousHoliday": false,
                   "isCurrentWeekend": false,
-                  "isPreviousWeekend": true
+                  "isPreviousWeekend": false
                 },
                 {
                   "currentDate": "2026-04-23",
-                  "previousDate": "2026-03-23",
+                  "previousDate": "2025-04-23",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8270,7 +8278,7 @@
                 },
                 {
                   "currentDate": "2026-04-24",
-                  "previousDate": "2026-03-24",
+                  "previousDate": "2025-04-24",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8280,7 +8288,7 @@
                 },
                 {
                   "currentDate": "2026-04-25",
-                  "previousDate": "2026-03-25",
+                  "previousDate": "2025-04-25",
                   "highlightCurrent": true,
                   "highlightPrevious": false,
                   "isCurrentHoliday": true,
@@ -8290,17 +8298,27 @@
                 },
                 {
                   "currentDate": "2026-04-26",
-                  "previousDate": "2026-03-26",
+                  "previousDate": "2025-04-26",
                   "highlightCurrent": true,
-                  "highlightPrevious": false,
+                  "highlightPrevious": true,
                   "isCurrentHoliday": true,
-                  "isPreviousHoliday": false,
+                  "isPreviousHoliday": true,
                   "isCurrentWeekend": true,
-                  "isPreviousWeekend": false
+                  "isPreviousWeekend": true
                 },
                 {
                   "currentDate": "2026-04-27",
-                  "previousDate": "2026-03-27",
+                  "previousDate": "2025-04-27",
+                  "highlightCurrent": false,
+                  "highlightPrevious": true,
+                  "isCurrentHoliday": false,
+                  "isPreviousHoliday": true,
+                  "isCurrentWeekend": false,
+                  "isPreviousWeekend": true
+                },
+                {
+                  "currentDate": "2026-04-28",
+                  "previousDate": "2025-04-28",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8309,28 +8327,18 @@
                   "isPreviousWeekend": false
                 },
                 {
-                  "currentDate": "2026-04-28",
-                  "previousDate": "2026-03-28",
-                  "highlightCurrent": false,
-                  "highlightPrevious": true,
-                  "isCurrentHoliday": false,
-                  "isPreviousHoliday": true,
-                  "isCurrentWeekend": false,
-                  "isPreviousWeekend": true
-                },
-                {
                   "currentDate": "2026-04-29",
-                  "previousDate": "2026-03-29",
+                  "previousDate": "2025-04-29",
                   "highlightCurrent": false,
-                  "highlightPrevious": true,
+                  "highlightPrevious": false,
                   "isCurrentHoliday": false,
-                  "isPreviousHoliday": true,
+                  "isPreviousHoliday": false,
                   "isCurrentWeekend": false,
-                  "isPreviousWeekend": true
+                  "isPreviousWeekend": false
                 },
                 {
                   "currentDate": "2026-04-30",
-                  "previousDate": "2026-03-30",
+                  "previousDate": "2025-04-30",
                   "highlightCurrent": false,
                   "highlightPrevious": false,
                   "isCurrentHoliday": false,
@@ -8416,19 +8424,19 @@
                   "key": "actual",
                   "label": "本期来店",
                   "displayValues": [
-                    "2474",
+                    "2473",
                     "2530",
-                    "2690",
+                    "2689",
                     "4943",
                     "5108",
                     "4682",
                     "3172",
                     "3174",
-                    "3742",
-                    "3853",
-                    "-",
-                    "-",
-                    "-",
+                    "3743",
+                    "3868",
+                    "6292",
+                    "6612",
+                    "3783",
                     "-",
                     "-",
                     "-",
@@ -8452,7 +8460,7 @@
                   "key": "dayDelta",
                   "label": "同比",
                   "displayValues": [
-                    "0.1%",
+                    "0.0%",
                     "-4.2%",
                     "-2.8%",
                     "-1.0%",
@@ -8461,10 +8469,10 @@
                     "1.5%",
                     "-19.3%",
                     "7.4%",
-                    "11.2%",
-                    "-",
-                    "-",
-                    "-",
+                    "11.7%",
+                    "68.6%",
+                    "43.2%",
+                    "-32.1%",
                     "-",
                     "-",
                     "-",
@@ -8488,19 +8496,19 @@
                   "key": "nevActual",
                   "label": "NEV本期实绩",
                   "displayValues": [
-                    "1287",
+                    "1286",
                     "1524",
-                    "1631",
+                    "1630",
                     "3001",
                     "2826",
                     "2731",
                     "1827",
                     "1933",
                     "2460",
-                    "2489",
-                    "-",
-                    "-",
-                    "-",
+                    "2487",
+                    "4192",
+                    "4201",
+                    "2157",
                     "-",
                     "-",
                     "-",
@@ -8532,11 +8540,11 @@
                     "1951",
                     "1345",
                     "1241",
-                    "1282",
-                    "1364",
-                    "-",
-                    "-",
-                    "-",
+                    "1283",
+                    "1381",
+                    "2100",
+                    "2411",
+                    "1626",
                     "-",
                     "-",
                     "-",
@@ -8568,11 +8576,11 @@
                     "-58.2%",
                     "-56.1%",
                     "-68.1%",
-                    "-62.8%",
-                    "-60.1%",
-                    "-",
-                    "-",
-                    "-",
+                    "-62.7%",
+                    "-59.6%",
+                    "-42.6%",
+                    "-46.7%",
+                    "-70.1%",
                     "-",
                     "-",
                     "-",
@@ -8627,7 +8635,7 @@
                 "4/29",
                 "4/30"
               ],
-              "reportDayIndex": 9,
+              "reportDayIndex": 12,
               "dailyAxisMax": 10000,
               "cumulativeAxisMax": 150000,
               "series": {
@@ -8696,19 +8704,19 @@
                   null
                 ],
                 "actual": [
-                  2474,
+                  2473,
                   2530,
-                  2690,
+                  2689,
                   4943,
                   5108,
                   4682,
                   3172,
                   3174,
-                  3742,
-                  3853,
-                  0,
-                  0,
-                  0,
+                  3743,
+                  3868,
+                  6292,
+                  6612,
+                  3783,
                   0,
                   0,
                   0,
@@ -8792,19 +8800,19 @@
                   null
                 ],
                 "cumulativeActual": [
-                  2474,
-                  5004,
-                  7694,
-                  12637,
-                  17745,
-                  22427,
-                  25599,
-                  28773,
-                  32515,
-                  36368,
-                  null,
-                  null,
-                  null,
+                  2473,
+                  5003,
+                  7692,
+                  12635,
+                  17743,
+                  22425,
+                  25597,
+                  28771,
+                  32514,
+                  36382,
+                  42674,
+                  49286,
+                  53069,
                   null,
                   null,
                   null,
