@@ -8,16 +8,7 @@
     <meta http-equiv="Expires" content="0" />
     <title>NEV / ICE 每日简报</title>
     <script>
-      const digestTheme = localStorage.getItem("ai-digest-theme") || "classic";
-      document.documentElement.dataset.theme = digestTheme;
       document.write('<link rel="stylesheet" href="./assets/styles.css?v=' + Date.now() + '" />');
-      document.write(
-        '<link rel="stylesheet" id="annual-theme-link" href="./assets/styles-annual-report.css?v=' +
-          Date.now() +
-          '"' +
-          (digestTheme === "classic" ? " disabled" : "") +
-          " />",
-      );
     </script>
   </head>
   <body>
@@ -25,13 +16,7 @@
       <header class="hero">
         <div class="hero-topline">
           <h1>NEV / ICE 线索及来店简报</h1>
-          <div class="hero-tools">
-            <div class="theme-switch" id="theme-switch" role="group" aria-label="主题切换">
-              <button type="button" class="theme-switch-button" data-theme-choice="classic">经典版</button>
-              <button type="button" class="theme-switch-button" data-theme-choice="annual">年报版</button>
-            </div>
-            <div class="report-date-highlight" id="report-date-highlight"></div>
-          </div>
+          <div class="report-date-highlight" id="report-date-highlight"></div>
         </div>
         <div class="meta-strip" id="meta-strip"></div>
       </header>
