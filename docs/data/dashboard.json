@@ -4,18 +4,19 @@
     "workbookName": "NEV+ICE_xsai.xlsm",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
-    "generatedAt": "2026-04-14T15:06:25",
-    "workbookModifiedAt": "2026-04-13T10:39:46",
-    "reportDate": "2026-04-12",
-    "reportDateLabel": "2026-04-12",
+    "generatedAt": "2026-04-14T15:59:20",
+    "workbookModifiedAt": "2026-04-14T15:53:47",
+    "reportDate": "2026-04-13",
+    "reportDateLabel": "2026-04-13",
     "dataRangeStart": "2026-04-01",
     "dataRangeEnd": "2026-04-12"
   },
   "analysis": {
-    "sheetCount": 6,
+    "sheetCount": 7,
     "sheetNames": [
       "参数",
       "目标竖版",
+      "全车有效线索管控",
       "全国按日NEV",
       "全国按日ICE",
       "十五代轩逸按日",
@@ -41,34 +42,34 @@
       "briefing": {
         "id": "daily-brief",
         "title": "每日简报",
-        "headline": "请查收04.12线索&来店日报",
-        "dateLabel": "04.12",
-        "reportDate": "2026-04-12",
+        "headline": "请查收04.13线索&来店日报",
+        "dateLabel": "04.13",
+        "reportDate": "2026-04-13",
         "sections": [
           {
             "kind": "intro",
             "title": "开场",
             "lines": [
               "各位领导：",
-              "请查收04.12线索&来店日报"
+              "请查收04.13线索&来店日报"
             ]
           },
           {
             "kind": "nev",
             "title": "NEV线索",
             "lines": [
-              "车累计实绩152,525，累计达成率81.5%；当日实绩19,231，当日达成率95.4%",
-              "①NX8累计实绩64,868，累计达成率103.0%；当日实绩10,255，当日达成率113.2%",
-              "②N7累计实绩27,470，累计达成率70.2%；当日实绩2,970，当日达成率84.5%",
-              "③N6累计实绩27,036，累计达成率65.9%；当日实绩2,580，当日达成率70.3%",
-              "④天籁·鸿蒙座舱累计实绩33,151，累计达成率75.0%；当日实绩3,426，当日达成率87.4%"
+              "车累计实绩152,525，累计达成率73.9%；当日实绩0，当日达成率0.0%",
+              "①NX8累计实绩64,868，累计达成率90.1%；当日实绩-，当日达成率-",
+              "②N7累计实绩27,470，累计达成率64.8%；当日实绩-，当日达成率-",
+              "③N6累计实绩27,036，累计达成率60.9%；当日实绩-，当日达成率-",
+              "④天籁·鸿蒙座舱累计实绩33,151，累计达成率69.5%；当日实绩-，当日达成率-"
             ]
           },
           {
             "kind": "sylphy15",
             "title": "十五代轩逸线索",
             "lines": [
-              "十五代轩逸累计实绩 12,139，累计达成率 56.1%；当日实绩 1,560，当日达成率 88.0%"
+              "十五代轩逸累计实绩 12,139，累计达成率 51.7%；当日实绩 -，当日达成率 -"
             ]
           },
           {
@@ -82,7 +83,7 @@
             "sourceCell": "来店简报!AG2"
           }
         ],
-        "generatedText": "各位领导：\n请查收04.12线索&来店日报\n\n【NEV线索】\n车累计实绩152,525，累计达成率81.5%；当日实绩19,231，当日达成率95.4%\n①NX8累计实绩64,868，累计达成率103.0%；当日实绩10,255，当日达成率113.2%\n②N7累计实绩27,470，累计达成率70.2%；当日实绩2,970，当日达成率84.5%\n③N6累计实绩27,036，累计达成率65.9%；当日实绩2,580，当日达成率70.3%\n④天籁·鸿蒙座舱累计实绩33,151，累计达成率75.0%；当日实绩3,426，当日达成率87.4%\n\n【十五代轩逸线索】\n十五代轩逸累计实绩 12,139，累计达成率 56.1%；当日实绩 1,560，当日达成率 88.0%",
+        "generatedText": "各位领导：\n请查收04.13线索&来店日报\n\n【NEV线索】\n车累计实绩152,525，累计达成率73.9%；当日实绩0，当日达成率0.0%\n①NX8累计实绩64,868，累计达成率90.1%；当日实绩-，当日达成率-\n②N7累计实绩27,470，累计达成率64.8%；当日实绩-，当日达成率-\n③N6累计实绩27,036，累计达成率60.9%；当日实绩-，当日达成率-\n④天籁·鸿蒙座舱累计实绩33,151，累计达成率69.5%；当日实绩-，当日达成率-\n\n【十五代轩逸线索】\n十五代轩逸累计实绩 12,139，累计达成率 51.7%；当日实绩 -，当日达成率 -",
         "arrivalBrief": {
           "kind": "arrival",
           "title": "【整体来店】",
@@ -116,14 +117,14 @@
               },
               {
                 "label": "累计目标",
-                "value": 187262,
-                "displayValue": "187,262",
+                "value": 206473,
+                "displayValue": "206,473",
                 "note": ""
               },
               {
                 "label": "累计达成率",
-                "value": 0.8145005393512832,
-                "displayValue": "81.5%",
+                "value": 0.7387164423435509,
+                "displayValue": "73.9%",
                 "note": ""
               },
               {
@@ -134,26 +135,26 @@
               },
               {
                 "label": "当日新增线索",
-                "value": 19231,
-                "displayValue": "19,231",
-                "note": "2026-04-12"
+                "value": null,
+                "displayValue": "-",
+                "note": "2026-04-13"
               },
               {
                 "label": "当日目标",
-                "value": 20162,
-                "displayValue": "20,162",
+                "value": 19211,
+                "displayValue": "19,211",
                 "note": ""
               },
               {
                 "label": "当日达成率",
-                "value": 0.9538240253943061,
-                "displayValue": "95.4%",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               },
               {
                 "label": "当日新增到店",
-                "value": 4026,
-                "displayValue": "4,026",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               }
             ],
@@ -165,8 +166,8 @@
               "items": [
                 {
                   "label": "累计目标",
-                  "value": 187262,
-                  "displayValue": "187,262"
+                  "value": 206473,
+                  "displayValue": "206,473"
                 },
                 {
                   "label": "累计实绩",
@@ -175,24 +176,24 @@
                 },
                 {
                   "label": "累计达成",
-                  "value": 0.8145005393512832,
-                  "displayValue": "81.5%",
-                  "note": "累计环比 43.8%"
+                  "value": 0.7387164423435509,
+                  "displayValue": "73.9%",
+                  "note": "累计环比 31.8%"
                 },
                 {
                   "label": "当日目标",
-                  "value": 20162,
-                  "displayValue": "20,162"
+                  "value": 19211,
+                  "displayValue": "19,211"
                 },
                 {
                   "label": "当日实绩",
-                  "value": 19231,
-                  "displayValue": "19,231"
+                  "value": null,
+                  "displayValue": "-"
                 },
                 {
                   "label": "当日达成",
-                  "value": 0.9538240253943061,
-                  "displayValue": "95.4%"
+                  "value": null,
+                  "displayValue": "-"
                 }
               ]
             },
@@ -800,7 +801,7 @@
                     "115852",
                     "133294",
                     "152525",
-                    "#N/A",
+                    "152525",
                     "#N/A",
                     "#N/A",
                     "#N/A",
@@ -891,7 +892,7 @@
                 "4/29",
                 "4/30"
               ],
-              "reportDayIndex": 11,
+              "reportDayIndex": 12,
               "dailyAxisMax": 30000,
               "cumulativeAxisMax": 550000,
               "series": {
@@ -1068,7 +1069,7 @@
                   115852,
                   133294,
                   152525,
-                  null,
+                  152525,
                   null,
                   null,
                   null,
@@ -1108,14 +1109,14 @@
               },
               {
                 "label": "累计目标",
-                "value": 62963,
-                "displayValue": "62,963",
+                "value": 71956,
+                "displayValue": "71,956",
                 "note": ""
               },
               {
                 "label": "累计达成率",
-                "value": 1.0302558645553739,
-                "displayValue": "103.0%",
+                "value": 0.9014953582745011,
+                "displayValue": "90.1%",
                 "note": ""
               },
               {
@@ -1126,26 +1127,26 @@
               },
               {
                 "label": "当日新增线索",
-                "value": 10255,
-                "displayValue": "10,255",
-                "note": "2026-04-12"
+                "value": null,
+                "displayValue": "-",
+                "note": "2026-04-13"
               },
               {
                 "label": "当日目标",
-                "value": 9058,
-                "displayValue": "9,058",
+                "value": 8993,
+                "displayValue": "8,993",
                 "note": ""
               },
               {
                 "label": "当日达成率",
-                "value": 1.1321483771251932,
-                "displayValue": "113.2%",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               },
               {
                 "label": "当日新增到店",
-                "value": 2695,
-                "displayValue": "2,695",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               }
             ],
@@ -1157,8 +1158,8 @@
               "items": [
                 {
                   "label": "累计目标",
-                  "value": 62963,
-                  "displayValue": "62,963"
+                  "value": 71956,
+                  "displayValue": "71,956"
                 },
                 {
                   "label": "累计实绩",
@@ -1167,24 +1168,24 @@
                 },
                 {
                   "label": "累计达成",
-                  "value": 1.0302558645553739,
-                  "displayValue": "103.0%",
-                  "note": "累计环比 14094.3%"
+                  "value": 0.9014953582745011,
+                  "displayValue": "90.1%",
+                  "note": "累计环比 12951.9%"
                 },
                 {
                   "label": "当日目标",
-                  "value": 9058,
-                  "displayValue": "9,058"
+                  "value": 8993,
+                  "displayValue": "8,993"
                 },
                 {
                   "label": "当日实绩",
-                  "value": 10255,
-                  "displayValue": "10,255"
+                  "value": null,
+                  "displayValue": "-"
                 },
                 {
                   "label": "当日达成",
-                  "value": 1.1321483771251932,
-                  "displayValue": "113.2%"
+                  "value": null,
+                  "displayValue": "-"
                 }
               ]
             },
@@ -1792,7 +1793,7 @@
                     "45068",
                     "54613",
                     "64868",
-                    "#N/A",
+                    "64868",
                     "#N/A",
                     "#N/A",
                     "#N/A",
@@ -1883,7 +1884,7 @@
                 "4/29",
                 "4/30"
               ],
-              "reportDayIndex": 11,
+              "reportDayIndex": 12,
               "dailyAxisMax": 15000,
               "cumulativeAxisMax": 250000,
               "series": {
@@ -2060,7 +2061,7 @@
                   45068,
                   54613,
                   64868,
-                  null,
+                  64868,
                   null,
                   null,
                   null,
@@ -2100,14 +2101,14 @@
               },
               {
                 "label": "累计目标",
-                "value": 39112,
-                "displayValue": "39,112",
+                "value": 42403,
+                "displayValue": "42,403",
                 "note": ""
               },
               {
                 "label": "累计达成率",
-                "value": 0.7023419922274494,
-                "displayValue": "70.2%",
+                "value": 0.6478315213546212,
+                "displayValue": "64.8%",
                 "note": ""
               },
               {
@@ -2118,26 +2119,26 @@
               },
               {
                 "label": "当日新增线索",
-                "value": 2970,
-                "displayValue": "2,970",
-                "note": "2026-04-12"
+                "value": null,
+                "displayValue": "-",
+                "note": "2026-04-13"
               },
               {
                 "label": "当日目标",
-                "value": 3513,
-                "displayValue": "3,513",
+                "value": 3291,
+                "displayValue": "3,291",
                 "note": ""
               },
               {
                 "label": "当日达成率",
-                "value": 0.8454312553373186,
-                "displayValue": "84.5%",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               },
               {
                 "label": "当日新增到店",
-                "value": 391,
-                "displayValue": "391",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               }
             ],
@@ -2149,8 +2150,8 @@
               "items": [
                 {
                   "label": "累计目标",
-                  "value": 39112,
-                  "displayValue": "39,112"
+                  "value": 42403,
+                  "displayValue": "42,403"
                 },
                 {
                   "label": "累计实绩",
@@ -2159,24 +2160,24 @@
                 },
                 {
                   "label": "累计达成",
-                  "value": 0.7023419922274494,
-                  "displayValue": "70.2%",
-                  "note": "累计环比 4.1%"
+                  "value": 0.6478315213546212,
+                  "displayValue": "64.8%",
+                  "note": "累计环比 -7.5%"
                 },
                 {
                   "label": "当日目标",
-                  "value": 3513,
-                  "displayValue": "3,513"
+                  "value": 3291,
+                  "displayValue": "3,291"
                 },
                 {
                   "label": "当日实绩",
-                  "value": 2970,
-                  "displayValue": "2,970"
+                  "value": null,
+                  "displayValue": "-"
                 },
                 {
                   "label": "当日达成",
-                  "value": 0.8454312553373186,
-                  "displayValue": "84.5%"
+                  "value": null,
+                  "displayValue": "-"
                 }
               ]
             },
@@ -2784,7 +2785,7 @@
                     "22222",
                     "24500",
                     "27470",
-                    "#N/A",
+                    "27470",
                     "#N/A",
                     "#N/A",
                     "#N/A",
@@ -2875,7 +2876,7 @@
                 "4/29",
                 "4/30"
               ],
-              "reportDayIndex": 11,
+              "reportDayIndex": 12,
               "dailyAxisMax": 4000,
               "cumulativeAxisMax": 150000,
               "series": {
@@ -3052,7 +3053,7 @@
                   22222,
                   24500,
                   27470,
-                  null,
+                  27470,
                   null,
                   null,
                   null,
@@ -3092,14 +3093,14 @@
               },
               {
                 "label": "累计目标",
-                "value": 41007,
-                "displayValue": "41,007",
+                "value": 44420,
+                "displayValue": "44,420",
                 "note": ""
               },
               {
                 "label": "累计达成率",
-                "value": 0.6593020703782281,
-                "displayValue": "65.9%",
+                "value": 0.6086447546150383,
+                "displayValue": "60.9%",
                 "note": ""
               },
               {
@@ -3110,26 +3111,26 @@
               },
               {
                 "label": "当日新增线索",
-                "value": 2580,
-                "displayValue": "2,580",
-                "note": "2026-04-12"
+                "value": null,
+                "displayValue": "-",
+                "note": "2026-04-13"
               },
               {
                 "label": "当日目标",
-                "value": 3672,
-                "displayValue": "3,672",
+                "value": 3413,
+                "displayValue": "3,413",
                 "note": ""
               },
               {
                 "label": "当日达成率",
-                "value": 0.7026143790849673,
-                "displayValue": "70.3%",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               },
               {
                 "label": "当日新增到店",
-                "value": 314,
-                "displayValue": "314",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               }
             ],
@@ -3141,8 +3142,8 @@
               "items": [
                 {
                   "label": "累计目标",
-                  "value": 41007,
-                  "displayValue": "41,007"
+                  "value": 44420,
+                  "displayValue": "44,420"
                 },
                 {
                   "label": "累计实绩",
@@ -3151,24 +3152,24 @@
                 },
                 {
                   "label": "累计达成",
-                  "value": 0.6593020703782281,
-                  "displayValue": "65.9%",
-                  "note": "累计环比 -15.0%"
+                  "value": 0.6086447546150383,
+                  "displayValue": "60.9%",
+                  "note": "累计环比 -20.9%"
                 },
                 {
                   "label": "当日目标",
-                  "value": 3672,
-                  "displayValue": "3,672"
+                  "value": 3413,
+                  "displayValue": "3,413"
                 },
                 {
                   "label": "当日实绩",
-                  "value": 2580,
-                  "displayValue": "2,580"
+                  "value": null,
+                  "displayValue": "-"
                 },
                 {
                   "label": "当日达成",
-                  "value": 0.7026143790849673,
-                  "displayValue": "70.3%"
+                  "value": null,
+                  "displayValue": "-"
                 }
               ]
             },
@@ -3776,7 +3777,7 @@
                     "22462",
                     "24456",
                     "27036",
-                    "#N/A",
+                    "27036",
                     "#N/A",
                     "#N/A",
                     "#N/A",
@@ -3867,7 +3868,7 @@
                 "4/29",
                 "4/30"
               ],
-              "reportDayIndex": 11,
+              "reportDayIndex": 12,
               "dailyAxisMax": 5000,
               "cumulativeAxisMax": 150000,
               "series": {
@@ -4044,7 +4045,7 @@
                   22462,
                   24456,
                   27036,
-                  null,
+                  27036,
                   null,
                   null,
                   null,
@@ -4084,14 +4085,14 @@
               },
               {
                 "label": "累计目标",
-                "value": 44180,
-                "displayValue": "44,180",
+                "value": 47694,
+                "displayValue": "47,694",
                 "note": ""
               },
               {
                 "label": "累计达成率",
-                "value": 0.7503621548211861,
-                "displayValue": "75.0%",
+                "value": 0.695076948882459,
+                "displayValue": "69.5%",
                 "note": ""
               },
               {
@@ -4102,26 +4103,26 @@
               },
               {
                 "label": "当日新增线索",
-                "value": 3426,
-                "displayValue": "3,426",
-                "note": "2026-04-12"
+                "value": null,
+                "displayValue": "-",
+                "note": "2026-04-13"
               },
               {
                 "label": "当日目标",
-                "value": 3919,
-                "displayValue": "3,919",
+                "value": 3514,
+                "displayValue": "3,514",
                 "note": ""
               },
               {
                 "label": "当日达成率",
-                "value": 0.8742026027047717,
-                "displayValue": "87.4%",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               },
               {
                 "label": "当日新增到店",
-                "value": 626,
-                "displayValue": "626",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               }
             ],
@@ -4133,8 +4134,8 @@
               "items": [
                 {
                   "label": "累计目标",
-                  "value": 44180,
-                  "displayValue": "44,180"
+                  "value": 47694,
+                  "displayValue": "47,694"
                 },
                 {
                   "label": "累计实绩",
@@ -4143,24 +4144,24 @@
                 },
                 {
                   "label": "累计达成",
-                  "value": 0.7503621548211861,
-                  "displayValue": "75.0%",
-                  "note": "累计环比 -30.0%"
+                  "value": 0.695076948882459,
+                  "displayValue": "69.5%",
+                  "note": "累计环比 -35.5%"
                 },
                 {
                   "label": "当日目标",
-                  "value": 3919,
-                  "displayValue": "3,919"
+                  "value": 3514,
+                  "displayValue": "3,514"
                 },
                 {
                   "label": "当日实绩",
-                  "value": 3426,
-                  "displayValue": "3,426"
+                  "value": null,
+                  "displayValue": "-"
                 },
                 {
                   "label": "当日达成",
-                  "value": 0.8742026027047717,
-                  "displayValue": "87.4%"
+                  "value": null,
+                  "displayValue": "-"
                 }
               ]
             },
@@ -4768,7 +4769,7 @@
                     "26100",
                     "29725",
                     "33151",
-                    "#N/A",
+                    "33151",
                     "#N/A",
                     "#N/A",
                     "#N/A",
@@ -4859,7 +4860,7 @@
                 "4/29",
                 "4/30"
               ],
-              "reportDayIndex": 11,
+              "reportDayIndex": 12,
               "dailyAxisMax": 10000,
               "cumulativeAxisMax": 150000,
               "series": {
@@ -5036,7 +5037,7 @@
                   26100,
                   29725,
                   33151,
-                  null,
+                  33151,
                   null,
                   null,
                   null,
@@ -5114,14 +5115,14 @@
               },
               {
                 "label": "当日有效线索",
-                "value": 17824,
-                "displayValue": "17,824",
-                "note": "2026-04-12"
+                "value": null,
+                "displayValue": "-",
+                "note": "2026-04-13"
               },
               {
                 "label": "当日到店量",
-                "value": 936,
-                "displayValue": "936",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               }
             ],
@@ -5145,7 +5146,7 @@
                   "label": "累计达成",
                   "value": null,
                   "displayValue": "-",
-                  "note": "累计环比 -4.7%"
+                  "note": "累计环比 -12.0%"
                 },
                 {
                   "label": "当日目标",
@@ -5154,8 +5155,8 @@
                 },
                 {
                   "label": "当日实绩",
-                  "value": 17824,
-                  "displayValue": "17,824"
+                  "value": null,
+                  "displayValue": "-"
                 },
                 {
                   "label": "当日达成",
@@ -5768,7 +5769,7 @@
                     "151182",
                     "167731",
                     "185555",
-                    "#N/A",
+                    "185555",
                     "#N/A",
                     "#N/A",
                     "#N/A",
@@ -5859,7 +5860,7 @@
                 "4/29",
                 "4/30"
               ],
-              "reportDayIndex": 11,
+              "reportDayIndex": 12,
               "dailyAxisMax": 30000,
               "cumulativeAxisMax": 500000,
               "series": {
@@ -6036,7 +6037,7 @@
                   151182,
                   167731,
                   185555,
-                  null,
+                  185555,
                   null,
                   null,
                   null,
@@ -6106,14 +6107,14 @@
               },
               {
                 "label": "当日有效线索",
-                "value": 1560,
-                "displayValue": "1,560",
-                "note": "2026-04-12"
+                "value": null,
+                "displayValue": "-",
+                "note": "2026-04-13"
               },
               {
                 "label": "当日到店量",
-                "value": 46,
-                "displayValue": "46",
+                "value": null,
+                "displayValue": "-",
                 "note": ""
               }
             ],
@@ -6125,8 +6126,8 @@
               "items": [
                 {
                   "label": "累计目标",
-                  "value": 21657,
-                  "displayValue": "21,657"
+                  "value": 23485,
+                  "displayValue": "23,485"
                 },
                 {
                   "label": "累计实绩",
@@ -6135,24 +6136,24 @@
                 },
                 {
                   "label": "累计达成",
-                  "value": 0.560511612873436,
-                  "displayValue": "56.1%",
-                  "note": "累计环比 -37.7%"
+                  "value": 0.5168831168831168,
+                  "displayValue": "51.7%",
+                  "note": "累计环比 -42.7%"
                 },
                 {
                   "label": "当日目标",
-                  "value": 1773,
-                  "displayValue": "1,773"
+                  "value": 1828,
+                  "displayValue": "1,828"
                 },
                 {
                   "label": "当日实绩",
-                  "value": 1560,
-                  "displayValue": "1,560"
+                  "value": null,
+                  "displayValue": "-"
                 },
                 {
                   "label": "当日达成",
-                  "value": 0.879864636209814,
-                  "displayValue": "88.0%"
+                  "value": null,
+                  "displayValue": "-"
                 }
               ]
             },
@@ -6760,7 +6761,7 @@
                     "9353",
                     "10579",
                     "12139",
-                    "#N/A",
+                    "12139",
                     "#N/A",
                     "#N/A",
                     "#N/A",
@@ -6851,9 +6852,9 @@
                 "4/29",
                 "4/30"
               ],
-              "reportDayIndex": 11,
-              "dailyAxisMax": 4000,
-              "cumulativeAxisMax": 150000,
+              "reportDayIndex": 12,
+              "dailyAxisMax": 2000,
+              "cumulativeAxisMax": 60000,
               "series": {
                 "previousActual": [
                   1786,
@@ -7028,7 +7029,7 @@
                   9353,
                   10579,
                   12139,
-                  null,
+                  12139,
                   null,
                   null,
                   null,
