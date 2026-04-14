@@ -262,6 +262,153 @@ def aggregate_targets(*groups: dict[date, int | float]) -> dict[date, int | floa
     return merged
 
 
+def build_running_totals(values: list[int | float | None], *, stop_at: int | None = None) -> list[int | float | None]:
+    totals: list[int | float | None] = []
+    running = 0
+    for index, value in enumerate(values):
+        if stop_at is not None and index > stop_at:
+            totals.append(None)
+            continue
+        if isinstance(value, (int, float)):
+            running += value
+        totals.append(running)
+    return totals
+
+
+def build_valid_leads_control_trend(
+    report_date: date,
+    current_actuals: dict[date, dict[str, int | float | None]],
+    previous_actuals: dict[date, dict[str, int | float | None]],
+) -> dict[str, Any]:
+    dates = month_dates(report_date)
+    report_index = report_date.day - 1
+    prev_dates: list[str] = []
+    curr_dates: list[str] = []
+    prev_daily: list[int | float | None] = []
+    curr_daily: list[int | float | None] = []
+    chart_daily: list[int | float | None] = []
+    day_delta: list[float | None] = []
+    column_meta: list[dict[str, Any]] = []
+
+    for current_date in dates:
+        previous_date = aligned_previous_date(current_date)
+        prev_value = previous_actuals.get(previous_date, {}).get("validLeads") if previous_date else None
+        raw_actual = current_actuals.get(current_date, {}).get("validLeads")
+        curr_value = raw_actual if current_date <= report_date else None
+        chart_value = raw_actual if raw_actual is not None and current_date <= report_date else 0
+        prev_dates.append(fmt_sheet_date(previous_date))
+        curr_dates.append(fmt_sheet_date(current_date))
+        prev_daily.append(prev_value)
+        curr_daily.append(curr_value)
+        chart_daily.append(chart_value)
+        day_delta.append(delta_ratio(curr_value, prev_value))
+        current_day_off = is_day_off(current_date)
+        previous_day_off = is_day_off(previous_date)
+        column_meta.append(
+            {
+                "currentDate": current_date.isoformat(),
+                "previousDate": previous_date.isoformat() if previous_date else None,
+                "highlightCurrent": current_day_off,
+                "highlightPrevious": previous_day_off,
+                "isCurrentHoliday": current_day_off,
+                "isPreviousHoliday": previous_day_off,
+                "isCurrentWeekend": current_date.weekday() >= 5,
+                "isPreviousWeekend": previous_date.weekday() >= 5 if previous_date else False,
+            }
+        )
+
+    prev_cum = build_running_totals(prev_daily)
+    curr_cum = build_running_totals(curr_daily, stop_at=report_index)
+    cumulative_delta = [delta_ratio(curr_value, prev_value) for curr_value, prev_value in zip(curr_cum, prev_cum)]
+    daily_actual = curr_daily[report_index]
+    daily_previous = prev_daily[report_index]
+    cumulative_actual = curr_cum[report_index]
+    cumulative_previous = prev_cum[report_index]
+
+    return {
+        "chartTitle": f"{report_date.month}月全车有效线索趋势",
+        "summary": {
+            "items": [
+                {"label": "累计本期实绩", "value": normalize_scalar(cumulative_actual), "displayValue": fmt_count(cumulative_actual)},
+                {"label": "累计上期实绩", "value": normalize_scalar(cumulative_previous), "displayValue": fmt_count(cumulative_previous)},
+                {
+                    "label": "累计环比",
+                    "value": normalize_scalar(delta_ratio(cumulative_actual, cumulative_previous)),
+                    "displayValue": fmt_percent(delta_ratio(cumulative_actual, cumulative_previous)),
+                },
+                {"label": "当日本期实绩", "value": normalize_scalar(daily_actual), "displayValue": fmt_count(daily_actual)},
+                {"label": "当日上期实绩", "value": normalize_scalar(daily_previous), "displayValue": fmt_count(daily_previous)},
+                {
+                    "label": "当日环比",
+                    "value": normalize_scalar(delta_ratio(daily_actual, daily_previous)),
+                    "displayValue": fmt_percent(delta_ratio(daily_actual, daily_previous)),
+                },
+            ]
+        },
+        "matrix": {
+            "labels": [fmt_axis_date(item) for item in dates],
+            "columnMeta": column_meta,
+            "visibleRowKeys": [
+                "previousDate",
+                "currentDate",
+                "previousActual",
+                "actual",
+                "previousCumulative",
+                "cumulativeActual",
+                "dayDelta",
+                "cumulativeDelta",
+            ],
+            "rows": [
+                {"key": "previousDate", "label": "上期日期", "displayValues": prev_dates},
+                {"key": "currentDate", "label": "本期日期", "displayValues": curr_dates},
+                {"key": "previousActual", "label": "上期实绩", "displayValues": [fmt_plain(v) for v in prev_daily]},
+                {"key": "actual", "label": "本期实绩", "displayValues": [fmt_plain(v) for v in curr_daily]},
+                {"key": "previousCumulative", "label": "上期累计实绩", "displayValues": [fmt_plain(v) for v in prev_cum]},
+                {"key": "cumulativeActual", "label": "本期累计实绩", "displayValues": [fmt_plain(v, fallback="#N/A") for v in curr_cum]},
+                {"key": "dayDelta", "label": "环比", "displayValues": [fmt_percent(v) for v in day_delta]},
+                {"key": "cumulativeDelta", "label": "累计环比", "displayValues": [fmt_percent(v) for v in cumulative_delta]},
+            ],
+        },
+        "chart": {
+            "labels": [fmt_axis_date(item) for item in dates],
+            "reportDayIndex": report_index,
+            "dailyAxisMax": nice_axis_max([*prev_daily, *chart_daily]),
+            "cumulativeAxisMax": nice_axis_max([*prev_cum, *curr_cum]),
+            "seriesDefinitions": [
+                {
+                    "key": "previousActual",
+                    "label": "上期实绩",
+                    "type": "bar",
+                    "color": "#8da1b8",
+                    "fill": "rgba(255,255,255,0.85)",
+                    "stroke": "#8da1b8",
+                    "strokeWidth": 1.4,
+                },
+                {"key": "actual", "label": "本期实绩", "type": "bar", "color": "#c20f2f", "fill": "#c20f2f"},
+                {"key": "previousCumulative", "label": "上期累计实绩", "type": "line", "color": "#b6c2d0", "strokeWidth": "3"},
+                {
+                    "key": "cumulativeActual",
+                    "label": "本期累计实绩",
+                    "type": "line",
+                    "color": "#c20f2f",
+                    "strokeWidth": "3.5",
+                    "markers": True,
+                    "markerFill": "#ffffff",
+                    "markerStroke": "#c20f2f",
+                    "markerRadius": 4.8,
+                },
+            ],
+            "series": {
+                "previousActual": [normalize_scalar(v) for v in prev_daily],
+                "actual": [normalize_scalar(v) for v in chart_daily],
+                "previousCumulative": [normalize_scalar(v) for v in prev_cum],
+                "cumulativeActual": [normalize_scalar(v) for v in curr_cum],
+            },
+            "note": "",
+        },
+    }
+
+
 def build_monthly_trend(
     title: str,
     metric_label: str,
@@ -501,10 +648,20 @@ def build_line_brief(report_date: date, nev_daily, nev_targets, sylphy_daily, sy
 
 def build_arrival_brief(arrival_wb) -> dict[str, Any]:
     ws = arrival_wb["来店简报"]
-    lines = [line.strip() for line in str(ws["AG2"].value or "").replace("\r\n", "\n").replace("\r", "\n").split("\n") if line.strip()]
-    title = lines[0] if lines else "来店简报"
-    detail_lines = lines[1:]
-    return {"kind": "arrival", "title": title, "lines": [item for item in detail_lines if item], "sourceCell": "来店简报!AG2"}
+    overview = read_table_block(ws, "全国来店（ICE+NEV）整体情况")
+    rows = overview["rows"]
+    lines = [
+        format_arrival_brief_line("全国", rows.get("全国", {})),
+        format_arrival_brief_line("NEV", rows.get("NEV", {}), marker="①"),
+        format_arrival_brief_line("ICE", rows.get("ICE", {}), marker="②"),
+    ]
+    return {
+        "kind": "arrival",
+        "title": "来店简报",
+        "lines": [item for item in lines if item],
+        "sourceSheet": "来店简报",
+        "sourceBlock": "全国来店（ICE+NEV）整体情况",
+    }
 
 
 def read_row_values(ws, row_index: int, start_col: int, end_col: int) -> list[Any]:
@@ -517,41 +674,154 @@ def trim_by_last_date(values: list[date | None]) -> int:
 
 
 def safe_close_workbook(workbook: Any) -> None:
-    workbook.close()
     archive = getattr(workbook, "_archive", None)
-    if archive is not None:
-        archive.fp = None
+    vba_archive = getattr(workbook, "vba_archive", None)
+    workbook.close()
+    for handle in (archive, vba_archive):
+        if handle is not None:
+            try:
+                handle.close()
+            except Exception:
+                pass
+
+
+def find_row_index(ws, target: str, *, column: int | None = None, start_row: int = 1, end_row: int | None = None) -> int | None:
+    target_text = target.strip()
+    last_row = end_row or ws.max_row
+    for row in range(start_row, last_row + 1):
+        columns = [column] if column is not None else range(1, ws.max_column + 1)
+        for col in columns:
+            value = ws.cell(row, col).value
+            if isinstance(value, str) and value.strip() == target_text:
+                return row
+    return None
+
+
+def read_table_block(ws, title: str, *, title_column: int = 1) -> dict[str, Any]:
+    title_row = find_row_index(ws, title, column=title_column)
+    if title_row is None:
+        raise ValueError(f"未找到表格标题：{title}")
+
+    header_row = title_row + 1
+    headers = [ws.cell(header_row, col).value for col in range(1, ws.max_column + 1)]
+    last_header_col = max(
+        (index for index, value in enumerate(headers, start=1) if value not in (None, "")),
+        default=1,
+    )
+    header_labels = [str(value).strip() if value not in (None, "") else "" for value in headers[:last_header_col]]
+
+    rows: dict[str, dict[str, Any]] = {}
+    current_row = header_row + 1
+    while current_row <= ws.max_row:
+        row_label = ws.cell(current_row, 1).value
+        if row_label in (None, ""):
+            break
+        label_text = str(row_label).strip()
+        rows[label_text] = {
+            header_labels[col - 1] or f"col_{col}": ws.cell(current_row, col).value
+            for col in range(1, last_header_col + 1)
+        }
+        current_row += 1
+
+    return {"titleRow": title_row, "headerRow": header_row, "headers": header_labels, "rows": rows}
+
+
+def read_labeled_matrix_block(
+    ws,
+    anchor_label: str,
+    row_labels: list[str],
+    *,
+    anchor_column: int = 2,
+    data_start_col: int = 3,
+    search_start_row: int = 1,
+    window_size: int = 12,
+) -> dict[str, Any]:
+    anchor_row = find_row_index(ws, anchor_label, column=anchor_column, start_row=search_start_row)
+    if anchor_row is None:
+        raise ValueError(f"未找到矩阵起始标签：{anchor_label}")
+
+    raw_dates = [coerce_date(ws.cell(anchor_row, col).value) for col in range(data_start_col, ws.max_column + 1)]
+    length = trim_by_last_date(raw_dates)
+    dates = raw_dates[:length]
+    end_col = data_start_col + max(length - 1, 0)
+
+    series: dict[str, list[Any]] = {}
+    for label in row_labels:
+        row_index = find_row_index(
+            ws,
+            label,
+            column=anchor_column,
+            start_row=anchor_row + 1,
+            end_row=min(anchor_row + window_size, ws.max_row),
+        )
+        if row_index is None:
+            raise ValueError(f"未找到矩阵行标签：{label}")
+        series[label] = [ws.cell(row_index, col).value for col in range(data_start_col, end_col + 1)]
+
+    return {"anchorRow": anchor_row, "dates": dates, "series": series}
+
+
+def format_arrival_brief_line(label: str, metrics: dict[str, Any], marker: str = "") -> str:
+    prefix = f"{marker}{label}"
+    return (
+        f"{prefix}累计来店{fmt_count(num(metrics.get('来店累计')))}，"
+        f"累计达成率{fmt_percent(ratio(num(metrics.get('来店累计')), num(metrics.get('来店管控目标'))))}；"
+        f"当日来店{fmt_count(num(metrics.get('当日来店')))}，"
+        f"同比{fmt_percent(num(metrics.get('同比')))}，"
+        f"环比{fmt_percent(num(metrics.get('环比')))}"
+    )
+
+
+def build_valid_leads_control_section(
+    report_date: date,
+    current_actuals: dict[date, dict[str, int | float | None]],
+    previous_actuals: dict[date, dict[str, int | float | None]],
+) -> dict[str, Any]:
+    return {
+        "id": "lead-control-total",
+        "sectionLabel": "",
+        "title": "",
+        "headline": "",
+        "summary": {"cards": []},
+        "trend": build_valid_leads_control_trend(report_date, current_actuals, previous_actuals),
+        "note": "",
+        "noteHasError": False,
+    }
 
 
 def build_arrival_dashboard(arrival_wb) -> dict[str, Any]:
     trend_ws = arrival_wb.worksheets[0]
-    brief_ws = arrival_wb.worksheets[1]
+    matrix_block = read_labeled_matrix_block(
+        trend_ws,
+        "全国",
+        ["同期来店", "本期目标", "本期来店", "同比", "NEV本期实绩", "ICE本期实绩", "ICE同比"],
+        anchor_column=2,
+        data_start_col=3,
+    )
 
-    current_dates = [coerce_date(item) for item in read_row_values(brief_ws, 32, 2, 32)]
-    previous_dates = [coerce_date(item) for item in read_row_values(brief_ws, 31, 2, 32)]
-    length = trim_by_last_date(current_dates)
-    current_dates = current_dates[:length]
-    previous_dates = previous_dates[:length]
-
-    current_daily = [num(item) for item in read_row_values(brief_ws, 37, 2, 32)[:length]]
-    previous_daily = [num(item) for item in read_row_values(brief_ws, 38, 2, 32)[:length]]
-    current_target = [num(item) for item in read_row_values(brief_ws, 36, 2, 32)[:length]]
-    current_cumulative = [num(item) for item in read_row_values(brief_ws, 34, 2, 32)[:length]]
-    previous_cumulative = [num(item) for item in read_row_values(brief_ws, 35, 2, 32)[:length]]
-    target_cumulative = [num(item) for item in read_row_values(brief_ws, 33, 2, 32)[:length]]
+    current_dates = matrix_block["dates"]
+    previous_dates = [aligned_previous_date(item) for item in current_dates]
+    current_daily = [num(item) for item in matrix_block["series"]["本期来店"]]
+    previous_daily = [num(item) for item in matrix_block["series"]["同期来店"]]
+    current_target = [num(item) for item in matrix_block["series"]["本期目标"]]
 
     report_indexes = [index for index, value in enumerate(current_daily) if isinstance(value, (int, float)) and value > 0]
     report_index = report_indexes[-1] if report_indexes else 0
     chart_actual = [value if index <= report_index and value is not None else 0 for index, value in enumerate(current_daily)]
+    current_cumulative = build_running_totals(current_daily, stop_at=report_index)
+    previous_cumulative = build_running_totals(previous_daily)
+    has_target = any(isinstance(value, (int, float)) for value in current_target)
+    target_cumulative = build_running_totals(current_target) if has_target else [None] * len(current_dates)
+    month_prefix = f"{current_dates[report_index].month}月" if current_dates and current_dates[report_index] else ""
 
     matrix_rows = [
-        {"key": "previousActual", "label": "同期来店", "displayValues": [fmt_plain(num(item)) for item in read_row_values(trend_ws, 31, 3, 32)[:length]]},
-        {"key": "target", "label": "本期目标", "displayValues": [fmt_plain(num(item)) for item in read_row_values(trend_ws, 32, 3, 32)[:length]]},
-        {"key": "actual", "label": "本期来店", "displayValues": [fmt_plain(num(item)) for item in read_row_values(trend_ws, 33, 3, 32)[:length]]},
-        {"key": "dayDelta", "label": "同比", "displayValues": [fmt_percent(num(item)) for item in read_row_values(trend_ws, 34, 3, 32)[:length]]},
-        {"key": "nevActual", "label": "NEV本期实绩", "displayValues": [fmt_plain(num(item)) for item in read_row_values(trend_ws, 35, 3, 32)[:length]]},
-        {"key": "iceActual", "label": "ICE本期实绩", "displayValues": [fmt_plain(num(item)) for item in read_row_values(trend_ws, 36, 3, 32)[:length]]},
-        {"key": "iceDelta", "label": "ICE同比", "displayValues": [fmt_percent(num(item)) for item in read_row_values(trend_ws, 37, 3, 32)[:length]]},
+        {"key": "previousActual", "label": "同期来店", "displayValues": [fmt_plain(item) for item in previous_daily]},
+        {"key": "target", "label": "本期目标", "displayValues": [fmt_plain(item) for item in current_target]},
+        {"key": "actual", "label": "本期来店", "displayValues": [fmt_plain(item) for item in current_daily]},
+        {"key": "dayDelta", "label": "同比", "displayValues": [fmt_percent(num(item)) for item in matrix_block["series"]["同比"]]},
+        {"key": "nevActual", "label": "NEV本期实绩", "displayValues": [fmt_plain(num(item)) for item in matrix_block["series"]["NEV本期实绩"]]},
+        {"key": "iceActual", "label": "ICE本期实绩", "displayValues": [fmt_plain(num(item)) for item in matrix_block["series"]["ICE本期实绩"]]},
+        {"key": "iceDelta", "label": "ICE同比", "displayValues": [fmt_percent(num(item)) for item in matrix_block["series"]["ICE同比"]]},
     ]
 
     trend = {
@@ -603,9 +873,9 @@ def build_arrival_dashboard(arrival_wb) -> dict[str, Any]:
                 {"key": "previousActual", "label": "同期来店", "type": "bar", "color": "#a9c8ff", "fill": "rgba(255,255,255,0.85)", "stroke": "#a9c8ff", "strokeWidth": 1.4},
                 {"key": "target", "label": "本期目标", "type": "bar", "color": "#d7d7d7", "fill": "#d7d7d7", "opacity": 0.9},
                 {"key": "actual", "label": "本期来店", "type": "bar", "color": "#d40000", "fill": "#d40000"},
-                {"key": "cumulativeTarget", "label": "4月累计目标", "type": "line", "color": "#9f9f9f", "dashed": True, "strokeWidth": "3"},
-                {"key": "cumulativeActual", "label": "4月累计来店", "type": "line", "color": "#d40000", "strokeWidth": "3.5", "markers": True, "markerFill": "#ffffff", "markerStroke": "#d40000", "markerRadius": 4.8},
-                {"key": "previousCumulative", "label": "4月同期来店", "type": "line", "color": "#bfd0ff", "strokeWidth": "3", "markers": False},
+                {"key": "cumulativeTarget", "label": f"{month_prefix}累计目标", "type": "line", "color": "#9f9f9f", "dashed": True, "strokeWidth": "3"},
+                {"key": "cumulativeActual", "label": f"{month_prefix}累计来店", "type": "line", "color": "#d40000", "strokeWidth": "3.5", "markers": True, "markerFill": "#ffffff", "markerStroke": "#d40000", "markerRadius": 4.8},
+                {"key": "previousCumulative", "label": f"{month_prefix}同期来店", "type": "line", "color": "#bfd0ff", "strokeWidth": "3", "markers": False},
             ],
             "note": "",
         },
@@ -664,7 +934,9 @@ def build_payload(leads_path: Path, arrival_path: Path) -> dict[str, Any]:
         nev_total_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_MODELS))
         nev_total_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in NEV_MODELS))
         nev_total_targets = aggregate_targets(*(nev_targets.get(model_name, {}) for _, _, model_name in NEV_MODELS))
-        data_dates = sorted({*nev_total_current.keys(), *ice_current.keys(), *sylphy_current.keys()})
+        valid_leads_total_current = aggregate_daily_series(nev_total_current, ice_current)
+        valid_leads_total_previous = aggregate_daily_series(nev_total_previous, ice_previous)
+        data_dates = sorted({*nev_total_current.keys(), *ice_current.keys(), *sylphy_current.keys(), *valid_leads_total_current.keys()})
 
         dashboards = {
             "brief": {
@@ -674,6 +946,15 @@ def build_payload(leads_path: Path, arrival_path: Path) -> dict[str, Any]:
                 "headline": "",
                 "briefing": {**line_brief, "sections": [*line_brief["sections"], arrival_brief], "arrivalBrief": arrival_brief},
                 "sections": [],
+            },
+            "lead-control": {
+                "id": "lead-control",
+                "pageType": "dashboard",
+                "title": "全车有效线索管控",
+                "headline": "",
+                "sections": [
+                    build_valid_leads_control_section(report_date, valid_leads_total_current, valid_leads_total_previous),
+                ],
             },
             "nev": {
                 "id": "nev",
@@ -719,7 +1000,7 @@ def build_payload(leads_path: Path, arrival_path: Path) -> dict[str, Any]:
                 "sheetNames": leads.sheetnames,
                 "issues": [
                     {"sheet": "每日NEV早报模板", "summary": "线索简报按底层数据重建，避免继续沿用历史模板文案。"},
-                    {"sheet": "来店简报", "summary": "来店简报读取 AG2 缓存结果并追加到原有线索简报页，不覆盖原线索内容。"},
+                    {"sheet": "来店简报", "summary": "来店简报与全国来店趋势改为按结构化标题块和标签行解析，不再依赖 AG2 缓存文案。"},
                 ],
             },
             "dashboards": dashboards,

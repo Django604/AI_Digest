@@ -467,9 +467,13 @@ function renderTrendBoard(trend) {
   }
   const columnMeta = trend.matrix.columnMeta ?? [];
 
+  const defaultVisibleRowKeys = ["previousActual", "target", "actual", "dayDelta"];
+  const declaredVisibleRowKeys = Array.isArray(trend.matrix.visibleRowKeys) && trend.matrix.visibleRowKeys.length
+    ? trend.matrix.visibleRowKeys
+    : defaultVisibleRowKeys;
   const visibleRows = isArrival
     ? trend.matrix.rows ?? []
-    : (trend.matrix.rows ?? []).filter((row) => ["previousActual", "target", "actual", "dayDelta"].includes(row.key));
+    : (trend.matrix.rows ?? []).filter((row) => declaredVisibleRowKeys.includes(row.key));
 
   const getTrendCellClassName = (rowKey, meta = {}) => {
     const classNames = [];
