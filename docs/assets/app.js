@@ -4,9 +4,13 @@ const branchSwitcher = document.querySelector("#branch-switcher");
 const sectionNav = document.querySelector("#section-nav");
 const metaStrip = document.querySelector("#meta-strip");
 const reportDateHighlight = document.querySelector("#report-date-highlight");
+const themeSwitch = document.querySelector("#theme-switch");
+const annualThemeLink = document.querySelector("#annual-theme-link");
 const dashboardTemplate = document.querySelector("#dashboard-template");
 const sectionTemplate = document.querySelector("#section-template");
 const chartModal = createChartModal();
+const THEME_STORAGE_KEY = "ai-digest-theme";
+const DEFAULT_THEME = "annual";
 
 const colors = {
   previousBarStroke: "#8da1b8",
@@ -38,7 +42,54 @@ const state = {
   sectionObserver: null,
 };
 
+initThemeSwitch();
 void loadDashboard();
+
+function initThemeSwitch() {
+  const initialTheme = getStoredTheme();
+  applyTheme(initialTheme);
+
+  if (!themeSwitch) {
+    return;
+  }
+
+  [...themeSwitch.querySelectorAll("[data-theme-choice]")].forEach((button) => {
+    button.addEventListener("click", () => {
+      applyTheme(button.dataset.themeChoice);
+    });
+  });
+}
+
+function getStoredTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    return saved === "classic" || saved === "annual" ? saved : DEFAULT_THEME;
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
+
+function applyTheme(theme) {
+  const nextTheme = theme === "classic" ? "classic" : "annual";
+  document.documentElement.dataset.theme = nextTheme;
+
+  if (annualThemeLink) {
+    annualThemeLink.disabled = nextTheme !== "annual";
+  }
+
+  if (themeSwitch) {
+    [...themeSwitch.querySelectorAll("[data-theme-choice]")].forEach((button) => {
+      button.classList.toggle("active", button.dataset.themeChoice === nextTheme);
+      button.setAttribute("aria-pressed", String(button.dataset.themeChoice === nextTheme));
+    });
+  }
+
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  } catch {
+    // Ignore storage failures and keep the current session theme.
+  }
+}
 
 async function loadDashboard() {
   try {
