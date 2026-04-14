@@ -10,7 +10,7 @@ const dashboardTemplate = document.querySelector("#dashboard-template");
 const sectionTemplate = document.querySelector("#section-template");
 const chartModal = createChartModal();
 const THEME_STORAGE_KEY = "ai-digest-theme";
-const DEFAULT_THEME = "annual";
+const DEFAULT_THEME = "classic";
 
 const colors = {
   previousBarStroke: "#8da1b8",
