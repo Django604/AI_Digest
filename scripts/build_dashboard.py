@@ -861,12 +861,7 @@ def format_arrival_brief_line(
     marker: str = "",
 ) -> str:
     prefix = f"{marker}{label}"
-    return (
-        f"{prefix}累计来店{fmt_count(current_cumulative)}，"
-        f"累计同比{fmt_percent(delta_ratio(current_cumulative, previous_cumulative))}；"
-        f"当日来店{fmt_count(daily_current)}，"
-        f"当日同比{fmt_percent(delta_ratio(daily_current, daily_previous))}"
-    )
+    return f"{prefix}累计来店{fmt_count(current_cumulative)}；当日来店{fmt_count(daily_current)}"
 
 
 def build_valid_leads_control_section(
