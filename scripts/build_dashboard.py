@@ -925,6 +925,14 @@ def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date
         "matrix": {
             "stubLabel": "项目",
             "labels": [fmt_axis_date(item) for item in current_dates],
+            "visibleRowKeys": [
+                "previousActual",
+                "actual",
+                "dayDelta",
+                "nevActual",
+                "iceActual",
+                "iceDelta",
+            ],
             "columnMeta": [
                 {
                     "currentDate": current.isoformat() if current else None,
@@ -945,6 +953,7 @@ def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date
             "reportDayIndex": report_index,
             "dailyAxisMax": nice_axis_max([*previous_daily, *current_target, *chart_actual]),
             "cumulativeAxisMax": nice_axis_max([*previous_cumulative, *target_cumulative, *current_cumulative]),
+            "hiddenSeriesKeys": ["target", "cumulativeTarget"],
             "series": {
                 "previousActual": [normalize_scalar(item) for item in previous_daily],
                 "target": [normalize_scalar(item) for item in current_target],

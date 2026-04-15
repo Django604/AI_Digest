@@ -468,12 +468,13 @@ function renderTrendBoard(trend) {
   const columnMeta = trend.matrix.columnMeta ?? [];
 
   const defaultVisibleRowKeys = ["previousActual", "target", "actual", "dayDelta"];
-  const declaredVisibleRowKeys = Array.isArray(trend.matrix.visibleRowKeys) && trend.matrix.visibleRowKeys.length
-    ? trend.matrix.visibleRowKeys
-    : defaultVisibleRowKeys;
-  const visibleRows = isArrival
-    ? trend.matrix.rows ?? []
-    : (trend.matrix.rows ?? []).filter((row) => declaredVisibleRowKeys.includes(row.key));
+  const hasDeclaredVisibleRowKeys = Array.isArray(trend.matrix.visibleRowKeys) && trend.matrix.visibleRowKeys.length;
+  const declaredVisibleRowKeys = hasDeclaredVisibleRowKeys ? trend.matrix.visibleRowKeys : defaultVisibleRowKeys;
+  const visibleRows = hasDeclaredVisibleRowKeys
+    ? (trend.matrix.rows ?? []).filter((row) => declaredVisibleRowKeys.includes(row.key))
+    : isArrival
+      ? trend.matrix.rows ?? []
+      : (trend.matrix.rows ?? []).filter((row) => declaredVisibleRowKeys.includes(row.key));
 
   const getTrendCellClassName = (rowKey, meta = {}) => {
     const classNames = [];
@@ -607,6 +608,7 @@ function renderTrendChart(trend, options = {}) {
   const plotHeight = maxY - minY;
   const bandWidth = (maxX - minX) / Math.max(chart.labels.length, 1);
   const defs = getSeriesDefinitions(chart);
+  const visibleSeriesKeys = new Set(defs.map((item) => item.key));
   const dailyAxis = buildDailyAxis(chart);
   const cumulativeAxis = buildCumulativeAxis(chart, defs);
 
@@ -640,18 +642,24 @@ function renderTrendChart(trend, options = {}) {
     const targetWidth = bandWidth * 0.42;
     const sideWidth = bandWidth * 0.18;
 
-    drawBar(svg, centerX, chart.series?.target?.[index], dailyAxis, minY, maxY, targetWidth, {
-      fill: colors.targetBar,
-      opacity: "0.9",
-    });
-    drawBar(svg, centerX - bandWidth * 0.18, chart.series?.previousActual?.[index], dailyAxis, minY, maxY, sideWidth, {
-      fill: "rgba(255,255,255,0.85)",
-      stroke: colors.previousBarStroke,
-      "stroke-width": "1.4",
-    });
-    drawBar(svg, centerX + bandWidth * 0.18, chart.series?.actual?.[index], dailyAxis, minY, maxY, sideWidth, {
-      fill: colors.actualBar,
-    });
+    if (visibleSeriesKeys.has("target")) {
+      drawBar(svg, centerX, chart.series?.target?.[index], dailyAxis, minY, maxY, targetWidth, {
+        fill: colors.targetBar,
+        opacity: "0.9",
+      });
+    }
+    if (visibleSeriesKeys.has("previousActual")) {
+      drawBar(svg, centerX - bandWidth * 0.18, chart.series?.previousActual?.[index], dailyAxis, minY, maxY, sideWidth, {
+        fill: "rgba(255,255,255,0.85)",
+        stroke: colors.previousBarStroke,
+        "stroke-width": "1.4",
+      });
+    }
+    if (visibleSeriesKeys.has("actual")) {
+      drawBar(svg, centerX + bandWidth * 0.18, chart.series?.actual?.[index], dailyAxis, minY, maxY, sideWidth, {
+        fill: colors.actualBar,
+      });
+    }
 
     const actualValue = chart.series?.actual?.[index];
     if (typeof actualValue === "number" && Number.isFinite(actualValue)) {
@@ -803,8 +811,9 @@ function closeChartModal() {
 }
 
 function getSeriesDefinitions(chart) {
+  const hiddenSeriesKeys = new Set(Array.isArray(chart?.hiddenSeriesKeys) ? chart.hiddenSeriesKeys : []);
   if (Array.isArray(chart?.seriesDefinitions) && chart.seriesDefinitions.length) {
-    return chart.seriesDefinitions;
+    return chart.seriesDefinitions.filter((item) => !hiddenSeriesKeys.has(item.key));
   }
   return [
     {
@@ -838,11 +847,13 @@ function getSeriesDefinitions(chart) {
       strokeWidth: "3",
       markers: false,
     },
-  ];
+  ].filter((item) => !hiddenSeriesKeys.has(item.key));
 }
 
 function buildDailyAxis(chart) {
-  return buildAdaptiveAxis(collectNumericSeriesValues(chart, ["previousActual", "target", "actual"]), {
+  const hiddenSeriesKeys = new Set(Array.isArray(chart?.hiddenSeriesKeys) ? chart.hiddenSeriesKeys : []);
+  const dailyKeys = ["previousActual", "target", "actual"].filter((key) => !hiddenSeriesKeys.has(key));
+  return buildAdaptiveAxis(collectNumericSeriesValues(chart, dailyKeys), {
     forceMinZero: true,
     tickCount: trendAxisConfig.daily.tickCount,
     topPaddingRatio: trendAxisConfig.daily.topPaddingRatio,

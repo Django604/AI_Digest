@@ -4,7 +4,7 @@
     "workbookName": "NEV+ICE_xsai.xlsm",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
-    "generatedAt": "2026-04-15T10:26:43",
+    "generatedAt": "2026-04-15T10:37:26",
     "workbookModifiedAt": "2026-04-15T09:50:21",
     "reportDate": "2026-04-14",
     "reportDateLabel": "2026-04-14",
@@ -8043,6 +8043,14 @@
                 "4/29",
                 "4/30"
               ],
+              "visibleRowKeys": [
+                "previousActual",
+                "actual",
+                "dayDelta",
+                "nevActual",
+                "iceActual",
+                "iceDelta"
+              ],
               "columnMeta": [
                 {
                   "currentDate": "2026-04-01",
@@ -8636,6 +8644,10 @@
               "reportDayIndex": 13,
               "dailyAxisMax": 10000,
               "cumulativeAxisMax": 150000,
+              "hiddenSeriesKeys": [
+                "target",
+                "cumulativeTarget"
+              ],
               "series": {
                 "previousActual": [
                   2472,
