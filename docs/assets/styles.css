@@ -416,7 +416,7 @@ button,
 }
 
 .brief-page-line .brief-number.is-negative {
-  color: var(--brand-blue);
+  color: var(--positive);
 }
 
 .brief-page-card.intro .brief-page-line:first-child {
