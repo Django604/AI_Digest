@@ -476,10 +476,13 @@ function renderTrendBoard(trend) {
       ? trend.matrix.rows ?? []
       : (trend.matrix.rows ?? []).filter((row) => declaredVisibleRowKeys.includes(row.key));
 
+  const previousHighlightRowKeys = new Set(["previousActual", "previousCumulative"]);
+  const currentHighlightRowKeys = new Set(["target", "actual", "cumulativeTarget", "cumulativeActual", "nevActual", "iceActual"]);
+
   const getTrendCellClassName = (rowKey, meta = {}) => {
     const classNames = [];
-    const shouldHighlightPrevious = rowKey === "previousActual" && meta.highlightPrevious;
-    const shouldHighlightCurrent = ["target", "actual", "nevActual", "iceActual"].includes(rowKey) && meta.highlightCurrent;
+    const shouldHighlightPrevious = previousHighlightRowKeys.has(rowKey) && meta.highlightPrevious;
+    const shouldHighlightCurrent = currentHighlightRowKeys.has(rowKey) && meta.highlightCurrent;
 
     if (shouldHighlightPrevious || shouldHighlightCurrent) {
       classNames.push("is-calendar-highlight");
@@ -493,16 +496,12 @@ function renderTrendBoard(trend) {
   };
 
   const getTrendCellHint = (rowKey, meta = {}) => {
-    if (rowKey === "previousActual") {
+    if (previousHighlightRowKeys.has(rowKey)) {
       if (meta.isPreviousHoliday) return "上期节假日";
       if (meta.isPreviousWeekend) return "上期周末";
       return "";
     }
-    if (["target", "actual"].includes(rowKey)) {
-      if (meta.isCurrentHoliday) return "本期节假日";
-      if (meta.isCurrentWeekend) return "本期周末";
-    }
-    if (["nevActual", "iceActual"].includes(rowKey)) {
+    if (currentHighlightRowKeys.has(rowKey)) {
       if (meta.isCurrentHoliday) return "本期节假日";
       if (meta.isCurrentWeekend) return "本期周末";
     }
@@ -549,11 +548,12 @@ function renderTrendBoard(trend) {
               ${(row.displayValues ?? [])
                 .map((value, index) => {
                   const meta = columnMeta[index] ?? {};
+                  const displayValue = formatMatrixCellValue(value);
                   const className = [getTrendCellClassName(row.key, meta), getTrendValueClassName(row, value)]
                     .filter(Boolean)
                     .join(" ");
                   const title = getTrendCellHint(row.key, meta);
-                  return `<td class="${className}"${title ? ` title="${escapeHtml(title)}"` : ""}>${escapeHtml(value ?? "-")}</td>`;
+                  return `<td class="${className}"${title ? ` title="${escapeHtml(title)}"` : ""}>${escapeHtml(displayValue)}</td>`;
                 })
                 .join("")}
             </tr>
@@ -1206,6 +1206,14 @@ function formatCompact(value) {
     return "-";
   }
   return Math.round(value).toString();
+}
+
+function formatMatrixCellValue(value) {
+  const text = String(value ?? "").trim();
+  if (!text || ["#N/A", "#REF!", "#VALUE!"].includes(text)) {
+    return "-";
+  }
+  return text;
 }
 
 function getSummaryValueClass(item) {
