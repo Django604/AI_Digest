@@ -349,8 +349,6 @@ def build_valid_leads_control_trend(
             "labels": [fmt_axis_date(item) for item in dates],
             "columnMeta": column_meta,
             "visibleRowKeys": [
-                "previousDate",
-                "currentDate",
                 "previousActual",
                 "actual",
                 "previousCumulative",
