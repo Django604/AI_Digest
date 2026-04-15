@@ -2,6 +2,7 @@
 
 import argparse
 import calendar
+import copy
 import json
 from collections import defaultdict
 from datetime import date, datetime
@@ -9,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
+from openpyxl.workbook.workbook import Workbook
 from openpyxl.utils.datetime import from_excel
 
 
@@ -16,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LEADS_BOOK = ROOT / "data" / "source" / "NEV+ICE_xsai.xlsm"
 ARRIVAL_BOOK = ROOT / "data" / "source" / "NEV+ICE_ldai.xlsx"
 OUT_JSON = ROOT / "docs" / "data" / "dashboard.json"
+SUMMARY_JSON = ROOT / "docs" / "data" / "dashboard.summary.json"
 
 NEV_MODELS = [
     ("nx8", "NX8", "NX8"),
@@ -31,6 +34,15 @@ SYLPHY_TARGET_OVERRIDES = {
         1773, 1773, 1828, 1828, 1828, 1828, 1828, 1772, 1771, 1828,
         1828, 1828, 1830, 1830, 1771, 1771, 1830, 1830, 1831, 1831,
     ]
+}
+AGGREGATE_FIELDS = ("newLeads", "validLeads", "storeLeads", "arrivals", "leads", "orders", "deals")
+REQUIRED_LEADS_SHEETS = ("参数", "目标竖版", "全国按日NEV", "全国按日ICE", "十五代轩逸按日")
+REQUIRED_ARRIVAL_SHEETS = ("NEV本期来店", "NEV同期来店", "ICE本期来店", "ICE同期来店")
+REQUIRED_HEADERS = {
+    "目标竖版": (2, ("合计",)),
+    "全国按日NEV": (2, ("新增线索量", "有效线索量", "门店线索总量", "新增到店量")),
+    "全国按日ICE": (1, ("按日", "线索总量", "有效线索量", "到店量", "订单量", "成交量")),
+    "十五代轩逸按日": (1, ("按日", "线索总量", "有效线索量", "到店量", "订单量", "成交量")),
 }
 
 SPECIAL_DAY_OFFS = {
@@ -119,6 +131,95 @@ def normalize_scalar(value: Any) -> Any:
     if isinstance(value, float) and value.is_integer():
         return int(value)
     return value
+
+
+def normalize_path_display(path: Path) -> str:
+    text = path.as_posix()
+    if len(text) >= 2 and text[1] == ":":
+        return text[0].upper() + text[1:]
+    return text
+
+
+def serialize_payload(payload: dict[str, Any]) -> str:
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def write_text_if_changed(path: Path, content: str, *, encoding: str = "utf-8") -> bool:
+    existing = path.read_text(encoding=encoding) if path.exists() else None
+    if existing == content:
+        return False
+    path.write_text(content, encoding=encoding)
+    return True
+
+
+def read_json_file(path: Path, *, encoding: str = "utf-8") -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding=encoding))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def without_volatile_fields(payload: dict[str, Any], field_paths: tuple[tuple[str, ...], ...]) -> dict[str, Any]:
+    cloned = copy.deepcopy(payload)
+    for path in field_paths:
+        cursor: Any = cloned
+        for key in path[:-1]:
+            if not isinstance(cursor, dict):
+                cursor = None
+                break
+            cursor = cursor.get(key)
+        if isinstance(cursor, dict):
+            cursor.pop(path[-1], None)
+    return cloned
+
+
+def write_json_if_changed(
+    path: Path,
+    payload: dict[str, Any],
+    *,
+    encoding: str = "utf-8",
+    volatile_field_paths: tuple[tuple[str, ...], ...] = (),
+) -> tuple[bool, dict[str, Any] | None]:
+    existing_payload = read_json_file(path, encoding=encoding)
+    if existing_payload is not None:
+        if without_volatile_fields(existing_payload, volatile_field_paths) == without_volatile_fields(payload, volatile_field_paths):
+            return False, existing_payload
+    content = serialize_payload(payload)
+    changed = write_text_if_changed(path, content, encoding=encoding)
+    return changed, existing_payload
+
+
+def file_mtime_iso(path: Path) -> str:
+    return datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec="seconds")
+
+
+def validate_workbook_sheets(workbook: Workbook, required_sheets: tuple[str, ...], workbook_label: str) -> None:
+    missing = [sheet for sheet in required_sheets if sheet not in workbook.sheetnames]
+    if missing:
+        raise ValueError(f"{workbook_label} 缺少必需工作表：{', '.join(missing)}")
+
+
+def validate_sheet_headers(ws, row_index: int, required_headers: tuple[str, ...], sheet_name: str) -> None:
+    headers = header_map(ws, row_index)
+    missing = [header for header in required_headers if header not in headers]
+    if missing:
+        raise ValueError(f"工作表 '{sheet_name}' 缺少必需列：{', '.join(missing)}")
+
+
+def validate_workbook_structure(leads: Workbook, arrival: Workbook) -> None:
+    validate_workbook_sheets(leads, REQUIRED_LEADS_SHEETS, "线索工作簿")
+    validate_workbook_sheets(arrival, REQUIRED_ARRIVAL_SHEETS, "来店工作簿")
+    for sheet_name, (row_index, headers) in REQUIRED_HEADERS.items():
+        validate_sheet_headers(leads[sheet_name], row_index, headers, sheet_name)
+
+
+def validate_report_date_cell(leads: Workbook) -> date:
+    report_date = coerce_date(leads["参数"]["C2"].value)
+    if report_date is None:
+        raise ValueError("参数!C2 未读取到有效日期。")
+    return report_date
 
 
 def ratio(current: int | float | None, target: int | float | None) -> float | None:
@@ -239,12 +340,12 @@ def aggregate_daily_series(*groups: dict[date, dict[str, int | float | None]]) -
     merged: dict[date, dict[str, int | float | None]] = {}
     all_dates = sorted({d for group in groups for d in group})
     for current_date in all_dates:
-        totals = {"newLeads": 0, "validLeads": 0, "storeLeads": 0, "arrivals": 0, "leads": 0, "orders": 0, "deals": 0}
+        totals = {key: 0 for key in AGGREGATE_FIELDS}
         for group in groups:
             item = group.get(current_date)
             if not item:
                 continue
-            for key in totals:
+            for key in AGGREGATE_FIELDS:
                 value = item.get(key)
                 if isinstance(value, (int, float)):
                     totals[key] += value
@@ -275,50 +376,120 @@ def build_running_totals(values: list[int | float | None], *, stop_at: int | Non
     return totals
 
 
-def build_valid_leads_control_trend(
+def build_column_meta(current_date: date, previous_date: date | None) -> dict[str, Any]:
+    current_day_off = is_day_off(current_date)
+    previous_day_off = is_day_off(previous_date)
+    return {
+        "currentDate": current_date.isoformat(),
+        "previousDate": previous_date.isoformat() if previous_date else None,
+        "highlightCurrent": current_day_off,
+        "highlightPrevious": previous_day_off,
+        "isCurrentHoliday": current_day_off,
+        "isPreviousHoliday": previous_day_off,
+        "isCurrentWeekend": current_date.weekday() >= 5,
+        "isPreviousWeekend": previous_date.weekday() >= 5 if previous_date else False,
+    }
+
+
+def build_monthly_series_context(
     report_date: date,
     current_actuals: dict[date, dict[str, int | float | None]],
     previous_actuals: dict[date, dict[str, int | float | None]],
+    actual_key: str,
+    current_targets: dict[date, int | float] | None = None,
 ) -> dict[str, Any]:
     dates = month_dates(report_date)
     report_index = report_date.day - 1
     prev_dates: list[str] = []
     curr_dates: list[str] = []
     prev_daily: list[int | float | None] = []
+    target_daily: list[int | float | None] = []
     curr_daily: list[int | float | None] = []
     chart_daily: list[int | float | None] = []
     day_delta: list[float | None] = []
     column_meta: list[dict[str, Any]] = []
+    prev_run = 0
+    target_run = 0
+    curr_run = 0
+    has_target = bool(current_targets) and any(value is not None for value in current_targets.values())
+    prev_cum: list[int | float | None] = []
+    target_cum: list[int | float | None] = []
+    curr_cum: list[int | float | None] = []
 
     for current_date in dates:
         previous_date = aligned_previous_date(current_date)
-        prev_value = previous_actuals.get(previous_date, {}).get("validLeads") if previous_date else None
-        raw_actual = current_actuals.get(current_date, {}).get("validLeads")
+        prev_value = previous_actuals.get(previous_date, {}).get(actual_key) if previous_date else None
+        target_value = current_targets.get(current_date) if current_targets else None
+        raw_actual = current_actuals.get(current_date, {}).get(actual_key)
         curr_value = raw_actual if current_date <= report_date else None
         chart_value = raw_actual if raw_actual is not None and current_date <= report_date else 0
+
         prev_dates.append(fmt_sheet_date(previous_date))
         curr_dates.append(fmt_sheet_date(current_date))
         prev_daily.append(prev_value)
+        target_daily.append(target_value)
         curr_daily.append(curr_value)
         chart_daily.append(chart_value)
-        day_delta.append(delta_ratio(curr_value, prev_value))
-        current_day_off = is_day_off(current_date)
-        previous_day_off = is_day_off(previous_date)
-        column_meta.append(
-            {
-                "currentDate": current_date.isoformat(),
-                "previousDate": previous_date.isoformat() if previous_date else None,
-                "highlightCurrent": current_day_off,
-                "highlightPrevious": previous_day_off,
-                "isCurrentHoliday": current_day_off,
-                "isPreviousHoliday": previous_day_off,
-                "isCurrentWeekend": current_date.weekday() >= 5,
-                "isPreviousWeekend": previous_date.weekday() >= 5 if previous_date else False,
-            }
-        )
 
-    prev_cum = build_running_totals(prev_daily)
-    curr_cum = build_running_totals(curr_daily, stop_at=report_index)
+        if previous_date is not None:
+            if isinstance(prev_value, (int, float)):
+                prev_run += prev_value
+            prev_cum.append(prev_run)
+        else:
+            prev_cum.append(None)
+
+        if has_target:
+            if isinstance(target_value, (int, float)):
+                target_run += target_value
+            target_cum.append(target_run)
+        else:
+            target_cum.append(None)
+
+        if current_date <= report_date:
+            if isinstance(curr_value, (int, float)):
+                curr_run += curr_value
+            curr_cum.append(curr_run)
+        else:
+            curr_cum.append(None)
+
+        day_delta.append(delta_ratio(curr_value, prev_value))
+        column_meta.append(build_column_meta(current_date, previous_date))
+
+    return {
+        "dates": dates,
+        "reportIndex": report_index,
+        "prevDates": prev_dates,
+        "currDates": curr_dates,
+        "prevDaily": prev_daily,
+        "targetDaily": target_daily,
+        "currDaily": curr_daily,
+        "chartDaily": chart_daily,
+        "prevCumulative": prev_cum,
+        "targetCumulative": target_cum,
+        "currCumulative": curr_cum,
+        "dayDelta": day_delta,
+        "columnMeta": column_meta,
+        "hasTarget": has_target,
+    }
+
+
+def build_valid_leads_control_trend(
+    report_date: date,
+    current_actuals: dict[date, dict[str, int | float | None]],
+    previous_actuals: dict[date, dict[str, int | float | None]],
+) -> dict[str, Any]:
+    context = build_monthly_series_context(report_date, current_actuals, previous_actuals, "validLeads")
+    dates = context["dates"]
+    report_index = context["reportIndex"]
+    prev_dates = context["prevDates"]
+    curr_dates = context["currDates"]
+    prev_daily = context["prevDaily"]
+    curr_daily = context["currDaily"]
+    chart_daily = context["chartDaily"]
+    prev_cum = context["prevCumulative"]
+    curr_cum = context["currCumulative"]
+    day_delta = context["dayDelta"]
+    column_meta = context["columnMeta"]
     cumulative_delta = [delta_ratio(curr_value, prev_value) for curr_value, prev_value in zip(curr_cum, prev_cum)]
     daily_actual = curr_daily[report_index]
     daily_previous = prev_daily[report_index]
@@ -416,71 +587,21 @@ def build_monthly_trend(
     actual_key: str,
     current_targets: dict[date, int | float] | None,
 ) -> dict[str, Any]:
-    dates = month_dates(report_date)
-    report_index = report_date.day - 1
-    prev_dates: list[str] = []
-    curr_dates: list[str] = []
-    prev_daily: list[int | float | None] = []
-    target_daily: list[int | float | None] = []
-    curr_daily: list[int | float | None] = []
-    chart_daily: list[int | float | None] = []
-    prev_cum: list[int | float | None] = []
-    target_cum: list[int | float | None] = []
-    curr_cum: list[int | float | None] = []
-    day_delta: list[float | None] = []
-    column_meta: list[dict[str, Any]] = []
-    prev_run = 0
-    target_run = 0
-    curr_run = 0
-    has_target = bool(current_targets) and any(value is not None for value in current_targets.values())
-
-    for current_date in dates:
-        previous_date = aligned_previous_date(current_date)
-        prev_value = previous_actuals.get(previous_date, {}).get(actual_key) if previous_date else None
-        target_value = current_targets.get(current_date) if current_targets else None
-        raw_actual = current_actuals.get(current_date, {}).get(actual_key)
-        curr_value = raw_actual if current_date <= report_date else None
-        chart_value = raw_actual if raw_actual is not None and current_date <= report_date else 0
-        prev_dates.append(fmt_sheet_date(previous_date))
-        curr_dates.append(fmt_sheet_date(current_date))
-        prev_daily.append(prev_value)
-        target_daily.append(target_value)
-        curr_daily.append(curr_value)
-        chart_daily.append(chart_value)
-        if previous_date is not None:
-            if isinstance(prev_value, (int, float)):
-                prev_run += prev_value
-            prev_cum.append(prev_run)
-        else:
-            prev_cum.append(None)
-        if has_target:
-            if isinstance(target_value, (int, float)):
-                target_run += target_value
-            target_cum.append(target_run)
-        else:
-            target_cum.append(None)
-        if current_date <= report_date:
-            if isinstance(curr_value, (int, float)):
-                curr_run += curr_value
-            curr_cum.append(curr_run)
-        else:
-            curr_cum.append(None)
-        day_delta.append(delta_ratio(curr_value, prev_value))
-        current_day_off = is_day_off(current_date)
-        previous_day_off = is_day_off(previous_date)
-        column_meta.append(
-            {
-                "currentDate": current_date.isoformat(),
-                "previousDate": previous_date.isoformat() if previous_date else None,
-                "highlightCurrent": current_day_off,
-                "highlightPrevious": previous_day_off,
-                "isCurrentHoliday": current_day_off,
-                "isPreviousHoliday": previous_day_off,
-                "isCurrentWeekend": current_date.weekday() >= 5,
-                "isPreviousWeekend": previous_date.weekday() >= 5 if previous_date else False,
-            }
-        )
-
+    context = build_monthly_series_context(report_date, current_actuals, previous_actuals, actual_key, current_targets)
+    dates = context["dates"]
+    report_index = context["reportIndex"]
+    prev_dates = context["prevDates"]
+    curr_dates = context["currDates"]
+    prev_daily = context["prevDaily"]
+    target_daily = context["targetDaily"]
+    curr_daily = context["currDaily"]
+    chart_daily = context["chartDaily"]
+    prev_cum = context["prevCumulative"]
+    target_cum = context["targetCumulative"]
+    curr_cum = context["currCumulative"]
+    day_delta = context["dayDelta"]
+    column_meta = context["columnMeta"]
+    has_target = context["hasTarget"]
     cumulative_target = target_cum[report_index] if has_target else None
     cumulative_actual = curr_cum[report_index]
     previous_cumulative = prev_cum[report_index]
@@ -685,15 +806,6 @@ def build_arrival_brief(report_date: date, arrival_maps: dict[str, dict[date, in
     }
 
 
-def read_row_values(ws, row_index: int, start_col: int, end_col: int) -> list[Any]:
-    return [ws.cell(row_index, col).value for col in range(start_col, end_col + 1)]
-
-
-def trim_by_last_date(values: list[date | None]) -> int:
-    valid = [index for index, item in enumerate(values) if item is not None]
-    return valid[-1] + 1 if valid else len(values)
-
-
 def safe_close_workbook(workbook: Any) -> None:
     archive = getattr(workbook, "_archive", None)
     vba_archive = getattr(workbook, "vba_archive", None)
@@ -704,82 +816,6 @@ def safe_close_workbook(workbook: Any) -> None:
                 handle.close()
             except Exception:
                 pass
-
-
-def find_row_index(ws, target: str, *, column: int | None = None, start_row: int = 1, end_row: int | None = None) -> int | None:
-    target_text = target.strip()
-    last_row = end_row or ws.max_row
-    for row in range(start_row, last_row + 1):
-        columns = [column] if column is not None else range(1, ws.max_column + 1)
-        for col in columns:
-            value = ws.cell(row, col).value
-            if isinstance(value, str) and value.strip() == target_text:
-                return row
-    return None
-
-
-def read_table_block(ws, title: str, *, title_column: int = 1) -> dict[str, Any]:
-    title_row = find_row_index(ws, title, column=title_column)
-    if title_row is None:
-        raise ValueError(f"未找到表格标题：{title}")
-
-    header_row = title_row + 1
-    headers = [ws.cell(header_row, col).value for col in range(1, ws.max_column + 1)]
-    last_header_col = max(
-        (index for index, value in enumerate(headers, start=1) if value not in (None, "")),
-        default=1,
-    )
-    header_labels = [str(value).strip() if value not in (None, "") else "" for value in headers[:last_header_col]]
-
-    rows: dict[str, dict[str, Any]] = {}
-    current_row = header_row + 1
-    while current_row <= ws.max_row:
-        row_label = ws.cell(current_row, 1).value
-        if row_label in (None, ""):
-            break
-        label_text = str(row_label).strip()
-        rows[label_text] = {
-            header_labels[col - 1] or f"col_{col}": ws.cell(current_row, col).value
-            for col in range(1, last_header_col + 1)
-        }
-        current_row += 1
-
-    return {"titleRow": title_row, "headerRow": header_row, "headers": header_labels, "rows": rows}
-
-
-def read_labeled_matrix_block(
-    ws,
-    anchor_label: str,
-    row_labels: list[str],
-    *,
-    anchor_column: int = 2,
-    data_start_col: int = 3,
-    search_start_row: int = 1,
-    window_size: int = 12,
-) -> dict[str, Any]:
-    anchor_row = find_row_index(ws, anchor_label, column=anchor_column, start_row=search_start_row)
-    if anchor_row is None:
-        raise ValueError(f"未找到矩阵起始标签：{anchor_label}")
-
-    raw_dates = [coerce_date(ws.cell(anchor_row, col).value) for col in range(data_start_col, ws.max_column + 1)]
-    length = trim_by_last_date(raw_dates)
-    dates = raw_dates[:length]
-    end_col = data_start_col + max(length - 1, 0)
-
-    series: dict[str, list[Any]] = {}
-    for label in row_labels:
-        row_index = find_row_index(
-            ws,
-            label,
-            column=anchor_column,
-            start_row=anchor_row + 1,
-            end_row=min(anchor_row + window_size, ws.max_row),
-        )
-        if row_index is None:
-            raise ValueError(f"未找到矩阵行标签：{label}")
-        series[label] = [ws.cell(row_index, col).value for col in range(data_start_col, end_col + 1)]
-
-    return {"anchorRow": anchor_row, "dates": dates, "series": series}
 
 
 def aligned_previous_year_date(current_date: date) -> date:
@@ -998,9 +1034,8 @@ def build_payload(leads_path: Path, arrival_path: Path) -> dict[str, Any]:
     leads = load_workbook(leads_path, data_only=True, keep_vba=True)
     arrival = load_workbook(arrival_path, data_only=True, keep_vba=True)
     try:
-        report_date = coerce_date(leads["参数"]["C2"].value)
-        if report_date is None:
-            raise ValueError("参数!C2 未读取到有效日期。")
+        validate_workbook_structure(leads, arrival)
+        report_date = validate_report_date_cell(leads)
 
         current_start = month_start(report_date)
         previous_start = previous_month(report_date)
@@ -1078,9 +1113,9 @@ def build_payload(leads_path: Path, arrival_path: Path) -> dict[str, Any]:
 
         return {
             "meta": {
-                "workbook": leads_path.as_posix(),
+                "workbook": normalize_path_display(leads_path),
                 "workbookName": leads_path.name,
-                "arrivalWorkbook": arrival_path.as_posix(),
+                "arrivalWorkbook": normalize_path_display(arrival_path),
                 "arrivalWorkbookName": arrival_path.name,
                 "generatedAt": datetime.now().isoformat(timespec="seconds"),
                 "workbookModifiedAt": datetime.fromtimestamp(leads_path.stat().st_mtime).isoformat(timespec="seconds"),
@@ -1104,20 +1139,92 @@ def build_payload(leads_path: Path, arrival_path: Path) -> dict[str, Any]:
         safe_close_workbook(arrival)
 
 
+def build_run_summary(
+    payload: dict[str, Any],
+    leads_path: Path,
+    arrival_path: Path,
+    out_path: Path,
+    summary_path: Path,
+    dashboard_changed: bool,
+) -> dict[str, Any]:
+    dashboards = payload.get("dashboards", {})
+    analysis = payload.get("analysis", {})
+    issues = analysis.get("issues", [])
+    meta = payload.get("meta", {})
+    return {
+        "generatedAt": datetime.now().isoformat(timespec="seconds"),
+        "reportDate": meta.get("reportDate"),
+        "reportDateLabel": meta.get("reportDateLabel"),
+        "inputs": {
+            "workbook": normalize_path_display(leads_path),
+            "workbookName": leads_path.name,
+            "workbookModifiedAt": file_mtime_iso(leads_path),
+            "arrivalWorkbook": normalize_path_display(arrival_path),
+            "arrivalWorkbookName": arrival_path.name,
+            "arrivalWorkbookModifiedAt": file_mtime_iso(arrival_path),
+        },
+        "outputs": {
+            "dashboardJson": normalize_path_display(out_path),
+            "dashboardJsonName": out_path.name,
+            "dashboardChanged": dashboard_changed,
+            "dashboardStatus": "updated" if dashboard_changed else "unchanged",
+            "summaryJson": normalize_path_display(summary_path),
+            "summaryJsonName": summary_path.name,
+        },
+        "stats": {
+            "dashboardCount": len(dashboards),
+            "sectionCounts": {
+                dashboard_id: len(dashboard.get("sections", []))
+                for dashboard_id, dashboard in dashboards.items()
+            },
+            "sheetCount": analysis.get("sheetCount", 0),
+            "issueCount": len(issues),
+        },
+        "warnings": [
+            issue.get("summary")
+            for issue in issues
+            if isinstance(issue, dict) and issue.get("summary")
+        ],
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build dashboard JSON from leads workbook and append arrival brief.")
     parser.add_argument("--workbook", default=str(LEADS_BOOK), help="Path to the leads workbook")
     parser.add_argument("--arrival-workbook", default=str(ARRIVAL_BOOK), help="Path to the arrival workbook")
     parser.add_argument("--out", default=str(OUT_JSON), help="Output JSON path")
+    parser.add_argument("--summary-out", default="", help="Optional output summary JSON path")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    payload = build_payload(Path(args.workbook).resolve(), Path(args.arrival_workbook).resolve())
+    leads_path = Path(args.workbook).resolve()
+    arrival_path = Path(args.arrival_workbook).resolve()
+    payload = build_payload(leads_path, arrival_path)
     out_path = Path(args.out).resolve()
+    summary_path = Path(args.summary_out).resolve() if args.summary_out else out_path.with_name(f"{out_path.stem}.summary{out_path.suffix}")
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    changed, existing_payload = write_json_if_changed(
+        out_path,
+        payload,
+        encoding="utf-8",
+        volatile_field_paths=(("meta", "generatedAt"),),
+    )
+    if not changed and existing_payload is not None:
+        payload = existing_payload
+    status = "updated" if changed else "unchanged"
+    print(f"dashboard.json {status}: {out_path}")
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_payload = build_run_summary(payload, leads_path, arrival_path, out_path, summary_path, changed)
+    summary_changed, _ = write_json_if_changed(
+        summary_path,
+        summary_payload,
+        encoding="utf-8",
+        volatile_field_paths=(("generatedAt",),),
+    )
+    summary_status = "updated" if summary_changed else "unchanged"
+    print(f"dashboard.summary.json {summary_status}: {summary_path}")
     return 0
 
 

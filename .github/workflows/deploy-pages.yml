@@ -7,6 +7,7 @@ on:
       - ".github/workflows/deploy-pages.yml"
       - "docs/**"
       - "scripts/**"
+      - "requirements.txt"
       - "data/source/NEV+ICE_xsai.xlsm"
       - "data/source/NEV+ICE_ldai.xlsx"
   workflow_dispatch:
@@ -33,7 +34,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install openpyxl
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
 
       - name: Build dashboard data
         run: python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json

@@ -14,7 +14,8 @@ $rebuildScript = Join-Path $PSScriptRoot "rebuild_dashboard.ps1"
 $publishTargets = @(
   "data/source/NEV+ICE_xsai.xlsm",
   "data/source/NEV+ICE_ldai.xlsx",
-  "docs/data/dashboard.json"
+  "docs/data/dashboard.json",
+  "docs/data/dashboard.summary.json"
 )
 
 function Invoke-Git {
@@ -99,7 +100,7 @@ try {
   }
 
   if (-not $SkipRebuild) {
-    Write-Host "Step 1/4: rebuilding dashboard.json..." -ForegroundColor Cyan
+    Write-Host "Step 1/4: rebuilding dashboard outputs..." -ForegroundColor Cyan
     & powershell -ExecutionPolicy Bypass -File $rebuildScript
     if ($LASTEXITCODE -ne 0) {
       throw "Rebuild script failed with exit code $LASTEXITCODE."

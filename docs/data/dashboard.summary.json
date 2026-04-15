@@ -1,0 +1,37 @@
+{
+  "generatedAt": "2026-04-15T16:49:08",
+  "reportDate": "2026-04-14",
+  "reportDateLabel": "2026-04-14",
+  "inputs": {
+    "workbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_xsai.xlsm",
+    "workbookName": "NEV+ICE_xsai.xlsm",
+    "workbookModifiedAt": "2026-04-15T09:50:21",
+    "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
+    "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
+    "arrivalWorkbookModifiedAt": "2026-04-15T09:50:36"
+  },
+  "outputs": {
+    "dashboardJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.json",
+    "dashboardJsonName": "dashboard.json",
+    "dashboardChanged": false,
+    "dashboardStatus": "unchanged",
+    "summaryJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.summary.json",
+    "summaryJsonName": "dashboard.summary.json"
+  },
+  "stats": {
+    "dashboardCount": 5,
+    "sectionCounts": {
+      "brief": 0,
+      "lead-control": 1,
+      "nev": 5,
+      "ice": 2,
+      "arrival": 1
+    },
+    "sheetCount": 7,
+    "issueCount": 2
+  },
+  "warnings": [
+    "线索简报按底层数据重建，避免继续沿用历史模板文案。",
+    "全国来店简报与趋势改为基于 4 张来店底表聚合生成，不再依赖汇总页缓存结果。"
+  ]
+}

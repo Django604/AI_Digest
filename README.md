@@ -17,6 +17,7 @@
 
 - `data/source/NEV+ICE_xsai.xlsm`：线索源工作簿
 - `data/source/NEV+ICE_ldai.xlsx`：来店源工作簿
+- `requirements.txt`：Python 依赖清单
 - `scripts/build_dashboard.py`：从 Excel 抽取页面数据
 - `scripts/rebuild_dashboard.ps1`：Windows 下本地一键重建 `dashboard.json`
 - `scripts/publish_dashboard.ps1`：Windows 下本地一键重建并推送到 GitHub
@@ -27,9 +28,17 @@
 ## 本地使用
 
 1. 更新 `data/source/NEV+ICE_xsai.xlsm` 和 `data/source/NEV+ICE_ldai.xlsx`
-2. 运行 `powershell -ExecutionPolicy Bypass -File scripts/rebuild_dashboard.ps1`
-3. 运行 `python scripts/serve_dashboard.py --port 4173`，需要自动打开浏览器时可以附加 `--open-browser`
-4. 打开 `http://127.0.0.1:4173`，即使误写成 `/docs` 或 `/AI_Digest` 等路径也会被回退到 `index.html`
+2. 首次运行先执行 `pip install -r requirements.txt`
+3. 运行 `powershell -ExecutionPolicy Bypass -File scripts/rebuild_dashboard.ps1`
+   这会同时生成 `docs/data/dashboard.json` 和 `docs/data/dashboard.summary.json`
+4. 运行 `python scripts/serve_dashboard.py --port 4173`，需要自动打开浏览器时可以附加 `--open-browser`
+5. 打开 `http://127.0.0.1:4173`，即使误写成 `/docs` 或 `/AI_Digest` 等路径也会被回退到 `index.html`
+
+## 测试
+
+- 运行 `python -m unittest discover -s tests -v`
+- 当前测试覆盖构建输出的关键结构，以及源工作簿缺 sheet / 缺列 / 参数日期异常等输入校验
+- GitHub Actions 在发布前也会先跑同一套测试，避免坏数据直接上 Pages
 
 ## 首次部署到 GitHub Pages
 
@@ -42,10 +51,11 @@
 
 1. 本地用 Excel 更新源数据并保存
 2. 直接运行 `powershell -ExecutionPolicy Bypass -File scripts/publish_dashboard.ps1`
-3. 脚本会自动重建 `dashboard.json`，并只提交以下发布相关文件：
+3. 脚本会自动重建 `dashboard.json` 与 `dashboard.summary.json`，并只提交以下发布相关文件：
    - `data/source/NEV+ICE_xsai.xlsm`
    - `data/source/NEV+ICE_ldai.xlsx`
    - `docs/data/dashboard.json`
+   - `docs/data/dashboard.summary.json`
 4. `GitHub Actions` 自动重新生成并发布页面
 5. 别人打开 GitHub Pages 链接时，就能看到最新数据
 
@@ -55,3 +65,4 @@
 
 - 当前方案读取的是 Excel 保存后的缓存结果。你更新完源数据后，必须先让 Excel 完成重算并保存，否则页面会拿到旧结果。
 - 工作流已经改成读取当前实际使用的两本源文件：`NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`。
+- `docs/data/dashboard.summary.json` 提供了报表日期、输入文件修改时间、dashboard 数量和本次是否真的发生内容变更，方便后续定时任务或自动巡检直接读取。
