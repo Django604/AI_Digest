@@ -621,7 +621,7 @@ def build_line_brief(report_date: date, nev_daily, nev_targets, sylphy_daily, sy
         total_day_target += day_target or 0
         marker = BRIEF_MARKERS[index]
         nev_lines.append(f"{marker}{model_name}累计实绩{fmt_count(cum_actual)}，累计达成率{fmt_percent(ratio(cum_actual, cum_target))}；当日实绩{fmt_count(day_actual)}，当日达成率{fmt_percent(ratio(day_actual, day_target))}")
-    nev_summary = f"车累计实绩{fmt_count(total_cum_actual)}，累计达成率{fmt_percent(ratio(total_cum_actual, total_cum_target))}；当日实绩{fmt_count(total_day_actual)}，当日达成率{fmt_percent(ratio(total_day_actual, total_day_target))}"
+    nev_summary = f"四车累计实绩{fmt_count(total_cum_actual)}，累计达成率{fmt_percent(ratio(total_cum_actual, total_cum_target))}；当日实绩{fmt_count(total_day_actual)}，当日达成率{fmt_percent(ratio(total_day_actual, total_day_target))}"
     sylphy_cum_actual = sum((item.get('validLeads') or 0) for item in sylphy_daily.values())
     sylphy_day_actual = sylphy_daily.get(report_date, {}).get("validLeads")
     sylphy_cum_target = sum(sylphy_targets.get(d, 0) or 0 for d in month_dates(report_date) if d <= report_date)
