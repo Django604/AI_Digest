@@ -136,7 +136,7 @@ function renderDashboard(dashboard) {
   const fragment = dashboardTemplate.content.cloneNode(true);
   const titleNode = fragment.querySelector(".dashboard-title");
   const headlineNode = fragment.querySelector(".dashboard-headline");
-  const dashboardTitle = shouldRenderDashboardTitle(dashboard) ? getDisplayDashboardTitle(dashboard) : "";
+  const dashboardTitle = shouldRenderDashboardTitle(dashboard, sections) ? getDisplayDashboardTitle(dashboard) : "";
   titleNode.textContent = dashboardTitle;
   headlineNode.textContent = dashboard.headline ?? "";
   if (!dashboardTitle) {
@@ -318,11 +318,21 @@ function getDisplayDashboardTitle(dashboard) {
     return "NEV 线索";
   }
 
+  if (dashboard?.id === "ice") {
+    return "ICE 线索";
+  }
+
   return dashboard?.title ?? "";
 }
 
-function shouldRenderDashboardTitle(dashboard) {
-  return dashboard?.id !== "lead-control";
+function shouldRenderDashboardTitle(dashboard, sections = []) {
+  if (dashboard?.id === "lead-control") {
+    return false;
+  }
+
+  const dashboardTitle = getDisplayDashboardTitle(dashboard);
+  const firstSectionTitle = sections[0]?.title ?? "";
+  return dashboardTitle !== firstSectionTitle;
 }
 
 function getDisplaySections(dashboard) {
@@ -340,6 +350,14 @@ function getDisplaySections(dashboard) {
       return {
         ...section,
         title: "NEV 线索",
+        sectionLabel: "",
+      };
+    }
+
+    if (dashboard?.id === "ice") {
+      return {
+        ...section,
+        title: "ICE 线索",
         sectionLabel: "",
       };
     }

@@ -94,3 +94,23 @@
 - 回滚方法：回退 `docs/assets/app.js` 与本条变更记录到修改前状态。
 - 关联提交（如有）：待补充
 - 备注：本次仅调整前端展示层，不修改 `docs/data/dashboard.json` 原始数据。
+
+## 2026-04-20 15:29
+- 需求目标：删除 `NEV` 页面内容区顶部重复显示的第一个大标题，仅保留下方卡片内的 `NEV 线索` 标题。
+- 改动内容：更新 `docs/assets/app.js`，将 dashboard 标题渲染条件改为当其与首个 section 标题重复时不渲染，并继续保留 `lead-control` 页面对 dashboard 标题的隐藏策略。
+- 涉及文件：`docs/assets/app.js`、`DEV_CHANGELOG.md`
+- 关键命令：`git diff -- docs/assets/app.js`、`Get-Date -Format "yyyy-MM-dd HH:mm"`
+- 验证结果：代码差异已确认，`nev` 页面会因为 dashboard 标题与首个 section 标题同为 `NEV 线索` 而自动隐藏顶部大标题；未启动浏览器做页面目视验收。
+- 回滚方法：回退 `docs/assets/app.js` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
+- 关联提交（如有）：待补充
+- 备注：该规则同时避免未来其他 dashboard 再出现标题与首块内容重复显示的问题。
+
+## 2026-04-20 15:33
+- 需求目标：将 `ICE 线索趋势` 改为 `ICE 线索`，替换原来的 `ICE 总盘`，并删除顶部重复显示的大标题。
+- 改动内容：更新 `docs/assets/app.js`，为 `ice` dashboard 增加展示标题映射 `ICE 线索`，并将首个 section 标题同步替换为 `ICE 线索`，从而复用已有的重复标题隐藏逻辑。
+- 涉及文件：`docs/assets/app.js`、`DEV_CHANGELOG.md`
+- 关键命令：`rg -n "ICE 线索趋势|ICE 线索|ICE 总盘|getDisplayDashboardTitle|getDisplaySections" docs\assets\app.js docs\data\dashboard.json`、`git diff -- docs/assets/app.js DEV_CHANGELOG.md`
+- 验证结果：代码差异已确认，`ice` 页面顶部 dashboard 标题会与首个 section 标题统一为 `ICE 线索`，因此顶部大标题将自动不再渲染；未启动浏览器做页面目视验收。
+- 回滚方法：回退 `docs/assets/app.js` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
+- 关联提交（如有）：待补充
+- 备注：本次仍仅调整前端展示层，不修改 `docs/data/dashboard.json` 中的原始标题文本。
