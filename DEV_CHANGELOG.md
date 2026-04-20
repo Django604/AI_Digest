@@ -134,3 +134,13 @@
 - 回滚方法：回退 `scripts/build_dashboard.py`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
 - 关联提交（如有）：待补充
 - 备注：本次修复的是生成源头而非静态产物补丁，避免部署流程再次覆盖文案。
+
+## 2026-04-20 16:43
+- 需求目标：增加一个全局一键截图功能，批量导出各板块趋势图区域到用户选择的本地文件夹，并跳过 `4 月ICE 有效线索趋势`。
+- 改动内容：更新 `docs/index.html`，在侧边栏新增截图工具入口；更新 `docs/assets/styles.css`，补充截图按钮、状态提示和离屏渲染容器样式；更新 `docs/assets/app.js`，新增基于 `showDirectoryPicker()` 的批量截图流程、离屏渲染导出 PNG 逻辑、文件名清洗规则及 `ICE` 总盘跳过策略。
+- 涉及文件：`docs/index.html`、`docs/assets/styles.css`、`docs/assets/app.js`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest discover -s tests -v`、`rg -n "capture-all-button|handleGlobalTrendCapture|showDirectoryPicker|capture-stage|buildTrendCaptureJobs|shouldSkipTrendCapture" docs\index.html docs\assets\app.js docs\assets\styles.css`
+- 验证结果：项目现有 `8` 个单元测试通过；代码检索已确认截图入口、批量导出逻辑、文件夹选择能力和离屏截图容器均已接入；由于当前环境缺少浏览器自动化验收，本次未实际点击按钮完成端到端截图测试。
+- 回滚方法：回退 `docs/index.html`、`docs/assets/styles.css`、`docs/assets/app.js` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
+- 关联提交（如有）：待补充
+- 备注：截图功能依赖浏览器 `File System Access API`，建议在最新版 Chrome / Edge 且通过 `localhost` 或 `https` 环境使用。

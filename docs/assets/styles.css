@@ -205,7 +205,8 @@ button,
 }
 
 .panel-switcher,
-.branch-switcher {
+.branch-switcher,
+.capture-tools {
   padding: 0;
 }
 
@@ -216,6 +217,47 @@ button,
   text-transform: uppercase;
   color: var(--stone);
   font-weight: 800;
+}
+
+.capture-all-button {
+  width: 100%;
+  border: 1px solid rgba(194, 15, 47, 0.16);
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(194, 15, 47, 0.96), rgba(153, 9, 36, 0.96));
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  box-shadow: 0 12px 28px rgba(194, 15, 47, 0.18);
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease, filter 180ms ease;
+}
+
+.capture-all-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(194, 15, 47, 0.22);
+}
+
+.capture-all-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  filter: saturate(0.76);
+  box-shadow: none;
+}
+
+.capture-status {
+  margin: 10px 2px 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.capture-status[data-state="success"] {
+  color: var(--positive);
+}
+
+.capture-status[data-state="error"] {
+  color: var(--negative);
 }
 
 .tab-list {
@@ -996,6 +1038,21 @@ button,
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+}
+
+.capture-stage {
+  position: fixed;
+  left: -20000px;
+  top: 0;
+  width: 1120px;
+  padding: 0 0 28px;
+  pointer-events: none;
+  opacity: 1;
+  z-index: -1;
+}
+
+.capture-stage .data-section {
+  margin: 0;
 }
 
 .chart-wrap svg {

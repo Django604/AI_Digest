@@ -4,6 +4,8 @@ const branchSwitcher = document.querySelector("#branch-switcher");
 const sectionNav = document.querySelector("#section-nav");
 const metaStrip = document.querySelector("#meta-strip");
 const reportDateHighlight = document.querySelector("#report-date-highlight");
+const captureAllButton = document.querySelector("#capture-all-button");
+const captureStatus = document.querySelector("#capture-status");
 const dashboardTemplate = document.querySelector("#dashboard-template");
 const sectionTemplate = document.querySelector("#section-template");
 const chartModal = createChartModal();
@@ -36,8 +38,10 @@ const state = {
   activeDashboard: "brief",
   activeAnchor: null,
   sectionObserver: null,
+  captureBusy: false,
 };
 
+setupCaptureTools();
 void loadDashboard();
 
 async function loadDashboard() {
@@ -59,9 +63,307 @@ async function loadDashboard() {
     renderMeta(payload.meta ?? {});
     renderTabs(dashboards);
     renderDashboard(payload.dashboards[state.activeDashboard]);
+    updateCaptureTools();
   } catch (error) {
     renderError(error);
   }
+}
+
+function setupCaptureTools() {
+  captureAllButton?.addEventListener("click", () => {
+    void handleGlobalTrendCapture();
+  });
+  updateCaptureTools();
+}
+
+function updateCaptureTools(options = {}) {
+  if (!captureAllButton || !captureStatus) {
+    return;
+  }
+
+  const { message, stateName = "" } = options;
+  const unsupported = typeof window.showDirectoryPicker !== "function";
+  const ready = Boolean(state.payload);
+  captureAllButton.disabled = unsupported || !ready || state.captureBusy;
+  captureAllButton.textContent = state.captureBusy ? "截图中..." : "一键截图趋势图";
+
+  if (typeof message === "string") {
+    setCaptureStatus(message, stateName);
+    return;
+  }
+
+  if (unsupported) {
+    setCaptureStatus("当前浏览器不支持选择本地文件夹，请使用最新版 Chrome 或 Edge。", "error");
+    return;
+  }
+
+  if (!ready) {
+    setCaptureStatus("加载完成后可批量导出各板块趋势图。");
+    return;
+  }
+
+  setCaptureStatus("将保存所有板块的趋势图截图，并自动跳过 4 月ICE 有效线索趋势。");
+}
+
+function setCaptureStatus(message, stateName = "") {
+  if (!captureStatus) {
+    return;
+  }
+
+  captureStatus.textContent = message;
+  if (stateName) {
+    captureStatus.dataset.state = stateName;
+  } else {
+    delete captureStatus.dataset.state;
+  }
+}
+
+async function handleGlobalTrendCapture() {
+  if (state.captureBusy) {
+    return;
+  }
+
+  if (typeof window.showDirectoryPicker !== "function") {
+    updateCaptureTools({ message: "当前浏览器不支持选择本地文件夹，请使用最新版 Chrome 或 Edge。", stateName: "error" });
+    return;
+  }
+
+  const captureJobs = buildTrendCaptureJobs();
+  if (!captureJobs.length) {
+    updateCaptureTools({ message: "当前没有可导出的趋势图板块。", stateName: "error" });
+    return;
+  }
+
+  let directoryHandle = null;
+  let captureStage = null;
+
+  try {
+    directoryHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+    state.captureBusy = true;
+    updateCaptureTools({ message: `准备开始截图，共 ${captureJobs.length} 张。` });
+    captureStage = createCaptureStage();
+
+    let savedCount = 0;
+    for (const [index, job] of captureJobs.entries()) {
+      updateCaptureTools({
+        message: `正在保存第 ${index + 1}/${captureJobs.length} 张：${job.chartTitle}`,
+      });
+
+      const sectionNode = renderSection(job.section, job.dashboard.id, job.sectionIndex);
+      captureStage.replaceChildren(sectionNode);
+      await waitForAnimationFrames(2);
+
+      const chartCard = sectionNode.querySelector(".chart-card");
+      if (!(chartCard instanceof HTMLElement)) {
+        throw new Error(`未找到可截图的趋势图区域：${job.chartTitle}`);
+      }
+
+      const blob = await renderElementToPng(chartCard, { pixelRatio: 2 });
+      await writeBlobToDirectory(directoryHandle, buildTrendCaptureFileName(job, index), blob);
+      savedCount += 1;
+    }
+
+    updateCaptureTools({
+      message: `截图完成，已保存 ${savedCount} 张趋势图到所选文件夹，已跳过 4 月ICE 有效线索趋势。`,
+      stateName: "success",
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      updateCaptureTools({ message: "已取消截图导出。"});
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    updateCaptureTools({ message: `截图失败：${message}`, stateName: "error" });
+  } finally {
+    state.captureBusy = false;
+    captureStage?.remove();
+    if (!captureStatus?.dataset.state || captureStatus.dataset.state !== "success") {
+      updateCaptureTools({ message: captureStatus?.textContent ?? "" , stateName: captureStatus?.dataset.state ?? "" });
+    } else {
+      updateCaptureTools({ message: captureStatus.textContent, stateName: captureStatus.dataset.state });
+    }
+  }
+}
+
+function buildTrendCaptureJobs() {
+  const dashboards = Object.values(state.payload?.dashboards ?? {});
+  return dashboards.flatMap((dashboard) => {
+    if (isBriefDashboard(dashboard)) {
+      return [];
+    }
+
+    return getDisplaySections(dashboard)
+      .map((section, sectionIndex) => ({
+        dashboard,
+        section,
+        sectionIndex,
+        chartTitle: String(section?.trend?.chartTitle ?? "").trim(),
+      }))
+      .filter((job) => job.chartTitle && !shouldSkipTrendCapture(job.dashboard, job.section, job.chartTitle));
+  });
+}
+
+function shouldSkipTrendCapture(dashboard, section, chartTitle) {
+  return dashboard?.id === "ice" && (section?.id === "ice-total" || chartTitle === "4 月ICE 有效线索趋势");
+}
+
+function buildTrendCaptureFileName(job, index) {
+  const prefix = String(index + 1).padStart(2, "0");
+  const dashboardTitle = getDisplayDashboardTitle(job.dashboard);
+  const sectionTitle = job.section?.title ?? "";
+  const chartTitle = job.chartTitle || "趋势图";
+  const parts = [prefix, dashboardTitle, sectionTitle, chartTitle].filter(Boolean);
+  return `${sanitizeFilename(parts.join("_"))}.png`;
+}
+
+function sanitizeFilename(value) {
+  return String(value ?? "")
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replaceAll(" ", "_");
+}
+
+function createCaptureStage() {
+  const stage = document.createElement("div");
+  stage.className = "capture-stage";
+  stage.setAttribute("aria-hidden", "true");
+  const visibleWidth = Math.round(dashboardRoot.getBoundingClientRect().width);
+  stage.style.width = `${Math.max(visibleWidth || 0, 1120)}px`;
+  document.body.appendChild(stage);
+  return stage;
+}
+
+async function renderElementToPng(element, options = {}) {
+  await document.fonts?.ready;
+  const bounds = element.getBoundingClientRect();
+  const width = Math.ceil(bounds.width);
+  const height = Math.ceil(bounds.height);
+  if (!width || !height) {
+    throw new Error("截图区域尺寸无效。");
+  }
+
+  const clone = element.cloneNode(true);
+  inlineComputedStyles(element, clone);
+
+  const wrapper = document.createElement("div");
+  wrapper.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  wrapper.style.width = `${width}px`;
+  wrapper.style.height = `${height}px`;
+  wrapper.style.background = "#ffffff";
+  wrapper.style.margin = "0";
+  wrapper.style.padding = "0";
+  wrapper.appendChild(clone);
+
+  const serialized = new XMLSerializer().serializeToString(wrapper);
+  const svgMarkup = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <foreignObject width="100%" height="100%">${serialized}</foreignObject>
+    </svg>
+  `;
+  const svgUrl = URL.createObjectURL(new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" }));
+
+  try {
+    const image = await loadImage(svgUrl);
+    const pixelRatio = Math.max(1, options.pixelRatio ?? Math.min(window.devicePixelRatio || 1, 2));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * pixelRatio);
+    canvas.height = Math.round(height * pixelRatio);
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("截图画布初始化失败。");
+    }
+    context.scale(pixelRatio, pixelRatio);
+    context.drawImage(image, 0, 0, width, height);
+    return await canvasToBlob(canvas);
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+}
+
+function inlineComputedStyles(sourceNode, targetNode) {
+  if (!(sourceNode instanceof Element) || !(targetNode instanceof Element)) {
+    return;
+  }
+
+  const computedStyle = getComputedStyle(sourceNode);
+  for (const propertyName of computedStyle) {
+    targetNode.style.setProperty(
+      propertyName,
+      computedStyle.getPropertyValue(propertyName),
+      computedStyle.getPropertyPriority(propertyName),
+    );
+  }
+
+  if (sourceNode instanceof SVGElement) {
+    targetNode.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  }
+
+  if (sourceNode instanceof HTMLCanvasElement && targetNode instanceof HTMLCanvasElement) {
+    targetNode.width = sourceNode.width;
+    targetNode.height = sourceNode.height;
+    targetNode.getContext("2d")?.drawImage(sourceNode, 0, 0);
+  }
+
+  if (sourceNode instanceof HTMLTextAreaElement && targetNode instanceof HTMLTextAreaElement) {
+    targetNode.textContent = sourceNode.value;
+  }
+
+  const sourceChildren = [...sourceNode.childNodes];
+  const targetChildren = [...targetNode.childNodes];
+  sourceChildren.forEach((childNode, index) => {
+    const targetChild = targetChildren[index];
+    if (childNode instanceof Element && targetChild instanceof Element) {
+      inlineComputedStyles(childNode, targetChild);
+    }
+  });
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("截图图像渲染失败。"));
+    image.src = src;
+  });
+}
+
+function canvasToBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+      reject(new Error("PNG 导出失败。"));
+    }, "image/png");
+  });
+}
+
+async function writeBlobToDirectory(directoryHandle, fileName, blob) {
+  const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(blob);
+  await writable.close();
+}
+
+function waitForAnimationFrames(count = 1) {
+  return new Promise((resolve) => {
+    const step = (remaining) => {
+      if (remaining <= 0) {
+        resolve();
+        return;
+      }
+      requestAnimationFrame(() => step(remaining - 1));
+    };
+    step(count);
+  });
+}
+
+function isAbortError(error) {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function renderMeta(meta) {
@@ -1237,6 +1539,7 @@ function renderError(error) {
   metaStrip.innerHTML = "";
   dashboardRoot.innerHTML = "";
   dashboardRoot.appendChild(renderEmptyBlock(`页面加载失败：${message}`));
+  updateCaptureTools({ message: "页面加载失败，截图功能不可用。", stateName: "error" });
 }
 
 function renderEmptyBlock(message) {
