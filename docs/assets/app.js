@@ -247,8 +247,9 @@ function buildTrendCardExportSvg(section) {
   const chartTitle = String(trend.chartTitle ?? "趋势图");
   const summaryItems = trend.summary?.items ?? [];
   const chartMarkup = buildTrendChartExportMarkup(trend);
-  const width = 1120;
+  const minWidth = 1120;
   const padding = 28;
+  const width = Math.max(minWidth, Math.ceil(chartMarkup.width + padding * 2));
   const contentWidth = width - padding * 2;
   const summaryLayout = buildSummaryLayout(summaryItems, contentWidth);
   const chartY = 92 + summaryLayout.totalHeight;
