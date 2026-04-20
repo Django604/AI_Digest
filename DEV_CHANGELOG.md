@@ -144,3 +144,13 @@
 - 回滚方法：回退 `docs/index.html`、`docs/assets/styles.css`、`docs/assets/app.js` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
 - 关联提交（如有）：待补充
 - 备注：截图功能依赖浏览器 `File System Access API`，建议在最新版 Chrome / Edge 且通过 `localhost` 或 `https` 环境使用。
+
+## 2026-04-20 16:55
+- 需求目标：修复一键截图时出现 `Tainted canvases may not be exported` 导致导出失败的问题。
+- 改动内容：更新 `docs/assets/app.js`，移除基于 `foreignObject` 的整块 DOM 转 PNG 方案，改为生成纯 SVG 的趋势图导出卡片，再安全转换为 PNG；同步清理 `docs/assets/styles.css` 中已不再需要的离屏渲染容器样式。
+- 涉及文件：`docs/assets/app.js`、`docs/assets/styles.css`、`DEV_CHANGELOG.md`
+- 关键命令：`rg -n "renderTrendCardToPng|buildTrendCardExportSvg|buildTrendChartExportMarkup|buildLegendLayout|escapeXml" docs\assets\app.js`、`python -X utf8 -m unittest discover -s tests -v`
+- 验证结果：项目现有 `8` 个单元测试通过；代码层已不再使用会污染 canvas 的 `foreignObject` 导出链路；由于当前环境缺少浏览器端自动化验收，本次未实际点击按钮复测导出成功结果。
+- 回滚方法：回退 `docs/assets/app.js`、`docs/assets/styles.css` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
+- 关联提交（如有）：待补充
+- 备注：新的导出方式会生成一张结构化的趋势图卡片 PNG，目标是规避浏览器安全限制而不是逐像素复制当前 DOM。

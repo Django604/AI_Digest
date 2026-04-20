@@ -135,13 +135,11 @@ async function handleGlobalTrendCapture() {
   }
 
   let directoryHandle = null;
-  let captureStage = null;
 
   try {
     directoryHandle = await window.showDirectoryPicker({ mode: "readwrite" });
     state.captureBusy = true;
     updateCaptureTools({ message: `准备开始截图，共 ${captureJobs.length} 张。` });
-    captureStage = createCaptureStage();
 
     let savedCount = 0;
     for (const [index, job] of captureJobs.entries()) {
@@ -149,16 +147,7 @@ async function handleGlobalTrendCapture() {
         message: `正在保存第 ${index + 1}/${captureJobs.length} 张：${job.chartTitle}`,
       });
 
-      const sectionNode = renderSection(job.section, job.dashboard.id, job.sectionIndex);
-      captureStage.replaceChildren(sectionNode);
-      await waitForAnimationFrames(2);
-
-      const chartCard = sectionNode.querySelector(".chart-card");
-      if (!(chartCard instanceof HTMLElement)) {
-        throw new Error(`未找到可截图的趋势图区域：${job.chartTitle}`);
-      }
-
-      const blob = await renderElementToPng(chartCard, { pixelRatio: 2 });
+      const blob = await renderTrendCardToPng(job.section, { pixelRatio: 2 });
       await writeBlobToDirectory(directoryHandle, buildTrendCaptureFileName(job, index), blob);
       savedCount += 1;
     }
@@ -177,7 +166,6 @@ async function handleGlobalTrendCapture() {
     updateCaptureTools({ message: `截图失败：${message}`, stateName: "error" });
   } finally {
     state.captureBusy = false;
-    captureStage?.remove();
     if (!captureStatus?.dataset.state || captureStatus.dataset.state !== "success") {
       updateCaptureTools({ message: captureStatus?.textContent ?? "" , stateName: captureStatus?.dataset.state ?? "" });
     } else {
@@ -225,43 +213,12 @@ function sanitizeFilename(value) {
     .replaceAll(" ", "_");
 }
 
-function createCaptureStage() {
-  const stage = document.createElement("div");
-  stage.className = "capture-stage";
-  stage.setAttribute("aria-hidden", "true");
-  const visibleWidth = Math.round(dashboardRoot.getBoundingClientRect().width);
-  stage.style.width = `${Math.max(visibleWidth || 0, 1120)}px`;
-  document.body.appendChild(stage);
-  return stage;
-}
-
-async function renderElementToPng(element, options = {}) {
+async function renderTrendCardToPng(section, options = {}) {
   await document.fonts?.ready;
-  const bounds = element.getBoundingClientRect();
-  const width = Math.ceil(bounds.width);
-  const height = Math.ceil(bounds.height);
-  if (!width || !height) {
-    throw new Error("截图区域尺寸无效。");
-  }
-
-  const clone = element.cloneNode(true);
-  inlineComputedStyles(element, clone);
-
-  const wrapper = document.createElement("div");
-  wrapper.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-  wrapper.style.width = `${width}px`;
-  wrapper.style.height = `${height}px`;
-  wrapper.style.background = "#ffffff";
-  wrapper.style.margin = "0";
-  wrapper.style.padding = "0";
-  wrapper.appendChild(clone);
-
-  const serialized = new XMLSerializer().serializeToString(wrapper);
-  const svgMarkup = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-      <foreignObject width="100%" height="100%">${serialized}</foreignObject>
-    </svg>
-  `;
+  const svgMarkup = buildTrendCardExportSvg(section);
+  const size = getSvgMarkupSize(svgMarkup);
+  const width = size.width;
+  const height = size.height;
   const svgUrl = URL.createObjectURL(new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" }));
 
   try {
@@ -282,42 +239,160 @@ async function renderElementToPng(element, options = {}) {
   }
 }
 
-function inlineComputedStyles(sourceNode, targetNode) {
-  if (!(sourceNode instanceof Element) || !(targetNode instanceof Element)) {
-    return;
+function buildTrendCardExportSvg(section) {
+  const trend = section?.trend ?? {};
+  const chartTitle = String(trend.chartTitle ?? "趋势图");
+  const summaryItems = trend.summary?.items ?? [];
+  const chartMarkup = buildTrendChartExportMarkup(trend);
+  const width = 1120;
+  const padding = 28;
+  const contentWidth = width - padding * 2;
+  const summaryLayout = buildSummaryLayout(summaryItems, contentWidth);
+  const chartY = 92 + summaryLayout.totalHeight;
+  const legendLayout = buildLegendLayout(trend.chart, contentWidth);
+  const chartHeight = chartMarkup.height;
+  const legendY = chartY + chartHeight + 22;
+  const noteText = trend.chart?.note ? String(trend.chart.note) : "";
+  const noteHeight = noteText ? 26 : 0;
+  const height = legendY + legendLayout.height + noteHeight + 34;
+
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect width="${width}" height="${height}" rx="18" fill="#ffffff" stroke="rgba(22,28,36,0.08)" />
+      <text x="${padding}" y="48" fill="#161c24" font-size="20" font-weight="800" font-family="Segoe UI, Microsoft YaHei UI, PingFang SC, sans-serif">${escapeXml(chartTitle)}</text>
+      ${summaryLayout.markup ? `<g transform="translate(${padding}, 72)">${summaryLayout.markup}</g>` : ""}
+      <g transform="translate(${padding}, ${chartY})">${chartMarkup.markup}</g>
+      <g transform="translate(${padding}, ${legendY})">${legendLayout.markup}</g>
+      ${noteText ? `<text x="${padding}" y="${height - 18}" fill="#5f6975" font-size="14" font-family="Segoe UI, Microsoft YaHei UI, PingFang SC, sans-serif">${escapeXml(noteText)}</text>` : ""}
+    </svg>
+  `.trim();
+}
+
+function buildSummaryLayout(items, availableWidth) {
+  if (!items.length) {
+    return { markup: "", totalHeight: 0 };
   }
 
-  const computedStyle = getComputedStyle(sourceNode);
-  for (const propertyName of computedStyle) {
-    targetNode.style.setProperty(
-      propertyName,
-      computedStyle.getPropertyValue(propertyName),
-      computedStyle.getPropertyPriority(propertyName),
-    );
+  const columns = Math.min(items.length, items.length === 5 ? 5 : 6);
+  const gap = 12;
+  const cardWidth = (availableWidth - gap * (columns - 1)) / columns;
+  const cardHeight = items.some((item) => item.note) ? 102 : 86;
+  const rows = Math.ceil(items.length / columns);
+  const markup = items
+    .map((item, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const x = column * (cardWidth + gap);
+      const y = row * (cardHeight + gap);
+      const valueClass = getSummaryValueClass(item);
+      const valueColor = valueClass.includes("negative") ? "#1f8f57" : valueClass.includes("positive") ? "#c20f2f" : "#161c24";
+      const noteMarkup = item.note
+        ? `<text x="${x + 16}" y="${y + 78}" fill="#5f6975" font-size="13" font-family="Segoe UI, Microsoft YaHei UI, PingFang SC, sans-serif">${escapeXml(String(item.note))}</text>`
+        : "";
+
+      return `
+        <g transform="translate(0,0)">
+          <rect x="${x}" y="${y}" width="${cardWidth}" height="${cardHeight}" rx="12" fill="rgba(244,247,250,0.96)" stroke="rgba(22,28,36,0.07)" />
+          <text x="${x + 16}" y="${y + 28}" fill="#5f6975" font-size="13" font-family="Segoe UI, Microsoft YaHei UI, PingFang SC, sans-serif">${escapeXml(String(item.label ?? ""))}</text>
+          <text x="${x + 16}" y="${y + 56}" fill="${valueColor}" font-size="28" font-weight="800" font-family="Segoe UI, Microsoft YaHei UI, PingFang SC, sans-serif">${escapeXml(String(item.displayValue ?? "-"))}</text>
+          ${noteMarkup}
+        </g>
+      `;
+    })
+    .join("");
+
+  return {
+    markup,
+    totalHeight: rows * cardHeight + (rows - 1) * gap,
+  };
+}
+
+function buildTrendChartExportMarkup(trend) {
+  const chartNode = renderTrendChart(trend);
+  const svgNode = chartNode.querySelector("svg");
+  if (!(svgNode instanceof SVGSVGElement)) {
+    throw new Error(`未找到可截图的趋势图区域：${trend?.chartTitle ?? "趋势图"}`);
   }
 
-  if (sourceNode instanceof SVGElement) {
-    targetNode.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  const exportSvg = svgNode.cloneNode(true);
+  exportSvg.querySelectorAll(".hover-band").forEach((node) => node.remove());
+  exportSvg.setAttribute("x", "0");
+  exportSvg.setAttribute("y", "0");
+  exportSvg.setAttribute("width", exportSvg.viewBox.baseVal.width || exportSvg.width.baseVal.value || 0);
+  exportSvg.setAttribute("height", exportSvg.viewBox.baseVal.height || exportSvg.height.baseVal.value || 0);
+
+  const viewBox = exportSvg.viewBox.baseVal;
+  const width = viewBox?.width || exportSvg.width.baseVal.value;
+  const height = viewBox?.height || exportSvg.height.baseVal.value;
+
+  return {
+    markup: new XMLSerializer().serializeToString(exportSvg),
+    width,
+    height,
+  };
+}
+
+function buildLegendLayout(chart, availableWidth) {
+  const defs = getSeriesDefinitions(chart);
+  const baseY = 0;
+  const rowHeight = 24;
+  const gapX = 18;
+  let x = 0;
+  let y = baseY;
+  const markup = defs
+    .map((item) => {
+      const muted = !hasNumericValues(chart?.series?.[item.key]);
+      const label = String(item.label ?? "");
+      const itemWidth = estimateLegendItemWidth(label);
+      if (x > 0 && x + itemWidth > availableWidth) {
+        x = 0;
+        y += rowHeight;
+      }
+
+      const currentX = x;
+      const currentY = y;
+      x += itemWidth + gapX;
+      const opacity = muted ? 0.38 : 1;
+      return `
+        <g opacity="${opacity}" transform="translate(${currentX}, ${currentY})">
+          ${buildLegendSwatchMarkup(item)}
+          <text x="28" y="14" fill="#5f6975" font-size="15" font-family="Segoe UI, Microsoft YaHei UI, PingFang SC, sans-serif">${escapeXml(label)}</text>
+        </g>
+      `;
+    })
+    .join("");
+
+  return {
+    markup,
+    height: y + rowHeight,
+  };
+}
+
+function estimateLegendItemWidth(label) {
+  return 28 + String(label ?? "").length * 16;
+}
+
+function buildLegendSwatchMarkup(item) {
+  if (item.type === "line") {
+    const dash = item.dashed ? ` stroke-dasharray="8 6"` : "";
+    return `<line x1="0" y1="9" x2="18" y2="9" stroke="${item.color}" stroke-width="2.5"${dash} />`;
   }
 
-  if (sourceNode instanceof HTMLCanvasElement && targetNode instanceof HTMLCanvasElement) {
-    targetNode.width = sourceNode.width;
-    targetNode.height = sourceNode.height;
-    targetNode.getContext("2d")?.drawImage(sourceNode, 0, 0);
-  }
+  const fill = item.fill ?? item.color;
+  const stroke = item.stroke ?? item.color;
+  const strokeWidth = item.strokeWidth ?? 1.5;
+  return `<rect x="0" y="3" width="14" height="10" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
+}
 
-  if (sourceNode instanceof HTMLTextAreaElement && targetNode instanceof HTMLTextAreaElement) {
-    targetNode.textContent = sourceNode.value;
+function getSvgMarkupSize(svgMarkup) {
+  const match = svgMarkup.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+  if (!match) {
+    throw new Error("截图 SVG 尺寸解析失败。");
   }
-
-  const sourceChildren = [...sourceNode.childNodes];
-  const targetChildren = [...targetNode.childNodes];
-  sourceChildren.forEach((childNode, index) => {
-    const targetChild = targetChildren[index];
-    if (childNode instanceof Element && targetChild instanceof Element) {
-      inlineComputedStyles(childNode, targetChild);
-    }
-  });
+  return {
+    width: Math.ceil(Number(match[1])),
+    height: Math.ceil(Number(match[2])),
+  };
 }
 
 function loadImage(src) {
@@ -347,19 +422,6 @@ async function writeBlobToDirectory(directoryHandle, fileName, blob) {
   const writable = await fileHandle.createWritable();
   await writable.write(blob);
   await writable.close();
-}
-
-function waitForAnimationFrames(count = 1) {
-  return new Promise((resolve) => {
-    const step = (remaining) => {
-      if (remaining <= 0) {
-        resolve();
-        return;
-      }
-      requestAnimationFrame(() => step(remaining - 1));
-    };
-    step(count);
-  });
 }
 
 function isAbortError(error) {
@@ -1705,4 +1767,8 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function escapeXml(value) {
+  return escapeHtml(value);
 }
