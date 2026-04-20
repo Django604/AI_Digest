@@ -114,3 +114,13 @@
 - 回滚方法：回退 `docs/assets/app.js` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
 - 关联提交（如有）：待补充
 - 备注：本次仍仅调整前端展示层，不修改 `docs/data/dashboard.json` 中的原始标题文本。
+
+## 2026-04-20 15:59
+- 需求目标：将两处趋势图文案分别改为 `4 月NEV 新增线索趋势` 与 `4 月ICE 有效线索趋势`，并推送到远端仓库。
+- 改动内容：更新 `docs/data/dashboard.json` 中 `nev` 与 `ice` 首个趋势图的 `chartTitle`，移除原文案中的 `总盘` 字样，使页面截图文案与当前标题策略保持一致。
+- 涉及文件：`docs/data/dashboard.json`、`DEV_CHANGELOG.md`
+- 关键命令：`rg -n "4 月NEV 总盘新增线索趋势|4 月ICE 总盘有效线索趋势|4 月NEV|4 月ICE" docs\data\dashboard.json docs\assets\app.js`、`git diff -- docs\data\dashboard.json DEV_CHANGELOG.md`
+- 验证结果：代码检索已确认两处 `chartTitle` 文案已替换为目标文本；未启动浏览器做页面目视验收。
+- 回滚方法：回退 `docs/data/dashboard.json` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
+- 关联提交（如有）：待补充
+- 备注：本次仅修改静态数据文案，不涉及 `docs/assets/app.js` 的展示逻辑调整。

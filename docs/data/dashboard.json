@@ -1065,7 +1065,7 @@
             "auxiliary": []
           },
           "trend": {
-            "chartTitle": "4 月NEV 总盘新增线索趋势",
+            "chartTitle": "4 月NEV 新增线索趋势",
             "summary": {
               "items": [
                 {
@@ -6033,7 +6033,7 @@
             "auxiliary": []
           },
           "trend": {
-            "chartTitle": "4 月ICE 总盘有效线索趋势",
+            "chartTitle": "4 月ICE 有效线索趋势",
             "summary": {
               "items": [
                 {
