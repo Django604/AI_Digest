@@ -154,3 +154,23 @@
 - 回滚方法：回退 `docs/assets/app.js`、`docs/assets/styles.css` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
 - 关联提交（如有）：待补充
 - 备注：新的导出方式会生成一张结构化的趋势图卡片 PNG，目标是规避浏览器安全限制而不是逐像素复制当前 DOM。
+
+## 2026-04-20 17:01
+- 需求目标：继续修复截图导出仍触发 canvas 污染的问题，并提高浏览器兼容性。
+- 改动内容：更新 `docs/assets/app.js`，将 SVG 图片加载方式从 `blob:` URL 改为内联 `data:image/svg+xml`，并为 `Image` 显式设置 `crossOrigin = "anonymous"`；同时补充针对 canvas 污染异常的定向报错提示。
+- 涉及文件：`docs/assets/app.js`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest discover -s tests -v`、`git diff -- docs/assets/app.js`
+- 验证结果：项目现有 `8` 个单元测试通过；代码差异已确认导出链路改为内联 SVG 数据 URL；由于当前环境缺少浏览器端自动化验收，本次未实际点击按钮复测。
+- 回滚方法：回退 `docs/assets/app.js` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
+- 关联提交（如有）：待补充
+- 备注：如果个别浏览器仍然严格拦截，下一步应改为完全基于 Canvas API 手工绘制导出卡片，不再经过 `Image` 解码 SVG。
+
+## 2026-04-20 17:19
+- 需求目标：在推送前完成“一键截图趋势图”功能的真实浏览器自测，确认批量导出链路可用。
+- 改动内容：未修改功能代码；补充一次基于本地 HTTP 服务与 Playwright 的端到端验收，真实点击页面上的 `一键截图趋势图` 按钮，并通过模拟 `showDirectoryPicker()` 将导出的 PNG 写入本地临时目录。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest discover -s tests -v`、`python -X utf8 - <<'PY' ... PY`
+- 验证结果：单元测试 `8/8` 通过；浏览器端真实导出成功，状态文案为“截图完成，已保存 8 张趋势图到所选文件夹，已跳过 4 月ICE 有效线索趋势。”；临时目录内共生成 `8` 张 PNG，且未导出被要求跳过的 `4 月ICE 有效线索趋势`。
+- 回滚方法：删除本条 `DEV_CHANGELOG.md` 记录即可。
+- 关联提交（如有）：待补充
+- 备注：自动化验收过程中出现 1 条静态资源 `404` 控制台日志，但不影响页面加载与截图导出流程。

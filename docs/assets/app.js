@@ -219,7 +219,7 @@ async function renderTrendCardToPng(section, options = {}) {
   const size = getSvgMarkupSize(svgMarkup);
   const width = size.width;
   const height = size.height;
-  const svgUrl = URL.createObjectURL(new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" }));
+  const svgUrl = buildSvgDataUrl(svgMarkup);
 
   try {
     const image = await loadImage(svgUrl);
@@ -234,8 +234,11 @@ async function renderTrendCardToPng(section, options = {}) {
     context.scale(pixelRatio, pixelRatio);
     context.drawImage(image, 0, 0, width, height);
     return await canvasToBlob(canvas);
-  } finally {
-    URL.revokeObjectURL(svgUrl);
+  } catch (error) {
+    if (isCanvasTaintError(error)) {
+      throw new Error("浏览器阻止了 PNG 导出，请刷新页面后重试；如果仍失败，我再继续改成纯 Canvas 导出。");
+    }
+    throw error;
   }
 }
 
@@ -398,11 +401,16 @@ function getSvgMarkupSize(svgMarkup) {
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const image = new Image();
+    image.crossOrigin = "anonymous";
     image.decoding = "async";
     image.onload = () => resolve(image);
     image.onerror = () => reject(new Error("截图图像渲染失败。"));
     image.src = src;
   });
+}
+
+function buildSvgDataUrl(svgMarkup) {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
 }
 
 function canvasToBlob(canvas) {
@@ -426,6 +434,10 @@ async function writeBlobToDirectory(directoryHandle, fileName, blob) {
 
 function isAbortError(error) {
   return error instanceof DOMException && error.name === "AbortError";
+}
+
+function isCanvasTaintError(error) {
+  return error instanceof DOMException && /tainted canvases?/i.test(error.message);
 }
 
 function renderMeta(meta) {
