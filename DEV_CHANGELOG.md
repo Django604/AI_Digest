@@ -174,3 +174,13 @@
 - 回滚方法：删除本条 `DEV_CHANGELOG.md` 记录即可。
 - 关联提交（如有）：待补充
 - 备注：自动化验收过程中出现 1 条静态资源 `404` 控制台日志，但不影响页面加载与截图导出流程。
+
+## 2026-04-20 17:22
+- 需求目标：将已完成真实验收的截图导出修复提交并推送到 GitHub。
+- 改动内容：仅提交 `docs/assets/app.js` 与 `DEV_CHANGELOG.md`；创建提交 `743d611`，并推送到远端 `origin/main`。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`git add docs/assets/app.js DEV_CHANGELOG.md`、`git commit -m "Fix screenshot export compatibility"`、`git push origin main`
+- 验证结果：远端推送成功，`main` 分支已从 `204c88c` 更新到 `743d611`。
+- 回滚方法：如需撤回，基于提交 `743d611` 执行新的反向提交，不直接改写远端历史。
+- 关联提交（如有）：`743d611`
+- 备注：仓库内存在未跟踪的 `pptx` 与脚本文件，本次未纳入提交。
