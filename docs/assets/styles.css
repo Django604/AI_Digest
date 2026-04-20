@@ -627,6 +627,10 @@ button,
   gap: 10px;
 }
 
+.chart-card > .trend-summary {
+  margin-bottom: 18px;
+}
+
 .trend-summary-item {
   padding: 12px 14px;
   border-radius: 12px;
@@ -675,31 +679,37 @@ button,
   font-weight: 700;
 }
 
-.arrival-board .trend-summary {
+.arrival-board .trend-summary,
+.arrival-trend-summary {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 
-.arrival-board .trend-summary-item {
+.arrival-board .trend-summary-item,
+.arrival-trend-summary .trend-summary-item {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 244, 245, 0.94));
   padding: 12px 12px;
 }
 
-.arrival-board .trend-summary-item strong {
+.arrival-board .trend-summary-item strong,
+.arrival-trend-summary .trend-summary-item strong {
   font-size: 1.6rem;
   color: var(--brand-red);
   letter-spacing: -0.03em;
 }
 
-.arrival-board .trend-summary-item strong.is-positive-value {
+.arrival-board .trend-summary-item strong.is-positive-value,
+.arrival-trend-summary .trend-summary-item strong.is-positive-value {
   color: var(--brand-red);
 }
 
-.arrival-board .trend-summary-item strong.is-negative-value {
+.arrival-board .trend-summary-item strong.is-negative-value,
+.arrival-trend-summary .trend-summary-item strong.is-negative-value {
   color: var(--positive);
 }
 
-.arrival-board .trend-summary-item label {
+.arrival-board .trend-summary-item label,
+.arrival-trend-summary .trend-summary-item label {
   white-space: nowrap;
   font-size: 0.8rem;
 }
@@ -1200,7 +1210,8 @@ tbody tr:last-child td {
   }
 
   .trend-summary,
-  .arrival-board .trend-summary {
+  .arrival-board .trend-summary,
+  .arrival-trend-summary {
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: minmax(190px, 28vw);
@@ -1214,7 +1225,8 @@ tbody tr:last-child td {
   }
 
   .trend-summary-item,
-  .arrival-board .trend-summary-item {
+  .arrival-board .trend-summary-item,
+  .arrival-trend-summary .trend-summary-item {
     scroll-snap-align: start;
   }
 
@@ -1325,15 +1337,18 @@ tbody tr:last-child td {
   }
 
   .trend-summary,
-  .arrival-board .trend-summary {
+  .arrival-board .trend-summary,
+  .arrival-trend-summary {
     grid-auto-columns: minmax(188px, 56vw);
   }
 
-  .arrival-board .trend-summary-item strong {
+  .arrival-board .trend-summary-item strong,
+  .arrival-trend-summary .trend-summary-item strong {
     font-size: 1.38rem;
   }
 
-  .arrival-board .trend-summary-item strong.is-negative-value {
+  .arrival-board .trend-summary-item strong.is-negative-value,
+  .arrival-trend-summary .trend-summary-item strong.is-negative-value {
     color: var(--positive);
   }
   .mixed-chart {
@@ -1414,21 +1429,25 @@ tbody tr:last-child td {
   }
 
   .trend-summary,
-  .arrival-board .trend-summary {
+  .arrival-board .trend-summary,
+  .arrival-trend-summary {
     grid-auto-columns: minmax(184px, 78vw);
     gap: 8px;
   }
 
   .trend-summary-item,
-  .arrival-board .trend-summary-item {
+  .arrival-board .trend-summary-item,
+  .arrival-trend-summary .trend-summary-item {
     padding: 12px;
   }
 
-  .arrival-board .trend-summary-item strong {
+  .arrival-board .trend-summary-item strong,
+  .arrival-trend-summary .trend-summary-item strong {
     font-size: 1.32rem;
   }
 
-  .arrival-board .trend-summary-item strong.is-negative-value {
+  .arrival-board .trend-summary-item strong.is-negative-value,
+  .arrival-trend-summary .trend-summary-item strong.is-negative-value {
     color: var(--positive);
   }
 

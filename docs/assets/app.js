@@ -401,10 +401,17 @@ function renderSection(section, dashboardId, index) {
   headers[0].querySelector("p")?.remove();
   headers[1].querySelector("p")?.remove();
 
+  const chartCard = fragment.querySelector(".chart-card");
+  const chartWrap = fragment.querySelector(".chart-wrap");
+  const chartSummaryNode = renderTrendSummary(section.trend);
+  if (chartSummaryNode && chartCard && chartWrap) {
+    chartCard.insertBefore(chartSummaryNode, chartWrap);
+  }
+
   const chartNode = renderTrendChart(section.trend);
   chartNode.classList.add("clickable-chart");
   chartNode.addEventListener("click", () => openChartModal(section));
-  fragment.querySelector(".chart-wrap").appendChild(chartNode);
+  chartWrap.appendChild(chartNode);
   fragment.querySelector(".table-wrap").appendChild(renderTrendBoard(section.trend));
 
   const container = document.createElement("div");
@@ -432,6 +439,33 @@ function renderMetricCard(card) {
   return node;
 }
 
+function renderTrendSummary(trend) {
+  const items = trend?.summary?.items ?? [];
+  if (!items.length) {
+    return null;
+  }
+
+  const summary = document.createElement("div");
+  summary.className = "trend-summary";
+  if (isArrivalTrend(trend)) {
+    summary.classList.add("arrival-trend-summary");
+  }
+
+  items.forEach((item) => {
+    const article = document.createElement("article");
+    article.className = "trend-summary-item";
+    const valueClass = getSummaryValueClass(item);
+    article.innerHTML = `
+      <label>${escapeHtml(item.label ?? "")}</label>
+      <strong class="${valueClass}">${escapeHtml(item.displayValue ?? "-")}</strong>
+      ${item.note ? `<p>${formatSummaryNote(item.note)}</p>` : ""}
+    `;
+    summary.appendChild(article);
+  });
+
+  return summary;
+}
+
 function renderTrendBoard(trend) {
   if (!trend?.matrix?.rows?.length) {
     return renderEmptyBlock("当前没有可渲染的月度对照数据。");
@@ -443,20 +477,6 @@ function renderTrendBoard(trend) {
   if (isArrival) {
     board.classList.add("arrival-board");
   }
-
-  const summary = document.createElement("div");
-  summary.className = "trend-summary";
-  (trend.summary?.items ?? []).forEach((item) => {
-    const article = document.createElement("article");
-    article.className = "trend-summary-item";
-    const valueClass = getSummaryValueClass(item);
-    article.innerHTML = `
-      <label>${escapeHtml(item.label ?? "")}</label>
-      <strong class="${valueClass}">${escapeHtml(item.displayValue ?? "-")}</strong>
-      ${item.note ? `<p>${formatSummaryNote(item.note)}</p>` : ""}
-    `;
-    summary.appendChild(article);
-  });
 
   const matrixWrap = document.createElement("div");
   matrixWrap.className = "trend-matrix-wrap";
@@ -564,7 +584,6 @@ function renderTrendBoard(trend) {
   `;
 
   matrixWrap.appendChild(table);
-  board.appendChild(summary);
   board.appendChild(matrixWrap);
   return board;
 }
