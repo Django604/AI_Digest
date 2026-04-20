@@ -124,3 +124,13 @@
 - 回滚方法：回退 `docs/data/dashboard.json` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
 - 关联提交（如有）：待补充
 - 备注：本次仅修改静态数据文案，不涉及 `docs/assets/app.js` 的展示逻辑调整。
+
+## 2026-04-20 16:07
+- 需求目标：解决趋势图文案修改后页面仍未生效的问题，并确保部署后继续保持 `4 月NEV 新增线索趋势` 与 `4 月ICE 有效线索趋势`。
+- 改动内容：定位到 `GitHub Pages` 工作流会在推送后重新运行 `scripts/build_dashboard.py` 覆盖 `docs/data/dashboard.json`；因此改为更新 `scripts/build_dashboard.py` 的趋势图标题生成逻辑，仅对 `NEV 总盘 + 新增线索` 与 `ICE 总盘 + 有效线索` 做标题归一化，再重新生成 `docs/data/dashboard.json` 与 `docs/data/dashboard.summary.json`。
+- 涉及文件：`scripts/build_dashboard.py`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json --summary-out docs/data/dashboard.summary.json`、`rg -n "4 月NEV 新增线索趋势|4 月ICE 有效线索趋势|4 月NEV 总盘新增线索趋势|4 月ICE 总盘有效线索趋势" docs\data\dashboard.json scripts\build_dashboard.py`
+- 验证结果：重建后的 `docs/data/dashboard.json` 已确认输出目标文案；`docs/data/dashboard.summary.json` 同步记录本次构建状态为 `updated`；后续工作流重建时不会再把文案打回旧值。
+- 回滚方法：回退 `scripts/build_dashboard.py`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
+- 关联提交（如有）：待补充
+- 备注：本次修复的是生成源头而非静态产物补丁，避免部署流程再次覆盖文案。

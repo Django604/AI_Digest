@@ -588,6 +588,7 @@ def build_monthly_trend(
     current_targets: dict[date, int | float] | None,
 ) -> dict[str, Any]:
     context = build_monthly_series_context(report_date, current_actuals, previous_actuals, actual_key, current_targets)
+    chart_title = build_monthly_chart_title(title, metric_label)
     dates = context["dates"]
     report_index = context["reportIndex"]
     prev_dates = context["prevDates"]
@@ -608,7 +609,7 @@ def build_monthly_trend(
     daily_target = target_daily[report_index] if has_target else None
     daily_actual = curr_daily[report_index]
     return {
-        "chartTitle": f"{report_date.month} 月{title}{metric_label}趋势",
+        "chartTitle": f"{report_date.month} 月{chart_title}趋势",
         "summary": {
             "items": [
                 {"label": "累计目标", "value": normalize_scalar(cumulative_target), "displayValue": fmt_count(cumulative_target)},
@@ -659,6 +660,14 @@ def make_card(label: str, value: int | float | None, kind: str = "count", note: 
         "displayValue": fmt_percent(value) if kind == "percent" else fmt_count(value),
         "note": note,
     }
+
+
+def build_monthly_chart_title(title: str, metric_label: str) -> str:
+    special_titles = {
+        ("NEV 总盘", "新增线索"): "NEV 新增线索",
+        ("ICE 总盘", "有效线索"): "ICE 有效线索",
+    }
+    return special_titles.get((title, metric_label), f"{title}{metric_label}")
 
 
 def build_nev_section(section_id: str, title: str, report_date: date, current_actuals, previous_actuals, current_targets) -> dict[str, Any]:
