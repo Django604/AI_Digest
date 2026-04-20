@@ -88,7 +88,7 @@ function renderTabs(dashboards) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = dashboard.id === state.activeDashboard ? "active" : "";
-    button.textContent = dashboard.title;
+    button.textContent = getDisplayDashboardTitle(dashboard);
     button.addEventListener("click", () => {
       state.activeDashboard = dashboard.id;
       state.activeAnchor = null;
@@ -127,21 +127,27 @@ function renderDashboard(dashboard) {
     return;
   }
 
-  const sections = dashboard.sections ?? [];
+  const sections = getDisplaySections(dashboard);
   if (!sections.length) {
     dashboardRoot.appendChild(renderEmptyBlock("当前 dashboard 暂无可展示数据。"));
     return;
   }
 
   const fragment = dashboardTemplate.content.cloneNode(true);
-  const kickerNode = fragment.querySelector(".dashboard-kicker");
   const titleNode = fragment.querySelector(".dashboard-title");
   const headlineNode = fragment.querySelector(".dashboard-headline");
-  kickerNode.textContent = dashboard.id.toUpperCase();
-  titleNode.textContent = dashboard.title ?? "";
+  const dashboardTitle = shouldRenderDashboardTitle(dashboard) ? getDisplayDashboardTitle(dashboard) : "";
+  titleNode.textContent = dashboardTitle;
   headlineNode.textContent = dashboard.headline ?? "";
+  if (!dashboardTitle) {
+    titleNode.remove();
+  }
   if (!dashboard.headline) {
     headlineNode.remove();
+  }
+  if (!dashboardTitle && !dashboard.headline) {
+    fragment.querySelector(".dashboard-header")?.remove();
+  } else if (!dashboard.headline) {
     fragment.querySelector(".dashboard-header")?.classList.add("headline-hidden");
   }
 
@@ -163,7 +169,6 @@ function renderBriefPage(dashboard) {
   article.innerHTML = `
     <header class="dashboard-header brief-page-header">
       <div>
-        <p class="dashboard-kicker">Daily Brief</p>
         <h2 class="dashboard-title">${escapeHtml(dashboard.title ?? "")}</h2>
       </div>
       <div class="brief-page-meta">
@@ -308,6 +313,49 @@ function getSectionNavLabel(section) {
   return section.title || section.navLabel || section.sectionLabel || prettifySectionId(section.id) || "";
 }
 
+function getDisplayDashboardTitle(dashboard) {
+  if (dashboard?.id === "nev") {
+    return "NEV 线索";
+  }
+
+  return dashboard?.title ?? "";
+}
+
+function shouldRenderDashboardTitle(dashboard) {
+  return dashboard?.id !== "lead-control";
+}
+
+function getDisplaySections(dashboard) {
+  const sections = dashboard?.sections ?? [];
+  if (!sections.length) {
+    return sections;
+  }
+
+  return sections.map((section, index) => {
+    if (index !== 0) {
+      return section;
+    }
+
+    if (dashboard?.id === "nev") {
+      return {
+        ...section,
+        title: "NEV 线索",
+        sectionLabel: "",
+      };
+    }
+
+    if (dashboard?.id !== "lead-control") {
+      return section;
+    }
+
+    return {
+      ...section,
+      title: "全车系线索",
+      sectionLabel: "",
+    };
+  });
+}
+
 function isBriefDashboard(dashboard) {
   return dashboard?.pageType === "brief" || dashboard?.id === "brief" || Boolean(dashboard?.briefing);
 }
@@ -363,18 +411,15 @@ function normalizeBriefSections(briefing) {
 
 function renderSection(section, dashboardId, index) {
   const fragment = sectionTemplate.content.cloneNode(true);
-  const labelNode = fragment.querySelector(".section-label");
   const titleNode = fragment.querySelector(".section-title");
   const headlineNode = fragment.querySelector(".section-headline");
-  const titleBlock = labelNode.parentElement;
-  const sectionLabel = section.sectionLabel ?? (section.id ?? "").replaceAll("-", " ");
+  const titleBlock = titleNode.parentElement;
   const sectionTitle = section.title ?? "";
 
-  labelNode.textContent = sectionLabel;
   titleNode.textContent = sectionTitle;
   headlineNode.textContent = section.headline ?? "";
 
-  if (!sectionLabel && !sectionTitle) {
+  if (!sectionTitle) {
     titleBlock.remove();
     fragment.querySelector(".section-topline")?.classList.add("is-headline-only");
   }

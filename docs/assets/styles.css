@@ -92,9 +92,7 @@ body.modal-open {
   gap: 24px;
 }
 
-.eyebrow,
-.dashboard-kicker,
-.section-label {
+.eyebrow {
   margin: 0 0 10px;
   text-transform: uppercase;
   letter-spacing: 0.16em;

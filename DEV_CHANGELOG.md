@@ -67,3 +67,30 @@
 - 回滚方法：回退 `docs/assets/app.js`、`docs/assets/styles.css` 与本条变更记录到修改前状态。
 - 关联提交（如有）：待补充
 - 备注：本次未启动浏览器进行页面视觉验收，建议后续在本地预览页确认实际排版效果。
+## 2026-04-20 14:35
+- 需求目标：移除页面中所有标题上方的英文小标题文案。
+- 改动内容：更新 `docs/index.html`，删除页面主标题与区块标题模板中的英文小标题节点；更新 `docs/assets/app.js`，移除 `dashboard-kicker`、`section-label` 的渲染与赋值逻辑；更新 `docs/assets/styles.css`，清理对应样式选择器。
+- 涉及文件：`docs/index.html`、`docs/assets/app.js`、`docs/assets/styles.css`、`DEV_CHANGELOG.md`
+- 关键命令：`rg -n "dashboard-kicker|section-label|Daily Brief|toUpperCase\\(" docs\\assets\\app.js docs\\assets\\styles.css docs\\index.html`、`git diff -- docs/index.html docs/assets/app.js docs/assets/styles.css`
+- 验证结果：相关英文小标题节点与渲染入口已移除，检索结果确认 `dashboard-kicker`、`section-label`、`Daily Brief` 与标题上方英文赋值逻辑均已从相关文件中清除。
+- 回滚方法：回退 `docs/index.html`、`docs/assets/app.js`、`docs/assets/styles.css` 与本条变更记录到修改前状态。
+- 关联提交（如有）：待补充
+- 备注：本次未启动浏览器进行视觉验收，建议刷新本地页面确认标题间距是否符合预期。
+## 2026-04-20 14:35
+- 需求目标：将“全车有效线索管控”页面内容区标题改为“全车系线索”，并将其移动到“月度对照表”所在上一级容器中。
+- 改动内容：更新 `docs/assets/app.js`，为 `lead-control` dashboard 增加展示层标题策略：取消该页顶部 `dashboard-header` 标题渲染，并将首个 section 的标题注入为“全车系线索”，使标题显示在“月度对照表”的父级容器顶部。
+- 涉及文件：`docs/assets/app.js`、`DEV_CHANGELOG.md`
+- 关键命令：`rg -n "全车有效线索管控|全车系线索|月度对照表|dashboard-title|section-title" docs\\assets\\app.js docs\\index.html docs\\data\\dashboard.json`、`git diff -- docs/assets/app.js`
+- 验证结果：已确认 `lead-control` 页面改为不渲染顶部大标题，并将首个区块标题设置为“全车系线索”；本次未启动浏览器做实际页面验收。
+- 回滚方法：回退 `docs/assets/app.js` 与本条变更记录到修改前状态。
+- 关联提交（如有）：待补充
+- 备注：侧边栏按钮与原始数据文案未改动，本次仅调整页面内容区的展示位置与标题文本。
+## 2026-04-20 14:55
+- 需求目标：将 `NEV 线索趋势` 改为 `NEV 线索`，并将下方 `NEV 总盘` 及其英文标题一并替换。
+- 改动内容：更新 `docs/assets/app.js`，新增 dashboard 展示标题映射 `getDisplayDashboardTitle()`，将 `nev` 页签与内容区标题统一显示为 `NEV 线索`；扩展 `getDisplaySections()`，将 `nev` 首个区块标题替换为 `NEV 线索` 并清空 `sectionLabel`，避免继续显示原先的 `NEV 总盘` 与英文小标题。
+- 涉及文件：`docs/assets/app.js`、`DEV_CHANGELOG.md`
+- 关键命令：`rg -n "getDisplayDashboardTitle|NEV 线索|NEV 总盘|dashboard-kicker|section-label" docs\\assets\\app.js docs\\assets\\styles.css docs\\index.html`、`git diff -- docs/index.html docs/assets/app.js docs/assets/styles.css DEV_CHANGELOG.md`
+- 验证结果：代码检索已确认 `NEV` 页标题映射与首个区块标题替换逻辑已写入展示层；英文小标题模板入口已移除；本次未启动浏览器做页面视觉验收。
+- 回滚方法：回退 `docs/assets/app.js` 与本条变更记录到修改前状态。
+- 关联提交（如有）：待补充
+- 备注：本次仅调整前端展示层，不修改 `docs/data/dashboard.json` 原始数据。
