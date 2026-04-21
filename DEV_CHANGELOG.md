@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-04-21 18:28
+- 需求目标：修正 `ICE本期来店`、`ICE同期来店` 的取数源，按更正要求强制走 `来店批次分车系汇总表_按天T`，并重新跑通本地更新链路与页面更新 API。
+- 改动内容：新增并调整 `scripts/run_arrival_ice_exports.py` 的运行时补丁逻辑，只收敛 Tableau `thumbnail_uris` 到 `来店批次分车系汇总表_按天T`，保留真实导出 `sheetdocId` 对应的 `crosstab_sheet_name = E3S报表样式`；更新 `scripts/fetch_daily_data.py` 继续通过该包装器执行 ICE 来店导出；补充 `tests/test_run_arrival_ice_exports.py` 单测；同步更新 `README.md`、`SCRIPTS.md` 说明，并重新生成工作簿与 dashboard 数据。
+- 涉及文件：`DEV_CHANGELOG.md`、`README.md`、`SCRIPTS.md`、`scripts/fetch_daily_data.py`、`scripts/run_arrival_ice_exports.py`、`tests/test_run_arrival_ice_exports.py`、`data/source/NEV+ICE_xsai.xlsm`、`data/source/NEV+ICE_ldai.xlsx`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`
+- 关键命令：`python -X utf8 -m unittest discover -s tests -v`、`python -X utf8 scripts/run_arrival_ice_exports.py --business-date 2026-04-20 --report-keys store_batch_vehicle_summary_本期_来店,store_batch_vehicle_summary_同期_来店 --output-dir D:\WorkCode\AI_Digest\.runtime\ice_arrival_override_test2 --output-folder-name debug-0420`、`python -X utf8 scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`、`Invoke-WebRequest -Method Post http://127.0.0.1:4173/api/update-data`
+- 验证结果：全量测试 `20/20` 通过；直接全链路更新成功，运行目录 `D:\WorkCode\AI_Digest\.runtime\daily_update\20260420_20260421-181812` 已生成 7 张导出表并回填两本源工作簿；重启本地 `4173` 服务后，`/api/update-data` 再次真实返回 `success`，运行目录为 `D:\WorkCode\AI_Digest\.runtime\daily_update\20260420_20260421-182437`；保留的 ICE 来店 trace 已确认 `request_export_error = null`，说明请求导出不再因 `sheetdocId` 匹配失败回退到 UI 下载。
+- 回滚方法：回退本次提交涉及的包装器、文档、测试与数据文件，或基于本次提交创建新的反向提交。
+- 关联提交（如有）：待补充
+- 备注：仓库内仍存在与本次修复无关的未跟踪 `pptx`、`.codex/`、`tests/.tmp-copy-check/` 等文件，本次不会纳入提交。
+
 ## 2026-04-21 17:09
 - 需求目标：在网页 `更新` 按钮现有真实更新能力基础上，再补齐来店 4 张表，让同一次更新任务同时覆盖线索工作簿与来店工作簿。
 - 改动内容：扩展 `scripts/fetch_daily_data.py`，新增 `日报来店NEV源` 与 `日报来店ICE源` 两组任务，抓取 `NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店` 并回填 `data/source/NEV+ICE_ldai.xlsx`；为 NEV 来店任务固化 `--safe-bootstrap --capture-wait-ms 30000` 以规避共享初始化失败；补充导出别名、宏 / 非宏工作簿回填与报表日期回退测试；更新 `README.md`、`SCRIPTS.md` 说明；重启 `4173` 本地更新后端并通过真实 API 再次执行更新。

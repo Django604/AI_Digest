@@ -35,7 +35,7 @@ DAILY_SOURCE_ROOT = WORKSPACE_ROOT / "日报取数平台"
 NEV_SCRIPT = DAILY_SOURCE_ROOT / "日报线索NEV源" / "getdata.py"
 ICE_SCRIPT = DAILY_SOURCE_ROOT / "日报线索ICE源" / "getdata.py"
 ARRIVAL_NEV_SCRIPT = DAILY_SOURCE_ROOT / "日报来店NEV源" / "getdata.py"
-ARRIVAL_ICE_SCRIPT = DAILY_SOURCE_ROOT / "日报来店ICE源" / "getdata.py"
+ARRIVAL_ICE_SCRIPT = PROJECT_ROOT / "scripts" / "run_arrival_ice_exports.py"
 RUNTIME_ROOT = PROJECT_ROOT / ".runtime" / "daily_update"
 
 

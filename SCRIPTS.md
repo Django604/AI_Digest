@@ -44,7 +44,19 @@
 - 备注：
   - 默认按当天的 `N-1` 作为业务日期，也可通过 `--business-date` 显式覆盖
   - 脚本运行成功后会自动清理 `.runtime/daily_update/` 临时目录；若带 `--keep-runtime`，会保留导出文件与日志便于排查
+  - ICE 来店中的 `本期/同期` 会通过 `scripts/run_arrival_ice_exports.py` 内部包装器强制把 Tableau 交叉表缩略图入口锁定到 `来店批次分车系汇总表_按天T`，同时保留实际导出 sheet 名 `E3S报表样式` 以匹配 `sheetdocId`
   - 该脚本只负责本地更新；静态部署到 `GitHub Pages` 后不会自动具备浏览器取数能力
+
+## scripts/run_arrival_ice_exports.py
+
+- 路径：`./scripts/run_arrival_ice_exports.py`
+- 作用：作为 `日报来店ICE源/getdata.py` 的轻量包装器，仅对 `ICE本期来店`、`ICE同期来店` 两份 Tableau 报表改写导出配置，强制使用 `来店批次分车系汇总表_按天T` 的缩略图入口
+- 使用方法：
+  - 一般不单独调用，由 `python scripts/fetch_daily_data.py ...` 自动串联
+  - 需要单独验证时可执行：`python scripts/run_arrival_ice_exports.py --business-date 2026-04-20 --report-keys store_batch_vehicle_summary_本期_来店,store_batch_vehicle_summary_同期_来店`
+- 备注：
+  - 该包装器不会改动兄弟项目源码，只在运行时 monkey-patch `build_effective_report_configs`
+  - 这里不能把 `crosstab_sheet_name` 直接改成 `来店批次分车系汇总表_按天T`，否则 Tableau 导出响应里会因为拿不到真实的 `sheetdocId` 而失败
 
 ## scripts/rebuild_dashboard.ps1
 
@@ -125,6 +137,13 @@
 
 - 路径：`./tests/test_fetch_daily_data.py`
 - 作用：校验 `fetch_daily_data.py` 的业务日期解析、导出文件匹配、工作簿回填与 `report_date_override` 重建逻辑
+- 使用方法：
+  - `python -m unittest discover -s tests -v`
+
+## tests/test_run_arrival_ice_exports.py
+
+- 路径：`./tests/test_run_arrival_ice_exports.py`
+- 作用：校验 ICE 来店包装器会把导出缩略图入口锁定到 `来店批次分车系汇总表_按天T`，同时保留真实的 `crosstab_sheet_name`
 - 使用方法：
   - `python -m unittest discover -s tests -v`
 
