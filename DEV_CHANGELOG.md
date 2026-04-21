@@ -1,5 +1,25 @@
 # DEV CHANGELOG
 
+## 2026-04-21 16:08
+- 需求目标：把 GitHub Pages 页面的 `更新` 按钮真正跑起来，而不是只停留在前端展示层。
+- 改动内容：保留 `docs/data/runtime-config.json` 的 `serviceBaseUrl = http://localhost:4173`；确认本地更新服务在 `127.0.0.1:4173` 可访问；实际通过 `/api/update-data` 执行一次完整更新任务，复用 `日报取数平台` 登录逻辑拉取 `N-1` 日报表并回写工作簿，再重建仪表盘数据。
+- 涉及文件：`DEV_CHANGELOG.md`、`docs/data/runtime-config.json`、`data/source/NEV+ICE_xsai.xlsm`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`
+- 关键命令：`python -X utf8 scripts/serve_dashboard.py --host 127.0.0.1 --port 4173 --no-open-browser --cors-allow-origin https://django604.github.io`、`Invoke-WebRequest -Method Post http://127.0.0.1:4173/api/update-data`、`Invoke-WebRequest http://127.0.0.1:4173/api/update-status`
+- 验证结果：任务状态为 `success`，业务日期为 `2026-04-20`；运行目录 `D:\WorkCode\AI_Digest\.runtime\daily_update\20260420_20260421-160530` 中生成 `全国按日-0420.xlsx`、`全国按日ICE-0420.xlsx`、`十五代轩逸按日-0420.xlsx`，并确认 `dashboardChanged = true`、`summaryChanged = true`。
+- 回滚方法：停止 `4173` 端口本地服务；如需撤回此次数据更新与配置变更，基于本次提交创建新的反向提交。
+- 关联提交（如有）：待补充
+- 备注：当前配置适用于“同一台机器打开 GitHub Pages 并调用本机后端”的场景；如果页面在别的机器上打开，`localhost:4173` 自然会指向那台机器自己，不会连回这台电脑。
+
+## 2026-04-21 15:59
+- 需求目标：按方案 1 直接执行同机版部署，让 GitHub Pages 页面上的 `数据更新` 按钮默认指向本机独立后端，并实际启动后端服务。
+- 改动内容：将 `docs/data/runtime-config.json` 的 `serviceBaseUrl` 配置为 `http://localhost:4173`，用于当前机器上打开 GitHub Pages 页面时直接调用本机更新后端；同步补充本条执行记录。
+- 涉及文件：`docs/data/runtime-config.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python scripts/serve_dashboard.py --host 127.0.0.1 --port 4173 --no-open-browser --cors-allow-origin https://django604.github.io`
+- 验证结果：待补充
+- 回滚方法：将 `docs/data/runtime-config.json` 中的 `serviceBaseUrl` 恢复为空，并停止本机 `serve_dashboard.py` 服务。
+- 关联提交（如有）：待补充
+- 备注：该配置面向“在同一台机器上打开 GitHub Pages 页面并调用本机后端”的场景；若需跨机器使用，仍需把后端暴露为可访问的公网或内网服务地址。
+
 ## 2026-04-21 15:45
 - 需求目标：按“静态前端 + 独立后端 API”方案，让 GitHub Pages 页面上的 `数据更新` 按钮能够真正调用远端后端执行更新，而不是只在本地同源模式下可用。
 - 改动内容：扩展 `scripts/serve_dashboard.py`，新增 `/api/dashboard-data`、`/api/dashboard-summary` 与 `OPTIONS`/CORS 支持，使其既能本地预览，也能作为远端更新后端部署；新增 `docs/data/runtime-config.json`，允许静态前端配置 `serviceBaseUrl` / `dashboardDataUrl`；更新 `docs/assets/app.js`，增加运行时配置加载、远端 API URL 解析、远端 dashboard 数据源切换与不可达提示；补充 `tests/test_serve_dashboard.py`，覆盖数据接口与跨域预检；同步更新 `README.md`、`SCRIPTS.md`。

@@ -1,4 +1,4 @@
 {
-  "serviceBaseUrl": "",
+  "serviceBaseUrl": "http://localhost:4173",
   "dashboardDataUrl": ""
 }
