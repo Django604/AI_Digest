@@ -206,7 +206,8 @@ button,
 
 .panel-switcher,
 .branch-switcher,
-.capture-tools {
+.capture-tools,
+.update-tools {
   padding: 0;
 }
 
@@ -257,6 +258,47 @@ button,
 }
 
 .capture-status[data-state="error"] {
+  color: var(--negative);
+}
+
+.update-button {
+  justify-self: start;
+  min-width: 72px;
+  border: 1px solid rgba(22, 28, 36, 0.12);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease, opacity 180ms ease;
+}
+
+.update-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(194, 15, 47, 0.28);
+  background: rgba(194, 15, 47, 0.06);
+}
+
+.update-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.update-status {
+  margin: 10px 2px 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.update-status[data-state="success"] {
+  color: var(--positive);
+}
+
+.update-status[data-state="error"] {
   color: var(--negative);
 }
 

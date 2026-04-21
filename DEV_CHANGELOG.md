@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-04-21 15:33
+- 需求目标：为 `AI_Digest` 落地轻量化浏览器取数系统，复用 `日报取数平台` 登录逻辑抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日` 三张 `N-1` 日报表，回填 `NEV+ICE_xsai.xlsm` 指定工作表，并在本地页面增加 `更新` 按钮触发整套流程。
+- 改动内容：新增 `scripts/fetch_daily_data.py`，串联兄弟项目取数脚本、导出文件匹配、工作簿回填与 dashboard 重建；扩展 `scripts/build_dashboard.py` 支持 `--report-date`/`report_date_override` 且补上 `YYYYMMDD` 日期解析；重写 `scripts/serve_dashboard.py` 暴露 `/api/update-status` 与 `/api/update-data` 并修复任务管理器锁死问题；更新 `docs/index.html`、`docs/assets/styles.css`、`docs/assets/app.js` 增加本地 `更新` 按钮与状态轮询；新增 `tests/test_fetch_daily_data.py`、`tests/test_serve_dashboard.py` 覆盖日期解析、工作簿回填与本地更新 API；同步更新 `README.md`、`SCRIPTS.md`、`.gitignore`。
+- 涉及文件：`.gitignore`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`、`scripts/build_dashboard.py`、`scripts/fetch_daily_data.py`、`scripts/serve_dashboard.py`、`docs/index.html`、`docs/assets/styles.css`、`docs/assets/app.js`、`tests/test_fetch_daily_data.py`、`tests/test_serve_dashboard.py`
+- 关键命令：`python -X utf8 -m py_compile scripts\build_dashboard.py scripts\fetch_daily_data.py scripts\serve_dashboard.py tests\test_fetch_daily_data.py tests\test_serve_dashboard.py`、`python -X utf8 -m unittest discover -s tests -v`
+- 验证结果：`14/14` 项单元测试通过；新增测试已覆盖 `YYYYMMDD` 日期解析、工作簿回填、本地更新任务去重与 `/api/update-status`、`/api/update-data` 的真实 HTTP 交互；页面本地模式下具备触发更新的前后端链路。
+- 回滚方法：回退本条涉及的脚本、前端文件、测试文件与文档更新；如需撤销已落地功能，优先以新的反向提交处理，不直接删除用户已有数据文件。
+- 关联提交（如有）：待补充
+- 备注：浏览器取数依赖本地可访问目标系统与可用 Chrome 环境；静态 `GitHub Pages` 页面不会直接执行该本地更新能力。
+
 ## 2026-04-07 17:35
 - 需求目标：分析 `NEV+ICE线索简报AI模板.xlsm` 的公式依赖、数据结构与面板结构，并将 `NEV 全车系线索日趋势`、`ICE 全车系线索日趋势` 制作为可发布到 `GitHub Pages` 的 Web 版
 - 改动内容：复制源工作簿到 `data/source/dashboard-source.xlsm`；新增 Excel 分析报告；新增 `scripts/build_dashboard.py` 抽取面板数据；新增静态站点 `docs/`；新增 `GitHub Pages` 自动发布工作流；补充项目说明与脚本手册

@@ -93,7 +93,7 @@ def coerce_date(value: Any) -> date | None:
             return converted
     if isinstance(value, str):
         text = value.strip()
-        for fmt in ("%Y/%m/%d", "%Y-%m-%d", "%Y.%m.%d", "%m/%d/%Y", "%Y年%m月%d日"):
+        for fmt in ("%Y/%m/%d", "%Y-%m-%d", "%Y.%m.%d", "%Y%m%d", "%m/%d/%Y", "%Y年%m月%d日"):
             try:
                 return datetime.strptime(text, fmt).date()
             except ValueError:
@@ -1039,12 +1039,16 @@ def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date
     }
 
 
-def build_payload(leads_path: Path, arrival_path: Path) -> dict[str, Any]:
+def build_payload(
+    leads_path: Path,
+    arrival_path: Path,
+    report_date_override: date | None = None,
+) -> dict[str, Any]:
     leads = load_workbook(leads_path, data_only=True, keep_vba=True)
     arrival = load_workbook(arrival_path, data_only=True, keep_vba=True)
     try:
         validate_workbook_structure(leads, arrival)
-        report_date = validate_report_date_cell(leads)
+        report_date = report_date_override or validate_report_date_cell(leads)
 
         current_start = month_start(report_date)
         previous_start = previous_month(report_date)
@@ -1203,6 +1207,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--arrival-workbook", default=str(ARRIVAL_BOOK), help="Path to the arrival workbook")
     parser.add_argument("--out", default=str(OUT_JSON), help="Output JSON path")
     parser.add_argument("--summary-out", default="", help="Optional output summary JSON path")
+    parser.add_argument("--report-date", default="", help="Optional report date override in YYYY-MM-DD or YYYYMMDD")
     return parser.parse_args()
 
 
@@ -1210,7 +1215,12 @@ def main() -> int:
     args = parse_args()
     leads_path = Path(args.workbook).resolve()
     arrival_path = Path(args.arrival_workbook).resolve()
-    payload = build_payload(leads_path, arrival_path)
+    report_date_override = None
+    if args.report_date:
+        report_date_override = coerce_date(args.report_date)
+        if report_date_override is None:
+            raise ValueError(f"Invalid --report-date value: {args.report_date}")
+    payload = build_payload(leads_path, arrival_path, report_date_override=report_date_override)
     out_path = Path(args.out).resolve()
     summary_path = Path(args.summary_out).resolve() if args.summary_out else out_path.with_name(f"{out_path.stem}.summary{out_path.suffix}")
     out_path.parent.mkdir(parents=True, exist_ok=True)

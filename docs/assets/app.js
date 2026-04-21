@@ -6,6 +6,8 @@ const metaStrip = document.querySelector("#meta-strip");
 const reportDateHighlight = document.querySelector("#report-date-highlight");
 const captureAllButton = document.querySelector("#capture-all-button");
 const captureStatus = document.querySelector("#capture-status");
+const updateButton = document.querySelector("#update-button");
+const updateStatus = document.querySelector("#update-status");
 const dashboardTemplate = document.querySelector("#dashboard-template");
 const sectionTemplate = document.querySelector("#section-template");
 const chartModal = createChartModal();
@@ -39,9 +41,13 @@ const state = {
   activeAnchor: null,
   sectionObserver: null,
   captureBusy: false,
+  updateBusy: false,
+  updateAvailable: false,
+  updatePollTimer: null,
 };
 
 setupCaptureTools();
+setupUpdateTools();
 void loadDashboard();
 
 async function loadDashboard() {
@@ -64,6 +70,7 @@ async function loadDashboard() {
     renderTabs(dashboards);
     renderDashboard(payload.dashboards[state.activeDashboard]);
     updateCaptureTools();
+    updateUpdateTools();
   } catch (error) {
     renderError(error);
   }
@@ -74,6 +81,13 @@ function setupCaptureTools() {
     void handleGlobalTrendCapture();
   });
   updateCaptureTools();
+}
+
+function setupUpdateTools() {
+  updateButton?.addEventListener("click", () => {
+    void handleDataUpdate();
+  });
+  void probeUpdateCapability();
 }
 
 function updateCaptureTools(options = {}) {
@@ -115,6 +129,138 @@ function setCaptureStatus(message, stateName = "") {
     captureStatus.dataset.state = stateName;
   } else {
     delete captureStatus.dataset.state;
+  }
+}
+
+async function probeUpdateCapability() {
+  if (!updateButton || !updateStatus) {
+    return;
+  }
+
+  try {
+    const response = await fetch("./api/update-status", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    state.updateAvailable = Boolean(payload.available);
+    updateButton.hidden = !state.updateAvailable;
+    updateStatus.hidden = !state.updateAvailable;
+    updateUpdateTools({
+      message: payload.message || "本地更新服务已就绪。",
+      stateName: payload.status === "error" ? "error" : payload.status === "success" ? "success" : "",
+    });
+    if (payload.running) {
+      state.updateBusy = true;
+      scheduleUpdateStatusPoll();
+    }
+  } catch (_error) {
+    state.updateAvailable = false;
+    updateButton.hidden = true;
+    updateStatus.hidden = true;
+  }
+}
+
+function updateUpdateTools(options = {}) {
+  if (!updateButton || !updateStatus || !state.updateAvailable) {
+    return;
+  }
+
+  const { message, stateName = "" } = options;
+  const ready = Boolean(state.payload);
+  updateButton.disabled = !ready || state.updateBusy;
+  updateButton.textContent = state.updateBusy ? "更新中..." : "更新";
+
+  if (typeof message === "string") {
+    setUpdateStatus(message, stateName);
+    return;
+  }
+
+  if (!ready) {
+    setUpdateStatus("页面加载完成后可触发本地自动更新。");
+    return;
+  }
+
+  setUpdateStatus("点击“更新”后，将抓取 3 张日报表并重建当前页面数据。");
+}
+
+function setUpdateStatus(message, stateName = "") {
+  if (!updateStatus) {
+    return;
+  }
+
+  updateStatus.textContent = message;
+  if (stateName) {
+    updateStatus.dataset.state = stateName;
+  } else {
+    delete updateStatus.dataset.state;
+  }
+}
+
+async function handleDataUpdate() {
+  if (!state.updateAvailable || state.updateBusy) {
+    return;
+  }
+
+  state.updateBusy = true;
+  updateUpdateTools({ message: "更新任务已提交，正在准备执行。" });
+
+  try {
+    const response = await fetch("./api/update-data", {
+      method: "POST",
+      cache: "no-store",
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (![202, 409].includes(response.status)) {
+      throw new Error(payload.message || `HTTP ${response.status}`);
+    }
+    updateUpdateTools({
+      message: payload.message || "更新任务已启动。",
+      stateName: payload.status === "error" ? "error" : "",
+    });
+    scheduleUpdateStatusPoll();
+  } catch (error) {
+    state.updateBusy = false;
+    const message = error instanceof Error ? error.message : String(error);
+    updateUpdateTools({ message: `更新失败：${message}`, stateName: "error" });
+  }
+}
+
+function scheduleUpdateStatusPoll() {
+  if (state.updatePollTimer) {
+    clearTimeout(state.updatePollTimer);
+  }
+  state.updatePollTimer = window.setTimeout(() => {
+    void pollUpdateStatus();
+  }, 1200);
+}
+
+async function pollUpdateStatus() {
+  try {
+    const response = await fetch("./api/update-status", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    state.updateAvailable = Boolean(payload.available);
+    state.updateBusy = Boolean(payload.running);
+    updateUpdateTools({
+      message: payload.message || "更新服务空闲。",
+      stateName: payload.status === "error" ? "error" : payload.status === "success" ? "success" : "",
+    });
+
+    if (payload.running) {
+      scheduleUpdateStatusPoll();
+      return;
+    }
+
+    if (payload.status === "success") {
+      await loadDashboard();
+    }
+  } catch (error) {
+    state.updateBusy = false;
+    const message = error instanceof Error ? error.message : String(error);
+    updateUpdateTools({ message: `无法获取更新状态：${message}`, stateName: "error" });
   }
 }
 
