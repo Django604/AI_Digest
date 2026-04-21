@@ -26,7 +26,7 @@
 ## scripts/fetch_daily_data.py
 
 - 路径：`./scripts/fetch_daily_data.py`
-- 作用：复用 `日报取数平台` 的登录与取数逻辑，抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日` 三张 `N-1` 日报表，回填 `NEV+ICE_xsai.xlsm` 对应工作表并重建 `docs/data/dashboard.json`
+- 作用：复用 `日报取数平台` 的登录与取数逻辑，抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日`、`NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店` 共 7 张 `N-1` 日报表，分别回填 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx` 后重建 `docs/data/dashboard.json`
 - 使用方法：
   - `python scripts/fetch_daily_data.py`
   - 指定业务日期：`python scripts/fetch_daily_data.py --business-date 2026-04-20`
@@ -38,6 +38,7 @@
   - 运行环境可以正常打开本地 Chrome 并访问目标系统
 - 输出结果：
   - 更新 `data/source/NEV+ICE_xsai.xlsm` 中 `全国按日NEV`、`全国按日ICE`、`十五代轩逸按日`
+  - 更新 `data/source/NEV+ICE_ldai.xlsx` 中 `NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店`
   - 更新 `docs/data/dashboard.json`
   - 更新 `docs/data/dashboard.summary.json`
 - 备注：

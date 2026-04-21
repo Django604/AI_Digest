@@ -19,7 +19,7 @@
 - `data/source/NEV+ICE_ldai.xlsx`：来店源工作簿
 - `requirements.txt`：Python 依赖清单
 - `scripts/build_dashboard.py`：从 Excel 抽取页面数据
-- `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，抓取 3 张日报表并回填工作簿
+- `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，抓取线索 + 来店共 7 张日报表并回填两本工作簿
 - `scripts/rebuild_dashboard.ps1`：Windows 下本地一键重建 `dashboard.json`
 - `docs/data/runtime-config.json`：前端远端更新服务配置
 - `scripts/publish_dashboard.ps1`：Windows 下本地一键重建并推送到 GitHub
@@ -35,7 +35,7 @@
    这会同时生成 `docs/data/dashboard.json` 和 `docs/data/dashboard.summary.json`
 4. 运行 `python scripts/serve_dashboard.py --port 4173`，需要自动打开浏览器时可以附加 `--open-browser`
 5. 打开 `http://127.0.0.1:4173`，即使误写成 `/docs` 或 `/AI_Digest` 等路径也会被回退到 `index.html`
-6. 如果需要直接走浏览器取数，可在本地服务页面左侧点击 `数据更新`；它会按当天 `N-1` 抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日`，更新 `NEV+ICE_xsai.xlsm` 后再重建页面数据
+6. 如果需要直接走浏览器取数，可在本地服务页面左侧点击 `数据更新`；它会按当天 `N-1` 抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日`、`NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店`，分别更新 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx` 后再重建页面数据
 7. 如需指定业务日期或保留运行痕迹排查问题，可直接执行 `python scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`
 
 ## GitHub Pages 点击更新
@@ -53,7 +53,7 @@
 ## 测试
 
 - 运行 `python -m unittest discover -s tests -v`
-- 当前测试覆盖构建输出的关键结构、源工作簿缺 sheet / 缺列 / 参数日期异常等输入校验，以及本地/远端更新 API、跨域预检与工作簿回填逻辑
+- 当前测试覆盖构建输出的关键结构、源工作簿缺 sheet / 缺列 / 参数日期异常等输入校验，以及本地/远端更新 API、线索 / 来店双工作簿回填逻辑与跨域预检
 - GitHub Actions 在发布前也会先跑同一套测试，避免坏数据直接上 Pages
 
 ## 首次部署到 GitHub Pages

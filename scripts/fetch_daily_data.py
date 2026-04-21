@@ -34,6 +34,8 @@ from scripts.build_dashboard import (  # noqa: E402
 DAILY_SOURCE_ROOT = WORKSPACE_ROOT / "日报取数平台"
 NEV_SCRIPT = DAILY_SOURCE_ROOT / "日报线索NEV源" / "getdata.py"
 ICE_SCRIPT = DAILY_SOURCE_ROOT / "日报线索ICE源" / "getdata.py"
+ARRIVAL_NEV_SCRIPT = DAILY_SOURCE_ROOT / "日报来店NEV源" / "getdata.py"
+ARRIVAL_ICE_SCRIPT = DAILY_SOURCE_ROOT / "日报来店ICE源" / "getdata.py"
 RUNTIME_ROOT = PROJECT_ROOT / ".runtime" / "daily_update"
 
 
@@ -43,12 +45,19 @@ class FetchTask:
     script_path: Path
     output_subdir: str
     report_keys: tuple[str, ...]
+    extra_args: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class SheetUpdateMapping:
-    report_name: str
+    export_names: tuple[str, ...]
+    result_label: str
     target_sheet: str
+    workbook_kind: str
+
+
+LEADS_WORKBOOK_KIND = "leads"
+ARRIVAL_WORKBOOK_KIND = "arrival"
 
 
 FETCH_TASKS = (
@@ -64,13 +73,55 @@ FETCH_TASKS = (
         output_subdir="ice",
         report_keys=("ice_national_daily", "ice_sylphy15_daily"),
     ),
+    FetchTask(
+        label="NEV 来店本期 + 同期",
+        script_path=ARRIVAL_NEV_SCRIPT,
+        output_subdir="arrival-nev",
+        report_keys=("store_current_period", "store_same_period"),
+        extra_args=("--safe-bootstrap", "--capture-wait-ms", "30000"),
+    ),
+    FetchTask(
+        label="ICE 来店本期 + 同期",
+        script_path=ARRIVAL_ICE_SCRIPT,
+        output_subdir="arrival-ice",
+        report_keys=("store_batch_vehicle_summary_本期_来店", "store_batch_vehicle_summary_同期_来店"),
+    ),
 )
 
-SHEET_MAPPINGS = (
-    SheetUpdateMapping(report_name="全国按日", target_sheet="全国按日NEV"),
-    SheetUpdateMapping(report_name="全国按日ICE", target_sheet="全国按日ICE"),
-    SheetUpdateMapping(report_name="十五代轩逸按日", target_sheet="十五代轩逸按日"),
+LEADS_SHEET_MAPPINGS = (
+    SheetUpdateMapping(export_names=("全国按日",), result_label="全国按日", target_sheet="全国按日NEV", workbook_kind=LEADS_WORKBOOK_KIND),
+    SheetUpdateMapping(export_names=("全国按日ICE",), result_label="全国按日ICE", target_sheet="全国按日ICE", workbook_kind=LEADS_WORKBOOK_KIND),
+    SheetUpdateMapping(export_names=("十五代轩逸按日",), result_label="十五代轩逸按日", target_sheet="十五代轩逸按日", workbook_kind=LEADS_WORKBOOK_KIND),
 )
+
+ARRIVAL_SHEET_MAPPINGS = (
+    SheetUpdateMapping(
+        export_names=("NEV本期", "专营店本期"),
+        result_label="NEV本期来店",
+        target_sheet="NEV本期来店",
+        workbook_kind=ARRIVAL_WORKBOOK_KIND,
+    ),
+    SheetUpdateMapping(
+        export_names=("NEV同期", "专营店同期"),
+        result_label="NEV同期来店",
+        target_sheet="NEV同期来店",
+        workbook_kind=ARRIVAL_WORKBOOK_KIND,
+    ),
+    SheetUpdateMapping(
+        export_names=("来店本期",),
+        result_label="ICE本期来店",
+        target_sheet="ICE本期来店",
+        workbook_kind=ARRIVAL_WORKBOOK_KIND,
+    ),
+    SheetUpdateMapping(
+        export_names=("来店同期",),
+        result_label="ICE同期来店",
+        target_sheet="ICE同期来店",
+        workbook_kind=ARRIVAL_WORKBOOK_KIND,
+    ),
+)
+
+SHEET_MAPPINGS = (*LEADS_SHEET_MAPPINGS, *ARRIVAL_SHEET_MAPPINGS)
 
 
 def default_log(message: str) -> None:
@@ -98,12 +149,15 @@ def build_task_output_dir(task: FetchTask, run_root: Path) -> Path:
     return run_root / task.output_subdir / "exports"
 
 
-def resolve_export_path(output_dir: Path, report_name: str, business_date: date) -> Path:
+def resolve_export_path(output_dir: Path, report_name: str | tuple[str, ...], business_date: date) -> Path:
     suffix = build_business_suffix(business_date)
-    candidates = sorted(output_dir.glob(f"{report_name}-{suffix}.*"))
-    if not candidates:
-        raise FileNotFoundError(f"未找到导出文件：{report_name}-{suffix}.*（目录：{output_dir}）")
-    return candidates[0]
+    report_names = (report_name,) if isinstance(report_name, str) else report_name
+    for candidate_name in report_names:
+        candidates = sorted(output_dir.glob(f"{candidate_name}-{suffix}.*"))
+        if candidates:
+            return candidates[0]
+    joined = " / ".join(report_names)
+    raise FileNotFoundError(f"未找到导出文件：{joined}-{suffix}.*（目录：{output_dir}）")
 
 
 def stream_subprocess(command: list[str], cwd: Path, log: Callable[[str], None], prefix: str) -> None:
@@ -151,6 +205,7 @@ def run_fetch_task(
         "--report-keys",
         ",".join(task.report_keys),
     ]
+    command.extend(task.extra_args)
     command.append("--headless" if headless else "--headed")
     if username:
         command.extend(["--username", username])
@@ -208,27 +263,29 @@ def copy_worksheet_contents(source_ws, target_ws) -> None:
 
 
 def replace_workbook_sheets(
-    leads_path: Path,
+    workbook_path: Path,
     export_paths: dict[str, Path],
+    mappings: tuple[SheetUpdateMapping, ...],
     *,
     log: Callable[[str], None],
+    keep_vba: bool = False,
 ) -> None:
-    workbook = load_workbook(leads_path, keep_vba=True)
+    workbook = load_workbook(workbook_path, keep_vba=keep_vba)
     sources = {
-        mapping.target_sheet: load_workbook(export_paths[mapping.report_name], data_only=False)
-        for mapping in SHEET_MAPPINGS
+        mapping.target_sheet: load_workbook(export_paths[mapping.target_sheet], data_only=False)
+        for mapping in mappings
     }
     try:
-        for mapping in SHEET_MAPPINGS:
+        for mapping in mappings:
             target_ws = workbook[mapping.target_sheet]
             source_wb = sources[mapping.target_sheet]
             source_ws = source_wb[source_wb.sheetnames[0]]
-            log(f"回填工作表：{mapping.target_sheet} <- {mapping.report_name}")
+            log(f"回填工作表：{mapping.target_sheet} <- {source_ws.title}")
             copy_worksheet_contents(source_ws, target_ws)
 
-        temp_path = leads_path.with_name(f"{leads_path.stem}.updating{leads_path.suffix}")
+        temp_path = workbook_path.with_name(f"{workbook_path.stem}.updating{workbook_path.suffix}")
         workbook.save(temp_path)
-        temp_path.replace(leads_path)
+        temp_path.replace(workbook_path)
     finally:
         safe_close_workbook(workbook)
         for source in sources.values():
@@ -311,18 +368,30 @@ def run_update(
                 chrome_path=chrome_path,
             )
             for mapping in SHEET_MAPPINGS:
-                if mapping.report_name in export_paths:
+                if mapping.target_sheet in export_paths:
                     continue
                 try:
-                    export_paths[mapping.report_name] = resolve_export_path(output_dir, mapping.report_name, resolved_business_date)
+                    export_paths[mapping.target_sheet] = resolve_export_path(output_dir, mapping.export_names, resolved_business_date)
                 except FileNotFoundError:
                     continue
 
-        missing_reports = [mapping.report_name for mapping in SHEET_MAPPINGS if mapping.report_name not in export_paths]
+        missing_reports = [mapping.result_label for mapping in SHEET_MAPPINGS if mapping.target_sheet not in export_paths]
         if missing_reports:
             raise RuntimeError(f"缺少导出结果：{', '.join(missing_reports)}")
 
-        replace_workbook_sheets(leads_path, export_paths, log=log)
+        replace_workbook_sheets(
+            leads_path,
+            export_paths,
+            LEADS_SHEET_MAPPINGS,
+            log=log,
+            keep_vba=True,
+        )
+        replace_workbook_sheets(
+            arrival_path,
+            export_paths,
+            ARRIVAL_SHEET_MAPPINGS,
+            log=log,
+        )
         rebuild_summary = rebuild_dashboard(
             business_date=resolved_business_date,
             leads_path=leads_path,
@@ -334,7 +403,10 @@ def run_update(
         result = {
             "businessDate": format_business_date(resolved_business_date),
             "runtimeDir": str(runtime_dir),
-            "exports": {name: str(path) for name, path in export_paths.items()},
+            "exports": {
+                mapping.result_label: str(export_paths[mapping.target_sheet])
+                for mapping in SHEET_MAPPINGS
+            },
             **rebuild_summary,
         }
         log("更新流程完成。")

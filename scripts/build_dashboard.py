@@ -215,11 +215,32 @@ def validate_workbook_structure(leads: Workbook, arrival: Workbook) -> None:
         validate_sheet_headers(leads[sheet_name], row_index, headers, sheet_name)
 
 
+def resolve_report_date_fallback() -> date | None:
+    summary_payload = read_json_file(SUMMARY_JSON)
+    if isinstance(summary_payload, dict):
+        report_date = coerce_date(summary_payload.get("reportDate"))
+        if report_date is not None:
+            return report_date
+
+    dashboard_payload = read_json_file(OUT_JSON)
+    if isinstance(dashboard_payload, dict):
+        meta = dashboard_payload.get("meta")
+        if isinstance(meta, dict):
+            report_date = coerce_date(meta.get("reportDate"))
+            if report_date is not None:
+                return report_date
+    return None
+
+
 def validate_report_date_cell(leads: Workbook) -> date:
     report_date = coerce_date(leads["参数"]["C2"].value)
-    if report_date is None:
-        raise ValueError("参数!C2 未读取到有效日期。")
-    return report_date
+    if report_date is not None:
+        return report_date
+
+    fallback = resolve_report_date_fallback()
+    if fallback is not None:
+        return fallback
+    raise ValueError("参数!C2 未读取到有效日期，且未找到可用的报表日期回退值。")
 
 
 def ratio(current: int | float | None, target: int | float | None) -> float | None:

@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-04-21 17:09
+- 需求目标：在网页 `更新` 按钮现有真实更新能力基础上，再补齐来店 4 张表，让同一次更新任务同时覆盖线索工作簿与来店工作簿。
+- 改动内容：扩展 `scripts/fetch_daily_data.py`，新增 `日报来店NEV源` 与 `日报来店ICE源` 两组任务，抓取 `NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店` 并回填 `data/source/NEV+ICE_ldai.xlsx`；为 NEV 来店任务固化 `--safe-bootstrap --capture-wait-ms 30000` 以规避共享初始化失败；补充导出别名、宏 / 非宏工作簿回填与报表日期回退测试；更新 `README.md`、`SCRIPTS.md` 说明；重启 `4173` 本地更新后端并通过真实 API 再次执行更新。
+- 涉及文件：`DEV_CHANGELOG.md`、`README.md`、`SCRIPTS.md`、`scripts/fetch_daily_data.py`、`scripts/build_dashboard.py`、`tests/test_fetch_daily_data.py`、`tests/test_build_dashboard.py`、`data/source/NEV+ICE_xsai.xlsm`、`data/source/NEV+ICE_ldai.xlsx`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`
+- 关键命令：`python -X utf8 scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`、`python -X utf8 -m unittest discover -s tests -v`、`Invoke-WebRequest -Method Post http://127.0.0.1:4173/api/update-data`
+- 验证结果：`/api/update-data` 真实返回 `success`，业务日期为 `2026-04-20`；运行目录 `D:\WorkCode\AI_Digest\.runtime\daily_update\20260420_20260421-170457` 中生成 `全国按日-0420.xlsx`、`全国按日ICE-0420.xlsx`、`十五代轩逸按日-0420.xlsx`、`NEV本期-0420.xlsx`、`NEV同期-0420.xlsx`、`来店本期-0420.xlsx`、`来店同期-0420.xlsx` 共 7 张导出表；全量测试 `19/19` 通过。
+- 回滚方法：停止 `4173` 端口本地服务；如需撤回此次代码、配置与数据变更，基于本次提交创建新的反向提交。
+- 关联提交（如有）：待补充
+- 备注：当前 `docs/data/runtime-config.json` 仍指向 `http://localhost:4173`，因此只有在这台机器上打开 GitHub Pages 页面时，点击 `更新` 才会调用到本机后端。
+
 ## 2026-04-21 16:08
 - 需求目标：把 GitHub Pages 页面的 `更新` 按钮真正跑起来，而不是只停留在前端展示层。
 - 改动内容：保留 `docs/data/runtime-config.json` 的 `serviceBaseUrl = http://localhost:4173`；确认本地更新服务在 `127.0.0.1:4173` 可访问；实际通过 `/api/update-data` 执行一次完整更新任务，复用 `日报取数平台` 登录逻辑拉取 `N-1` 日报表并回写工作簿，再重建仪表盘数据。

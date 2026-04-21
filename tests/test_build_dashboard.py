@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import shutil
 import unittest
+from unittest.mock import patch
 
 from openpyxl import Workbook
 
@@ -112,13 +113,21 @@ class BuildDashboardValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "缺少必需列"):
             validate_sheet_headers(sheet, 2, ("合计",), sheet.title)
 
-    def test_validate_report_date_cell_requires_valid_date(self) -> None:
+    def test_validate_report_date_cell_uses_summary_fallback_when_formula_cache_missing(self) -> None:
         workbook = Workbook()
         sheet = workbook.active
         sheet.title = "参数"
         sheet["C2"] = "not-a-date"
-        with self.assertRaisesRegex(ValueError, "参数!C2 未读取到有效日期"):
-            validate_report_date_cell(workbook)
+        self.assertIsNotNone(validate_report_date_cell(workbook))
+
+    def test_validate_report_date_cell_requires_valid_date_without_fallback(self) -> None:
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "参数"
+        sheet["C2"] = "not-a-date"
+        with patch("scripts.build_dashboard.read_json_file", return_value=None):
+            with self.assertRaisesRegex(ValueError, "参数!C2 未读取到有效日期"):
+                validate_report_date_cell(workbook)
 
 
 if __name__ == "__main__":
