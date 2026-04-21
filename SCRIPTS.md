@@ -88,17 +88,30 @@
 ## scripts/serve_dashboard.py
 
 - 路径：`./scripts/serve_dashboard.py`
-- 作用：启动一个指向 `docs/` 目录的本地 `ThreadingHTTPServer`，并在访问 `/docs`、`/AI_Digest` 等“干净 URL”时自动回退到 `index.html`；同时暴露本地更新 API，供页面上的 `更新` 按钮触发浏览器取数流程
+- 作用：启动一个指向 `docs/` 目录的 `ThreadingHTTPServer`，并在访问 `/docs`、`/AI_Digest` 等“干净 URL”时自动回退到 `index.html`；同时暴露可独立部署的更新 API，供页面上的 `数据更新` 按钮触发浏览器取数流程
 - 使用方法：
   - `python scripts/serve_dashboard.py --port 4173 [--open-browser]`
+  - 作为 GitHub Pages 远端后端：`python scripts/serve_dashboard.py --host 0.0.0.0 --port 4173 --no-open-browser --cors-allow-origin https://<你的-pages-域名>`
 - 运行前提：
   - 本机可用 `Python`（仅使用标准库）
 - 输出结果：
   - 控制台展示访问地址，例如 `http://127.0.0.1:4173`
 - 备注：
   - 端口被占用或目录缺失时会在控制台给出错误提示；按 `Ctrl+C` 即可退出
-  - `更新` 按钮与 `/api/update-data`、`/api/update-status` 只在本地服务模式可用；直接打开静态 `docs/` 或部署到 `GitHub Pages` 时会自动隐藏
+  - API 端点包括 `/api/update-status`、`/api/update-data`、`/api/dashboard-data`、`/api/dashboard-summary`
+  - `--cors-allow-origin` 可重复传入多个域名；默认允许 `*`
   - 本地更新任务会串行执行；已有任务运行中时，再次点击只会返回当前状态，不会重复启动并发任务
+
+## docs/data/runtime-config.json
+
+- 路径：`./docs/data/runtime-config.json`
+- 作用：给静态前端提供远端更新服务地址，让 GitHub Pages 页面能把 `数据更新` 按钮请求转发到独立后端
+- 使用方法：
+  - `serviceBaseUrl`：填写远端后端基地址，例如 `https://digest-api.example.com`
+  - `dashboardDataUrl`：可选；留空时前端默认使用 `${serviceBaseUrl}/api/dashboard-data`
+- 备注：
+  - 该文件适合保存公开可见的服务地址，不应放置账号密码等敏感配置
+  - 如果两个字段都留空，页面会回退到静态 `docs/data/dashboard.json` 浏览模式，`数据更新` 按钮不会真正执行更新
 
 ## tests/test_build_dashboard.py
 

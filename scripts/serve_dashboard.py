@@ -20,6 +20,8 @@ except ImportError:  # pragma: no cover - script entrypoint fallback
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = PROJECT_ROOT / "docs"
+DASHBOARD_JSON_PATH = DOCS_DIR / "data" / "dashboard.json"
+DASHBOARD_SUMMARY_PATH = DOCS_DIR / "data" / "dashboard.summary.json"
 
 
 class UpdateTaskManager:
@@ -98,6 +100,10 @@ class UpdateTaskManager:
             )
 
 
+def load_json_payload(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def _inside_docs(path: Path) -> bool:
     try:
         path.relative_to(DOCS_DIR)
@@ -114,6 +120,15 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, directory: str | None = None, **kwargs):
         super().__init__(*args, directory=str(DOCS_DIR if directory is None else directory), **kwargs)
 
+    def _resolve_cors_origin(self) -> str | None:
+        allowed = getattr(self.server, "cors_allow_origins", ("*",))
+        origin = self.headers.get("Origin")
+        if "*" in allowed:
+            return "*"
+        if origin and origin in allowed:
+            return origin
+        return None
+
     def _send_json(self, payload: dict, status_code: int = 200) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status_code)
@@ -129,12 +144,35 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         self.send_header("Pragma", "no-cache")
         self.send_header("Expires", "0")
+        cors_origin = self._resolve_cors_origin()
+        if cors_origin:
+            self.send_header("Access-Control-Allow-Origin", cors_origin)
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            if cors_origin != "*":
+                self.send_header("Vary", "Origin")
         super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.end_headers()
 
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/api/update-status":
             self._send_json(self.update_manager.snapshot())
+            return
+        if parsed.path == "/api/dashboard-data":
+            try:
+                self._send_json(load_json_payload(DASHBOARD_JSON_PATH))
+            except FileNotFoundError:
+                self._send_json({"error": f"dashboard data not found: {DASHBOARD_JSON_PATH.name}"}, status_code=404)
+            return
+        if parsed.path == "/api/dashboard-summary":
+            try:
+                self._send_json(load_json_payload(DASHBOARD_SUMMARY_PATH))
+            except FileNotFoundError:
+                self._send_json({"error": f"dashboard summary not found: {DASHBOARD_SUMMARY_PATH.name}"}, status_code=404)
             return
         super().do_GET()
 
@@ -161,6 +199,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Serve the AI Digest dashboard with sane defaults.")
     parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=4173, help="Port to listen on (default: 4173)")
+    parser.add_argument(
+        "--cors-allow-origin",
+        action="append",
+        default=[],
+        help="Allowed CORS origin. Repeat this option to allow multiple origins. Default: *",
+    )
     browser_group = parser.add_mutually_exclusive_group()
     browser_group.add_argument(
         "--open-browser",
@@ -188,10 +232,11 @@ def main(argv: list[str] | None = None) -> int:
     handler: Callable[..., DashboardHandler] = functools.partial(DashboardHandler, directory=str(DOCS_DIR))
     try:
         with ThreadingHTTPServer((args.host, args.port), handler) as httpd:
+            httpd.cors_allow_origins = tuple(args.cors_allow_origin or ["*"])
             url = f"http://{args.host}:{args.port}"
             print(f"Serving {DOCS_DIR} at {url}")
             print("Clean URLs such as /docs or /AI_Digest fall back to index.html. Press Ctrl+C to exit.")
-            print("Local update API is available at /api/update-data and /api/update-status.")
+            print("Update API is available at /api/update-status, /api/update-data, /api/dashboard-data and /api/dashboard-summary.")
             if args.open_browser:
                 webbrowser.open(url)
             httpd.serve_forever()

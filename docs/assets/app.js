@@ -11,6 +11,10 @@ const updateStatus = document.querySelector("#update-status");
 const dashboardTemplate = document.querySelector("#dashboard-template");
 const sectionTemplate = document.querySelector("#section-template");
 const chartModal = createChartModal();
+const defaultRuntimeConfig = Object.freeze({
+  serviceBaseUrl: "",
+  dashboardDataUrl: "",
+});
 
 const colors = {
   previousBarStroke: "#8da1b8",
@@ -44,15 +48,82 @@ const state = {
   updateBusy: false,
   updateAvailable: false,
   updatePollTimer: null,
+  runtimeConfig: { ...defaultRuntimeConfig },
+  apiBaseUrl: "",
+  dashboardDataUrl: "./data/dashboard.json",
 };
 
-setupCaptureTools();
-setupUpdateTools();
-void loadDashboard();
+void bootstrapApp();
+
+async function bootstrapApp() {
+  await loadRuntimeConfig();
+  setupCaptureTools();
+  setupUpdateTools();
+  await loadDashboard();
+}
+
+async function loadRuntimeConfig() {
+  state.runtimeConfig = { ...defaultRuntimeConfig };
+  state.apiBaseUrl = "";
+  state.dashboardDataUrl = "./data/dashboard.json";
+
+  try {
+    const response = await fetch("./data/runtime-config.json", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    if (payload && typeof payload === "object") {
+      state.runtimeConfig = {
+        ...defaultRuntimeConfig,
+        ...payload,
+      };
+    }
+  } catch (_error) {
+    state.runtimeConfig = { ...defaultRuntimeConfig };
+  }
+
+  const configuredApiBase = normalizeBaseUrl(state.runtimeConfig.serviceBaseUrl);
+  const configuredDashboardDataUrl = normalizeAbsoluteUrl(state.runtimeConfig.dashboardDataUrl);
+
+  if (configuredApiBase) {
+    state.apiBaseUrl = configuredApiBase;
+    state.dashboardDataUrl = configuredDashboardDataUrl || buildApiUrl("/api/dashboard-data");
+    return;
+  }
+
+  if (configuredDashboardDataUrl) {
+    state.dashboardDataUrl = configuredDashboardDataUrl;
+  }
+}
+
+function normalizeBaseUrl(value) {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return "";
+  }
+  return text.replace(/\/+$/, "");
+}
+
+function normalizeAbsoluteUrl(value) {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return "";
+  }
+  return text;
+}
+
+function buildApiUrl(path) {
+  const suffix = String(path ?? "");
+  if (state.apiBaseUrl) {
+    return `${state.apiBaseUrl}${suffix}`;
+  }
+  return `.${suffix}`;
+}
 
 async function loadDashboard() {
   try {
-    const response = await fetch("./data/dashboard.json", { cache: "no-store" });
+    const response = await fetch(state.dashboardDataUrl, { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`加载 dashboard.json 失败，HTTP ${response.status}`);
     }
@@ -138,14 +209,12 @@ async function probeUpdateCapability() {
   }
 
   try {
-    const response = await fetch("./api/update-status", { cache: "no-store" });
+    const response = await fetch(buildApiUrl("/api/update-status"), { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
     const payload = await response.json();
     state.updateAvailable = Boolean(payload.available);
-    updateButton.hidden = !state.updateAvailable;
-    updateStatus.hidden = !state.updateAvailable;
     updateUpdateTools({
       message: payload.message || "本地更新服务已就绪。",
       stateName: payload.status === "error" ? "error" : payload.status === "success" ? "success" : "",
@@ -156,23 +225,33 @@ async function probeUpdateCapability() {
     }
   } catch (_error) {
     state.updateAvailable = false;
-    updateButton.hidden = true;
-    updateStatus.hidden = true;
+    state.updateBusy = false;
+    updateUpdateTools();
   }
 }
 
 function updateUpdateTools(options = {}) {
-  if (!updateButton || !updateStatus || !state.updateAvailable) {
+  if (!updateButton || !updateStatus) {
     return;
   }
 
   const { message, stateName = "" } = options;
   const ready = Boolean(state.payload);
-  updateButton.disabled = !ready || state.updateBusy;
-  updateButton.textContent = state.updateBusy ? "更新中..." : "更新";
+  updateButton.disabled = !state.updateAvailable || !ready || state.updateBusy;
+  updateButton.dataset.mode = state.updateAvailable ? "available" : "unavailable";
+  updateButton.textContent = state.updateBusy ? "数据更新中..." : "数据更新";
 
   if (typeof message === "string") {
     setUpdateStatus(message, stateName);
+    return;
+  }
+
+  if (!state.updateAvailable) {
+    if (state.apiBaseUrl) {
+      setUpdateStatus(`已配置远端更新服务 ${state.apiBaseUrl}，但当前无法连通。请检查后端服务是否在线。`, "error");
+      return;
+    }
+    setUpdateStatus("当前仍在使用静态数据。要让“数据更新”按钮真正执行更新，请在 docs/data/runtime-config.json 中配置可访问的后端 serviceBaseUrl。");
     return;
   }
 
@@ -181,7 +260,7 @@ function updateUpdateTools(options = {}) {
     return;
   }
 
-  setUpdateStatus("点击“更新”后，将抓取 3 张日报表并重建当前页面数据。");
+  setUpdateStatus("点击“数据更新”后，将抓取 3 张日报表并重建当前页面数据。");
 }
 
 function setUpdateStatus(message, stateName = "") {
@@ -206,7 +285,7 @@ async function handleDataUpdate() {
   updateUpdateTools({ message: "更新任务已提交，正在准备执行。" });
 
   try {
-    const response = await fetch("./api/update-data", {
+    const response = await fetch(buildApiUrl("/api/update-data"), {
       method: "POST",
       cache: "no-store",
     });
@@ -237,7 +316,7 @@ function scheduleUpdateStatusPoll() {
 
 async function pollUpdateStatus() {
   try {
-    const response = await fetch("./api/update-status", { cache: "no-store" });
+    const response = await fetch(buildApiUrl("/api/update-status"), { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }

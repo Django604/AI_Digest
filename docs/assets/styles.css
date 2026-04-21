@@ -209,6 +209,8 @@ button,
 .capture-tools,
 .update-tools {
   padding: 0;
+  display: grid;
+  gap: 10px;
 }
 
 .sidebar-title {
@@ -262,33 +264,42 @@ button,
 }
 
 .update-button {
-  justify-self: start;
-  min-width: 72px;
-  border: 1px solid rgba(22, 28, 36, 0.12);
-  border-radius: 999px;
-  padding: 8px 14px;
+  width: 100%;
+  justify-self: stretch;
+  border: 1px solid rgba(194, 15, 47, 0.16);
+  border-radius: 14px;
+  padding: 11px 14px;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--ink);
-  font-size: 0.82rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(252, 244, 246, 0.98));
+  color: #8f0f2d;
+  font-size: 0.9rem;
   font-weight: 800;
-  line-height: 1;
-  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease, opacity 180ms ease;
+  line-height: 1.1;
+  box-shadow: 0 10px 24px rgba(194, 15, 47, 0.08);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
 }
 
 .update-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  border-color: rgba(194, 15, 47, 0.28);
-  background: rgba(194, 15, 47, 0.06);
+  border-color: rgba(194, 15, 47, 0.3);
+  background: linear-gradient(135deg, rgba(255, 248, 249, 1), rgba(252, 238, 241, 1));
+  box-shadow: 0 14px 28px rgba(194, 15, 47, 0.12);
 }
 
 .update-button:disabled {
   cursor: not-allowed;
-  opacity: 0.58;
+  opacity: 0.66;
+  box-shadow: none;
+}
+
+.update-button[data-mode="unavailable"] {
+  border-color: rgba(22, 28, 36, 0.08);
+  background: rgba(246, 247, 249, 0.96);
+  color: var(--stone);
 }
 
 .update-status {
-  margin: 10px 2px 0;
+  margin: 0 2px;
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.5;

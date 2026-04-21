@@ -104,6 +104,41 @@ class ServeDashboardTests(unittest.TestCase):
         finally:
             serve_dashboard.DashboardHandler.update_manager = original_manager
 
+    def test_dashboard_data_endpoint_returns_payload(self) -> None:
+        with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
+            httpd.cors_allow_origins = ("*",)
+            server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            server_thread.start()
+            base_url = f"http://127.0.0.1:{httpd.server_port}"
+
+            try:
+                with urlopen(f"{base_url}/api/dashboard-data", timeout=2) as response:
+                    self.assertEqual(response.status, 200)
+                    payload = json.loads(response.read().decode("utf-8"))
+                self.assertIn("meta", payload)
+                self.assertIn("dashboards", payload)
+            finally:
+                httpd.shutdown()
+                server_thread.join(timeout=2)
+
+    def test_options_request_includes_cors_headers(self) -> None:
+        with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
+            httpd.cors_allow_origins = ("https://django604.github.io",)
+            server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            server_thread.start()
+            base_url = f"http://127.0.0.1:{httpd.server_port}"
+
+            try:
+                request = Request(f"{base_url}/api/update-data", method="OPTIONS")
+                request.add_header("Origin", "https://django604.github.io")
+                with urlopen(request, timeout=2) as response:
+                    self.assertEqual(response.status, 204)
+                    self.assertEqual(response.headers.get("Access-Control-Allow-Origin"), "https://django604.github.io")
+                    self.assertIn("POST", response.headers.get("Access-Control-Allow-Methods", ""))
+            finally:
+                httpd.shutdown()
+                server_thread.join(timeout=2)
+
 
 if __name__ == "__main__":
     unittest.main()

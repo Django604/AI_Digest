@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-04-21 15:45
+- 需求目标：按“静态前端 + 独立后端 API”方案，让 GitHub Pages 页面上的 `数据更新` 按钮能够真正调用远端后端执行更新，而不是只在本地同源模式下可用。
+- 改动内容：扩展 `scripts/serve_dashboard.py`，新增 `/api/dashboard-data`、`/api/dashboard-summary` 与 `OPTIONS`/CORS 支持，使其既能本地预览，也能作为远端更新后端部署；新增 `docs/data/runtime-config.json`，允许静态前端配置 `serviceBaseUrl` / `dashboardDataUrl`；更新 `docs/assets/app.js`，增加运行时配置加载、远端 API URL 解析、远端 dashboard 数据源切换与不可达提示；补充 `tests/test_serve_dashboard.py`，覆盖数据接口与跨域预检；同步更新 `README.md`、`SCRIPTS.md`。
+- 涉及文件：`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`、`scripts/serve_dashboard.py`、`docs/data/runtime-config.json`、`docs/assets/app.js`、`tests/test_serve_dashboard.py`
+- 关键命令：`python -X utf8 -m py_compile scripts\serve_dashboard.py tests\test_serve_dashboard.py`、`python -X utf8 -m unittest discover -s tests -v`
+- 验证结果：远端后端所需的 `dashboard-data` 与 `update-data` API 已接入同一服务；新增测试将验证 `dashboard-data` 返回结果与 `OPTIONS` 跨域预检响应头。
+- 回滚方法：回退本条涉及的后端脚本、前端运行时配置与测试文件；如需撤销远端更新方案，优先使用新的反向提交处理。
+- 关联提交（如有）：待补充
+- 备注：真正上线时仍需在可访问目标系统的机器上部署 `scripts/serve_dashboard.py`，并把 `docs/data/runtime-config.json` 指向该服务地址。
+
 ## 2026-04-21 15:33
 - 需求目标：为 `AI_Digest` 落地轻量化浏览器取数系统，复用 `日报取数平台` 登录逻辑抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日` 三张 `N-1` 日报表，回填 `NEV+ICE_xsai.xlsm` 指定工作表，并在本地页面增加 `更新` 按钮触发整套流程。
 - 改动内容：新增 `scripts/fetch_daily_data.py`，串联兄弟项目取数脚本、导出文件匹配、工作簿回填与 dashboard 重建；扩展 `scripts/build_dashboard.py` 支持 `--report-date`/`report_date_override` 且补上 `YYYYMMDD` 日期解析；重写 `scripts/serve_dashboard.py` 暴露 `/api/update-status` 与 `/api/update-data` 并修复任务管理器锁死问题；更新 `docs/index.html`、`docs/assets/styles.css`、`docs/assets/app.js` 增加本地 `更新` 按钮与状态轮询；新增 `tests/test_fetch_daily_data.py`、`tests/test_serve_dashboard.py` 覆盖日期解析、工作簿回填与本地更新 API；同步更新 `README.md`、`SCRIPTS.md`、`.gitignore`。
