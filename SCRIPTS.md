@@ -1,6 +1,6 @@
 # 脚本使用手册
 
-最后更新：2026-04-22
+最后更新：2026-04-22 17:53
 
 ## scripts/build_dashboard.py
 
@@ -87,6 +87,35 @@
 - 备注：
   - 这个脚本只负责本地重建数据；要让 GitHub Pages 同步更新，仍然需要把变更提交并推送到 GitHub
   - 脚本会优先使用 `python`，找不到时自动回退到 `py -3`
+
+## scripts/scheduled_update_runner.py
+
+- 路径：`./scripts/scheduled_update_runner.py`
+- 作用：作为 Windows 计划任务的实际执行入口，按当天 `N-1` 自动调用 `fetch_daily_data.py` 背后的 `run_update()`，并在启动与结束时弹出提示框说明更新流程与更新结果
+- 使用方法：
+  - 手动静默验证：`python scripts/scheduled_update_runner.py --suppress-start-message --suppress-finish-message`
+  - 调试有头浏览器：`python scripts/scheduled_update_runner.py --headed --suppress-start-message`
+  - 指定业务日期：`python scripts/scheduled_update_runner.py --business-date 2026-04-21`
+- 输出结果：
+  - 写入 `.runtime/scheduled_update/<timestamp>/scheduled_update.log`
+  - 写入 `.runtime/scheduled_update/<timestamp>/run_meta.json`
+  - 写入 `.runtime/scheduled_update/<timestamp>/result.json`
+- 备注：
+  - 正常计划任务场景下不需要带 `--suppress-*` 参数，这两个参数只是给测试或静默排查用
+  - 若你要求显示提示框，Windows 计划任务应配置为“仅当用户登录时运行”，否则弹框根本没地方显示
+
+## scripts/register_daily_update_task.ps1
+
+- 路径：`./scripts/register_daily_update_task.ps1`
+- 作用：在当前 Windows 机器上注册每天 `09:00` 自动执行的计划任务，默认任务名为 `AI_Digest_Daily_Update`
+- 使用方法：
+  - 直接注册默认任务：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1`
+  - 自定义时间：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -Time 09:00`
+  - 自定义 Python 路径：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -PythonPath C:\Python313\pythonw.exe`
+- 备注：
+  - 计划任务按当前 Windows 本地时区执行；这台机器的场景即北京时间
+  - 注册脚本会优先使用 `pythonw.exe`，避免计划任务运行时弹黑色控制台窗口
+  - 任务使用交互式登录模式运行，这样开始 / 结束提示框才能真正弹出来
 
 ## scripts/publish_dashboard.ps1
 

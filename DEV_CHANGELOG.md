@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-04-22 17:53
+- 需求 / 目标：为 `AI_Digest` 增加每天北京时间 `09:00` 自动执行的数据更新能力，替代手动点击网页 `数据更新`，并在任务启动与结束时弹出提示框说明更新流程和结果。
+- 改动内容：新增 `scripts/scheduled_update_runner.py`，复用 `fetch_daily_data.py` 的 `run_update()` 执行全量更新，并把启动说明、成功结果、失败结果分别封装成 Windows MessageBox 提示；新增 `scripts/register_daily_update_task.ps1`，使用 Windows 计划任务 API 注册默认任务 `AI_Digest_Daily_Update`，每天 `09:00` 触发、按交互式登录模式运行并优先使用 `pythonw.exe`；补充 `tests/test_scheduled_update_runner.py`，覆盖提示文案生成；同步更新 `README.md` 与 `SCRIPTS.md`。
+- 涉及文件：`scripts/scheduled_update_runner.py`、`scripts/register_daily_update_task.ps1`、`tests/test_scheduled_update_runner.py`、`README.md`、`SCRIPTS.md`
+- 关键命令：`python -X utf8 -m py_compile scripts\\scheduled_update_runner.py tests\\test_scheduled_update_runner.py`、`python -X utf8 -m unittest discover -s tests -v`
+- 验证结果：新增调度相关单测通过，`AI_Digest` 当前全量单测 `32/32` 通过。
+- 回滚方法：删除计划任务 `AI_Digest_Daily_Update`，并回退本次新增的调度脚本、测试与文档。
+- 关联提交（如有）：待补充
+- 备注：计划任务若需要正常显示提示框，需在“用户已登录”的交互式会话中运行；若机器关机或未登录，任务可触发但不会有可见弹框。
+
 ## 2026-04-22 17:30
 - 需求 / 目标：修复 `NEV本期来店`、`NEV同期来店` 仍未真实按日更新的问题，改为直接从 FineReport 后台接口导出自定义来店数据，并重新跑通整条网页更新链路后准备提交 GitHub。
 - 改动内容：新增 `scripts/run_arrival_nev_exports.py` 作为 `日报来店NEV源` 的运行时包装器，复用原登录态和参数模板，补上 `tab/execute(tabName=自定义)`，当 `REPORT2 load/content` 返回“合计值 + simplechart”时，继续解析 `chartID/ecName` 并请求 `chart.data` 还原按日序列；更新 `scripts/fetch_daily_data.py` 改为调用该包装器；更新 `scripts/build_dashboard.py`，去掉 `NEV` 来店按日数据为空时回退到线索工作簿 `arrivals` 聚合值的兜底逻辑，避免掩盖真实取数异常；补充 `tests/test_run_arrival_nev_exports.py`，覆盖 simplechart 元数据提取、chart.data 按日解析与 URL 构造；同步更新 `README.md` 与 `SCRIPTS.md`。
