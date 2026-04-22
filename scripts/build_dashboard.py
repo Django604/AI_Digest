@@ -863,26 +863,9 @@ def load_arrival_daily_sheet(ws) -> dict[date, int | float]:
     return result
 
 
-def project_daily_metric(
-    daily_series: dict[date, dict[str, int | float | None]],
-    metric_key: str,
-) -> dict[date, int | float]:
-    result: dict[date, int | float] = {}
-    for current_date, payload in daily_series.items():
-        value = payload.get(metric_key)
-        if isinstance(value, (int, float)):
-            result[current_date] = value
-    return result
-
-
-def build_arrival_daily_maps(
-    arrival_wb,
-    *,
-    nev_current_fallback: dict[date, int | float] | None = None,
-    nev_previous_fallback: dict[date, int | float] | None = None,
-) -> dict[str, dict[date, int | float]]:
-    nev_current = load_arrival_daily_sheet(arrival_wb["NEV本期来店"]) or dict(nev_current_fallback or {})
-    nev_previous = load_arrival_daily_sheet(arrival_wb["NEV同期来店"]) or dict(nev_previous_fallback or {})
+def build_arrival_daily_maps(arrival_wb) -> dict[str, dict[date, int | float]]:
+    nev_current = load_arrival_daily_sheet(arrival_wb["NEV本期来店"])
+    nev_previous = load_arrival_daily_sheet(arrival_wb["NEV同期来店"])
     ice_current = load_arrival_daily_sheet(arrival_wb["ICE本期来店"])
     ice_previous = load_arrival_daily_sheet(arrival_wb["ICE同期来店"])
 
@@ -1107,11 +1090,7 @@ def build_payload(
         sylphy_targets = build_sylphy_target_series(report_date)
         nev_total_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_MODELS))
         nev_total_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in NEV_MODELS))
-        arrival_maps = build_arrival_daily_maps(
-            arrival,
-            nev_current_fallback=project_daily_metric(nev_total_current, "arrivals"),
-            nev_previous_fallback=project_daily_metric(nev_total_previous, "arrivals"),
-        )
+        arrival_maps = build_arrival_daily_maps(arrival)
 
         line_brief = build_line_brief(report_date, nev_current, nev_targets, sylphy_current, sylphy_targets)
         arrival_brief = build_arrival_brief(report_date, arrival_maps)

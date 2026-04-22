@@ -1,6 +1,6 @@
 # 脚本使用手册
 
-最后更新：2026-04-21
+最后更新：2026-04-22
 
 ## scripts/build_dashboard.py
 
@@ -44,8 +44,20 @@
 - 备注：
   - 默认按当天的 `N-1` 作为业务日期，也可通过 `--business-date` 显式覆盖
   - 脚本运行成功后会自动清理 `.runtime/daily_update/` 临时目录；若带 `--keep-runtime`，会保留导出文件与日志便于排查
+  - NEV 来店中的 `本期/同期` 会通过 `scripts/run_arrival_nev_exports.py` 内部包装器复用 `日报来店NEV源` 的登录态与参数模板，并在后台执行 `tab/execute -> REPORT2 -> chart.data` 直接抓取自定义按日序列，不依赖前端页面点选与 SVG 解析
   - ICE 来店中的 `本期/同期` 会通过 `scripts/run_arrival_ice_exports.py` 内部包装器强制把 Tableau 交叉表缩略图入口锁定到 `来店批次分车系汇总表_按天T`，同时保留实际导出 sheet 名 `E3S报表样式` 以匹配 `sheetdocId`
   - 该脚本只负责本地更新；静态部署到 `GitHub Pages` 后不会自动具备浏览器取数能力
+
+## scripts/run_arrival_nev_exports.py
+
+- 路径：`./scripts/run_arrival_nev_exports.py`
+- 作用：作为 `日报来店NEV源/getdata.py` 的轻量包装器，仅对 `NEV本期来店`、`NEV同期来店` 两份 FineReport 报表切换到 `自定义` tab，并通过后台 `chart.data` 接口直接提取按日来店数据后导出为两列表 Excel
+- 使用方法：
+  - 一般不单独调用，由 `python scripts/fetch_daily_data.py ...` 自动串联
+  - 需要单独验证时可执行：`python scripts/run_arrival_nev_exports.py --business-date 2026-04-21 --report-keys store_current_period,store_same_period --safe-bootstrap --capture-wait-ms 30000`
+- 备注：
+  - 该包装器不会改动兄弟项目源码，只在运行时修正目标报表 URL、参数模板和导出策略
+  - 若 `REPORT2 load/content` 直接返回的不是按日两列表，而是“合计值 + simplechart”，包装器会继续从 `simplechart` 里提取 `chartID` 与 `ecName`，再请求 `chart.data` 还原每日来店量
 
 ## scripts/run_arrival_ice_exports.py
 

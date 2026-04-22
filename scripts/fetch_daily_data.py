@@ -36,6 +36,7 @@ NEV_SCRIPT = DAILY_SOURCE_ROOT / "日报线索NEV源" / "getdata.py"
 ICE_SCRIPT = DAILY_SOURCE_ROOT / "日报线索ICE源" / "getdata.py"
 ARRIVAL_NEV_SCRIPT = DAILY_SOURCE_ROOT / "日报来店NEV源" / "getdata.py"
 ARRIVAL_ICE_SCRIPT = PROJECT_ROOT / "scripts" / "run_arrival_ice_exports.py"
+ARRIVAL_NEV_WRAPPER_SCRIPT = PROJECT_ROOT / "scripts" / "run_arrival_nev_exports.py"
 RUNTIME_ROOT = PROJECT_ROOT / ".runtime" / "daily_update"
 
 
@@ -75,7 +76,7 @@ FETCH_TASKS = (
     ),
     FetchTask(
         label="NEV 来店本期 + 同期",
-        script_path=ARRIVAL_NEV_SCRIPT,
+        script_path=ARRIVAL_NEV_WRAPPER_SCRIPT,
         output_subdir="arrival-nev",
         report_keys=("store_current_period", "store_same_period"),
         extra_args=("--safe-bootstrap", "--capture-wait-ms", "30000"),

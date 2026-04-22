@@ -20,6 +20,7 @@
 - `requirements.txt`：Python 依赖清单
 - `scripts/build_dashboard.py`：从 Excel 抽取页面数据
 - `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，抓取线索 + 来店共 7 张日报表并回填两本工作簿
+- `scripts/run_arrival_nev_exports.py`：NEV 来店导出包装器，运行时切到 FineReport `自定义` tab 并通过后台 `chart.data` 直接抓取按日序列
 - `scripts/run_arrival_ice_exports.py`：ICE 来店导出包装器，运行时把 Tableau 导出入口锁定到 `来店批次分车系汇总表_按天T`
 - `scripts/rebuild_dashboard.ps1`：Windows 下本地一键重建 `dashboard.json`
 - `docs/data/runtime-config.json`：前端远端更新服务配置
@@ -38,7 +39,7 @@
 5. 打开 `http://127.0.0.1:4173`，即使误写成 `/docs` 或 `/AI_Digest` 等路径也会被回退到 `index.html`
 6. 如果需要直接走浏览器取数，可在本地服务页面左侧点击 `数据更新`；它会按当天 `N-1` 抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日`、`NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店`，分别更新 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx` 后再重建页面数据
 7. 如需指定业务日期或保留运行痕迹排查问题，可直接执行 `python scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`
-   其中 `ICE本期来店`、`ICE同期来店` 会通过内部包装器强制走 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
+   其中 `NEV本期来店`、`NEV同期来店` 会通过内部包装器直接走 FineReport 后台 `chart.data` 导出链，`ICE本期来店`、`ICE同期来店` 会通过内部包装器强制走 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
 
 ## GitHub Pages 点击更新
 

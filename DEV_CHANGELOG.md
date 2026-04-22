@@ -1,8 +1,18 @@
 # DEV CHANGELOG
 
+## 2026-04-22 17:30
+- 需求 / 目标：修复 `NEV本期来店`、`NEV同期来店` 仍未真实按日更新的问题，改为直接从 FineReport 后台接口导出自定义来店数据，并重新跑通整条网页更新链路后准备提交 GitHub。
+- 改动内容：新增 `scripts/run_arrival_nev_exports.py` 作为 `日报来店NEV源` 的运行时包装器，复用原登录态和参数模板，补上 `tab/execute(tabName=自定义)`，当 `REPORT2 load/content` 返回“合计值 + simplechart”时，继续解析 `chartID/ecName` 并请求 `chart.data` 还原按日序列；更新 `scripts/fetch_daily_data.py` 改为调用该包装器；更新 `scripts/build_dashboard.py`，去掉 `NEV` 来店按日数据为空时回退到线索工作簿 `arrivals` 聚合值的兜底逻辑，避免掩盖真实取数异常；补充 `tests/test_run_arrival_nev_exports.py`，覆盖 simplechart 元数据提取、chart.data 按日解析与 URL 构造；同步更新 `README.md` 与 `SCRIPTS.md`。
+- 涉及文件：`scripts/run_arrival_nev_exports.py`、`tests/test_run_arrival_nev_exports.py`、`scripts/fetch_daily_data.py`、`scripts/build_dashboard.py`、`README.md`、`SCRIPTS.md`、`data/source/NEV+ICE_ldai.xlsx`、`data/source/NEV+ICE_xsai.xlsm`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`
+- 关键命令：`python -X utf8 -m unittest discover -s tests -v`、`python -X utf8 scripts/run_arrival_nev_exports.py --business-date 2026-04-21 --report-keys store_current_period,store_same_period --output-dir D:\WorkCode\AI_Digest\.runtime\nev_arrival_chart_fix_test --output-folder-name debug-0421g --safe-bootstrap --capture-wait-ms 30000 --headless`、`python -X utf8 scripts/fetch_daily_data.py --business-date 2026-04-21 --keep-runtime`
+- 验证结果：`AI_Digest` 全量单测 `29/29` 通过；真实导出已生成 `NEV本期-0421.xlsx`、`NEV同期-0421.xlsx`，结构为标准两列表，抽样首尾值分别验证为 `2026-04-01 | 1286`、`2026-04-21 | 2017` 与 `2025-04-01 | 82`、`2025-04-21 | 263`；完整更新链路已成功回填 7 张表，运行目录为 `D:\WorkCode\AI_Digest\.runtime\daily_update\20260421_20260422-172530`，`dashboard.json` 与 `dashboard.summary.json` 均已更新。
+- 回滚方法：回退本次提交涉及的 NEV 来店包装器、回填逻辑、测试与数据文件，或基于本次提交创建新的反向提交。
+- 关联提交（如有）：待补充
+- 备注：当前仓库仍有与本次任务无关的未跟踪文件（如 `.codex/`、`reports/*.pptx`、`tests/.tmp-copy-check/`），本次不会纳入提交。
+
 ## 2026-04-22 14:42
 - 需求 / 目标：修复页面 `全国来店日趋势` 中 `NEV本期实绩` 整排显示为 `-` 的问题，并同步恢复来店简报中的 NEV 来店数据。
-- 改动内容：调整 `scripts/build_dashboard.py` 的来店数据编排逻辑，在 `NEV本期来店/NEV同期来店` 工作表不是按日两列表时，回退使用 `NEV+ICE_xsai.xlsm` 的 `全国按日NEV` 中 `新增到店量` 聚合生成 NEV 来店按日序列；补充 `tests/test_build_dashboard.py`，锁定 `NEV本期实绩` 行不再为空。
+- 改动内容：调整 `scripts/build_dashboard.py` 的来店数据编排逻辑，在 `NEV本期来店/NEV同期来店` 工作表不是按日两列表时，回退使用 `NEV+ICE_xsai.xlsm` 的 `全国按日NEV` 中 `新增到店量` 聚合生成 NEV 来店按日序列；补充 `tests/test_build_dashboard.py`，锁定 `NEV本期实绩` 行不再为空。  
 - 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`docs/data/dashboard.json`
 - 关键命令：`python -X utf8 scripts/build_dashboard.py --workbook data\\source\\NEV+ICE_xsai.xlsm --arrival-workbook data\\source\\NEV+ICE_ldai.xlsx --out docs\\data\\dashboard.json --summary-out docs\\data\\dashboard.summary.json`、`python -X utf8 -m unittest discover -s tests -v`
 - 验证结果：全量单测 `22/22` 通过；重建后的 `dashboard.json` 中 `NEV本期实绩` 已恢复按日数据，`全国累计来店` 更新为 `85,973`，`①NEV累计来店` 更新为 `50,835`，不再是只显示 ICE 数据。
