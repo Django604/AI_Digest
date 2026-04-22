@@ -69,6 +69,14 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertEqual(summary["stats"]["dashboardCount"], 5)
         self.assertEqual(summary["stats"]["sectionCounts"]["lead-control"], 1)
 
+    def test_arrival_dashboard_uses_nev_daily_arrivals_for_nev_actual_row(self) -> None:
+        trend = self.payload["dashboards"]["arrival"]["sections"][0]["trend"]
+        rows = {row["key"]: row["displayValues"] for row in trend["matrix"]["rows"]}
+        report_index = trend["chart"]["reportDayIndex"]
+
+        self.assertIn("nevActual", rows)
+        self.assertNotEqual(rows["nevActual"][report_index], "-")
+
     def test_write_json_if_changed_ignores_generated_at_only(self) -> None:
         original = {
             "meta": {"generatedAt": "2026-04-15T16:00:00", "reportDate": "2026-04-15"},

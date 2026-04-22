@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-04-22 14:42
+- 需求 / 目标：修复页面 `全国来店日趋势` 中 `NEV本期实绩` 整排显示为 `-` 的问题，并同步恢复来店简报中的 NEV 来店数据。
+- 改动内容：调整 `scripts/build_dashboard.py` 的来店数据编排逻辑，在 `NEV本期来店/NEV同期来店` 工作表不是按日两列表时，回退使用 `NEV+ICE_xsai.xlsm` 的 `全国按日NEV` 中 `新增到店量` 聚合生成 NEV 来店按日序列；补充 `tests/test_build_dashboard.py`，锁定 `NEV本期实绩` 行不再为空。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`docs/data/dashboard.json`
+- 关键命令：`python -X utf8 scripts/build_dashboard.py --workbook data\\source\\NEV+ICE_xsai.xlsm --arrival-workbook data\\source\\NEV+ICE_ldai.xlsx --out docs\\data\\dashboard.json --summary-out docs\\data\\dashboard.summary.json`、`python -X utf8 -m unittest discover -s tests -v`
+- 验证结果：全量单测 `22/22` 通过；重建后的 `dashboard.json` 中 `NEV本期实绩` 已恢复按日数据，`全国累计来店` 更新为 `85,973`，`①NEV累计来店` 更新为 `50,835`，不再是只显示 ICE 数据。
+- 回滚方法：基于本次提交创建新的反向提交，或回退 `scripts/build_dashboard.py`、相关测试与 `dashboard.json` 到修复前版本。
+- 关联提交（如有）：待补充
+- 备注：仓库内仍有与本次任务无关的未跟踪文件，本次不会纳入提交。
+
 ## 2026-04-22 14:13
 - 需求 / 目标：修复 `ICE本期来店`、`ICE同期来店` 仍未按日更新的问题，按用户更正强制改为从 `来店批次分车系汇总表_按天T` 的导出入口取数，并重新跑通整条更新链路。
 - 改动内容：调整 `scripts/run_arrival_ice_exports.py`，将目标 Tableau 视图从 `sheet2` 切到 `/_T`，仅保留 `来店批次分车系汇总表_按天T` 的缩略图入口，并把导出 sheet 名锁定为 `来店批次分车系汇总表_按天`，同时清空 `_T` 页面不再适用的旧单选参数；同步补充 `tests/test_run_arrival_ice_exports.py` 覆盖该行为。
