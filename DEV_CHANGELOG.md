@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-04-22 14:13
+- 需求 / 目标：修复 `ICE本期来店`、`ICE同期来店` 仍未按日更新的问题，按用户更正强制改为从 `来店批次分车系汇总表_按天T` 的导出入口取数，并重新跑通整条更新链路。
+- 改动内容：调整 `scripts/run_arrival_ice_exports.py`，将目标 Tableau 视图从 `sheet2` 切到 `/_T`，仅保留 `来店批次分车系汇总表_按天T` 的缩略图入口，并把导出 sheet 名锁定为 `来店批次分车系汇总表_按天`，同时清空 `_T` 页面不再适用的旧单选参数；同步补充 `tests/test_run_arrival_ice_exports.py` 覆盖该行为。
+- 涉及文件：`scripts/run_arrival_ice_exports.py`、`tests/test_run_arrival_ice_exports.py`、`data/source/NEV+ICE_ldai.xlsx`、`data/source/NEV+ICE_xsai.xlsm`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`
+- 关键命令：`python -X utf8 -m unittest discover -s tests -v`、`python -X utf8 scripts/run_arrival_ice_exports.py --business-date 2026-04-21 --report-keys store_batch_vehicle_summary_本期_来店,store_batch_vehicle_summary_同期_来店 --output-dir D:\WorkCode\AI_Digest\.runtime\ice_arrival_daily_fix_test --output-folder-name debug-0421f`、`python -X utf8 scripts/fetch_daily_data.py --business-date 2026-04-21 --keep-runtime`
+- 验证结果：全量单测 `21/21` 通过；已导出 `来店本期-0421.xlsx`、`来店同期-0421.xlsx`，首行数据分别验证为 `2026年4月1日 | 1187` 与 `2025年4月1日 | 2390` 的按日两列表结构；完整更新运行目录为 `D:\WorkCode\AI_Digest\.runtime\daily_update\20260421_20260422-142613`；`docs/data/dashboard.json` 中 `全国来店日趋势` 已恢复非零数据。
+- 回滚方法：基于本次提交创建新的反向提交，或回退 `scripts/run_arrival_ice_exports.py`、相关测试与数据产物到修复前版本。
+- 关联提交（如有）：待补充
+- 备注：仓库内仍有与本次任务无关的未跟踪文件，本次不会纳入提交。
+
 ## 2026-04-21 18:28
 - 需求目标：修正 `ICE本期来店`、`ICE同期来店` 的取数源，按更正要求强制走 `来店批次分车系汇总表_按天T`，并重新跑通本地更新链路与页面更新 API。
 - 改动内容：新增并调整 `scripts/run_arrival_ice_exports.py` 的运行时补丁逻辑，只收敛 Tableau `thumbnail_uris` 到 `来店批次分车系汇总表_按天T`，保留真实导出 `sheetdocId` 对应的 `crosstab_sheet_name = E3S报表样式`；更新 `scripts/fetch_daily_data.py` 继续通过该包装器执行 ICE 来店导出；补充 `tests/test_run_arrival_ice_exports.py` 单测；同步更新 `README.md`、`SCRIPTS.md` 说明，并重新生成工作簿与 dashboard 数据。

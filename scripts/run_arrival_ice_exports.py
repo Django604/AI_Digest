@@ -5,6 +5,7 @@ import importlib.util
 import sys
 from dataclasses import replace
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -16,7 +17,9 @@ TARGET_REPORT_KEYS = {
     "store_batch_vehicle_summary_本期_来店",
     "store_batch_vehicle_summary_同期_来店",
 }
-TARGET_CROSSTAB_SHEET = "来店批次分车系汇总表_按天T"
+TARGET_THUMBNAIL_SHEET = "来店批次分车系汇总表_按天T"
+TARGET_EXPORT_SHEET = "来店批次分车系汇总表_按天"
+TARGET_TABLEAU_VIEW_PATH = "/_T"
 
 
 def load_arrival_ice_module():
@@ -36,6 +39,20 @@ def load_arrival_ice_module():
     return module
 
 
+def switch_tableau_view_to_daily(view_url: str) -> str:
+    parsed = urlsplit(str(view_url or "").strip())
+    if not parsed.fragment:
+        return view_url
+
+    fragment = parsed.fragment
+    replaced_fragment = fragment.replace("/sheet2?", f"{TARGET_TABLEAU_VIEW_PATH}?", 1)
+    replaced_fragment = replaced_fragment.replace("/sheet2#", f"{TARGET_TABLEAU_VIEW_PATH}#", 1)
+    replaced_fragment = replaced_fragment.replace("/sheet2", TARGET_TABLEAU_VIEW_PATH, 1)
+    if replaced_fragment == fragment:
+        return view_url
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, parsed.query, replaced_fragment))
+
+
 def patch_report_config_builder(module) -> None:
     original_builder = module.build_effective_report_configs
 
@@ -50,20 +67,20 @@ def patch_report_config_builder(module) -> None:
             metadata = copy.deepcopy(getattr(config, "request_metadata", {}) or {})
             export_crosstab = dict(metadata.get("export_crosstab") or {})
             thumbnail_uris = dict(export_crosstab.get("thumbnail_uris") or {})
-            if TARGET_CROSSTAB_SHEET not in thumbnail_uris:
-                raise RuntimeError(f"ICE 来店导出配置中缺少目标缩略图 URI：{TARGET_CROSSTAB_SHEET}")
+            if TARGET_THUMBNAIL_SHEET not in thumbnail_uris:
+                raise RuntimeError(f"ICE 来店导出配置中缺少目标缩略图 URI：{TARGET_THUMBNAIL_SHEET}")
 
-            # Tableau 导出弹窗里返回的 sheetName 仍然是 "E3S报表样式"，
-            # 但真正选中的视图由 thumbnail URI 决定。这里仅强制使用 _按天T 的
-            # 缩略图入口，避免把 crosstab_sheet_name 改成中文视图名后找不到 sheetdocId。
             export_crosstab["thumbnail_uris"] = {
-                TARGET_CROSSTAB_SHEET: thumbnail_uris[TARGET_CROSSTAB_SHEET],
+                TARGET_THUMBNAIL_SHEET: thumbnail_uris[TARGET_THUMBNAIL_SHEET],
             }
             metadata["export_crosstab"] = export_crosstab
 
             patched_configs.append(
                 replace(
                     config,
+                    bi_target_url=switch_tableau_view_to_daily(getattr(config, "bi_target_url", "")),
+                    crosstab_sheet_name=TARGET_EXPORT_SHEET,
+                    single_select_parameters=(),
                     request_metadata=metadata,
                 )
             )
