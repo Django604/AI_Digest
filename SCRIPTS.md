@@ -91,34 +91,36 @@
 ## scripts/scheduled_update_runner.py
 
 - 路径：`./scripts/scheduled_update_runner.py`
-- 作用：作为 Windows 计划任务的实际执行入口，按当天 `N-1` 自动调用 `fetch_daily_data.py` 背后的 `run_update()`，并在同一个常驻进度窗中展示启动说明、自动开始倒计时、执行进度与最终结果
+- 作用：作为 Windows 计划任务的实际执行入口，按当天 `N-1` 自动调用 `fetch_daily_data.py` 背后的 `run_update()`；支持 `interactive` 弹窗模式与 `silent` 静默模式，并通过文件锁避免双任务重复回填同一批数据
 - 使用方法：
-  - 手动静默验证：`python scripts/scheduled_update_runner.py --suppress-start-message --suppress-finish-message`
-  - 调试有头浏览器：`python scripts/scheduled_update_runner.py --headed --suppress-start-message`
-  - 指定业务日期：`python scripts/scheduled_update_runner.py --business-date 2026-04-21`
+  - 手动静默验证：`python scripts/scheduled_update_runner.py --mode silent`
+  - 调试登录态弹窗 + 有头浏览器：`python scripts/scheduled_update_runner.py --mode interactive --headed --suppress-start-message`
+  - 指定业务日期：`python scripts/scheduled_update_runner.py --mode interactive --business-date 2026-04-21`
 - 输出结果：
   - 写入 `.runtime/scheduled_update/<timestamp>/scheduled_update.log`
   - 写入 `.runtime/scheduled_update/<timestamp>/run_meta.json`
   - 写入 `.runtime/scheduled_update/<timestamp>/result.json`
 - 备注：
-  - 正常计划任务场景下不需要带 `--suppress-*` 参数，这两个参数只是给测试或静默排查用
-  - 启动窗口弹出后，若 2 分钟内未点击“开始更新”，系统会自动继续执行
+  - 正常计划任务场景下不需要额外带 `--suppress-*` 参数；`silent` 模式会自动关闭全部弹窗
+  - `interactive` 模式下，启动窗口弹出后若 2 分钟内未点击“开始更新”，系统会自动继续执行
   - 一旦开始执行，窗口不会中途消失，而是切换为进度条视图，并根据日志阶段持续推进完成进度
   - 更新完成或失败后，结果会在同一个窗口里展示，随后自动关闭
-  - 若你要求显示提示框，Windows 计划任务应配置为“仅当用户登录时运行”，否则弹框根本没地方显示
+  - 无论是 `interactive` 还是 `silent`，都会写同一套日志 / 结果文件；若发现已有任务持锁，当前任务会记一次 `skipped` 并直接退出
 
 ## scripts/register_daily_update_task.ps1
 
 - 路径：`./scripts/register_daily_update_task.ps1`
-- 作用：在当前 Windows 机器上注册每天 `09:00` 自动执行的计划任务，默认任务名为 `AI_Digest_Daily_Update`
+- 作用：在当前 Windows 机器上注册每天自动执行的双计划任务，默认前缀为 `AI_Digest_Daily_Update`
 - 使用方法：
   - 直接注册默认任务：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1`
   - 自定义时间：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -Time 09:00`
+  - 自定义静默兜底延迟：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -Time 09:00 -SilentDelayMinutes 1`
   - 自定义 Python 路径：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -PythonPath C:\Python313\pythonw.exe`
 - 备注：
   - 计划任务按当前 Windows 本地时区执行；这台机器的场景即北京时间
   - 注册脚本会优先使用 `pythonw.exe`，避免计划任务运行时弹黑色控制台窗口
-  - 任务使用交互式登录模式运行，这样开始 / 结束提示框才能真正弹出来
+  - 脚本默认注册两条任务：`AI_Digest_Daily_Update_Interactive` 会在登录态下弹窗执行，`AI_Digest_Daily_Update_Silent` 会以 `SYSTEM` 服务账号在未登录时静默兜底
+  - 两条任务通过 `scheduled_update_runner.py` 内部的文件锁互斥，避免同时回填 Excel 与 dashboard 数据
 
 ## scripts/publish_dashboard.ps1
 

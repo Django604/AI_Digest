@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import queue
 import threading
 import traceback
@@ -9,6 +10,16 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
+
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - non-Windows fallback
+    msvcrt = None
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows has no fcntl
+    fcntl = None
 
 try:
     import tkinter as tk
@@ -28,6 +39,9 @@ SCHEDULED_RUNTIME_ROOT = PROJECT_ROOT / ".runtime" / "scheduled_update"
 WINDOW_TITLE = "AI Digest 定时更新"
 AUTO_START_SECONDS = 120
 FINISH_AUTO_CLOSE_SECONDS = 180
+INTERACTIVE_MODE = "interactive"
+SILENT_MODE = "silent"
+LOCK_FILENAME = ".daily_update.lock"
 
 
 @dataclass(frozen=True)
@@ -71,6 +85,13 @@ def build_start_message(started_at: datetime) -> str:
 
 def build_waiting_status(seconds_remaining: int) -> str:
     return f"将在 {seconds_remaining} 秒后自动开始，你也可以立即点击“开始更新”。"
+
+
+def build_skip_message(mode: str, existing_lock_details: str) -> str:
+    mode_label = "弹窗模式" if mode == INTERACTIVE_MODE else "静默模式"
+    if existing_lock_details:
+        return f"检测到已有更新任务正在执行，当前 {mode_label} 本次跳过。当前锁信息：{existing_lock_details}"
+    return f"检测到已有更新任务正在执行，当前 {mode_label} 本次跳过。"
 
 
 def build_success_message(result: dict[str, object], started_at: datetime, finished_at: datetime, log_path: Path) -> str:
@@ -134,12 +155,87 @@ class FileLogger:
 
 
 def build_run_dir(started_at: datetime) -> Path:
-    return SCHEDULED_RUNTIME_ROOT / started_at.strftime("%Y%m%d_%H%M%S")
+    return SCHEDULED_RUNTIME_ROOT / started_at.strftime("%Y%m%d_%H%M%S_%f")
+
+
+def build_lock_path() -> Path:
+    return SCHEDULED_RUNTIME_ROOT / LOCK_FILENAME
 
 
 def write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n")
+
+
+def lock_file_handle(handle) -> None:
+    handle.seek(0)
+    if msvcrt is not None:
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        return
+    if fcntl is not None:  # pragma: no cover - non-Windows fallback
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return
+    raise RuntimeError("当前平台不支持文件锁。")
+
+
+def unlock_file_handle(handle) -> None:
+    handle.seek(0)
+    if msvcrt is not None:
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+    if fcntl is not None:  # pragma: no cover - non-Windows fallback
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        return
+    raise RuntimeError("当前平台不支持文件锁。")
+
+
+class ScheduledUpdateLock:
+    def __init__(self, lock_path: Path) -> None:
+        self.lock_path = lock_path
+        self.handle = None
+
+    def acquire(self, metadata: dict[str, object]) -> bool:
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        handle = self.lock_path.open("a+", encoding="utf-8", newline="\n")
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(" ")
+            handle.flush()
+        handle.seek(0)
+        try:
+            lock_file_handle(handle)
+        except OSError:
+            handle.close()
+            return False
+        self.handle = handle
+        self.write_metadata(metadata)
+        return True
+
+    def write_metadata(self, metadata: dict[str, object]) -> None:
+        if self.handle is None:
+            return
+        payload = json.dumps(metadata, ensure_ascii=False, indent=2)
+        self.handle.seek(0)
+        self.handle.write(payload + "\n")
+        self.handle.truncate()
+        self.handle.flush()
+
+    def read_metadata(self) -> str:
+        if not self.lock_path.exists():
+            return ""
+        try:
+            return self.lock_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return ""
+
+    def release(self) -> None:
+        if self.handle is None:
+            return
+        try:
+            unlock_file_handle(self.handle)
+        finally:
+            self.handle.close()
+            self.handle = None
 
 
 class NullProgressWindow:
@@ -366,10 +462,11 @@ class ScheduledUpdateWindow:
 def create_progress_window(
     *,
     started_at: datetime,
+    mode: str,
     show_start_message: bool,
     show_finish_message: bool,
 ) -> ScheduledUpdateWindow | NullProgressWindow:
-    if not show_start_message and not show_finish_message:
+    if mode == SILENT_MODE or (not show_start_message and not show_finish_message):
         return NullProgressWindow()
     return ScheduledUpdateWindow(
         started_at=started_at,
@@ -380,6 +477,12 @@ def create_progress_window(
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the daily AI Digest update with popup notifications.")
+    parser.add_argument(
+        "--mode",
+        choices=(INTERACTIVE_MODE, SILENT_MODE),
+        default=INTERACTIVE_MODE,
+        help="运行模式：interactive 为登录态弹窗执行，silent 为未登录静默执行",
+    )
     parser.add_argument("--business-date", default="", help="可选：覆盖业务日期，支持 YYYY-MM-DD / YYYYMMDD")
     parser.add_argument("--headed", action="store_true", help="启用有头模式，便于排查")
     parser.add_argument("--keep-runtime", action="store_true", help="保留抓取运行目录")
@@ -388,8 +491,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def resolve_message_visibility(
+    mode: str,
+    *,
+    suppress_start_message: bool,
+    suppress_finish_message: bool,
+) -> tuple[bool, bool]:
+    if mode == SILENT_MODE:
+        return False, False
+    return (not suppress_start_message, not suppress_finish_message)
+
+
 def run_scheduled_update(
     *,
+    mode: str = INTERACTIVE_MODE,
     business_date_text: str = "",
     headless: bool = True,
     keep_runtime: bool = False,
@@ -399,24 +514,64 @@ def run_scheduled_update(
     started_at = datetime.now()
     run_dir = build_run_dir(started_at)
     log_path = run_dir / "scheduled_update.log"
-    progress_window = create_progress_window(
-        started_at=started_at,
-        show_start_message=show_start_message,
-        show_finish_message=show_finish_message,
-    )
-    logger = FileLogger(log_path, sink=progress_window.report_log)
+    logger = FileLogger(log_path)
     business_date = parse_business_date(business_date_text or None)
     result_holder: dict[str, object] = {"exit_code": 1}
+    lock = ScheduledUpdateLock(build_lock_path())
+    show_start_message, show_finish_message = resolve_message_visibility(
+        mode,
+        suppress_start_message=not show_start_message,
+        suppress_finish_message=not show_finish_message,
+    )
 
     write_json(
         run_dir / "run_meta.json",
         {
             "startedAt": started_at.isoformat(timespec="seconds"),
             "businessDate": format_business_date(business_date),
+            "mode": mode,
             "headless": headless,
             "keepRuntime": keep_runtime,
+            "showStartMessage": show_start_message,
+            "showFinishMessage": show_finish_message,
         },
     )
+
+    lock_metadata = {
+        "mode": mode,
+        "startedAt": started_at.isoformat(timespec="seconds"),
+        "businessDate": format_business_date(business_date),
+        "runDir": str(run_dir),
+        "logPath": str(log_path),
+    }
+    if not lock.acquire(lock_metadata):
+        finished_at = datetime.now()
+        existing_lock_details = lock.read_metadata()
+        skip_message = build_skip_message(mode, existing_lock_details)
+        logger(skip_message)
+        write_json(
+            run_dir / "result.json",
+            {
+                "status": "skipped",
+                "reason": "another-run-active",
+                "mode": mode,
+                "startedAt": started_at.isoformat(timespec="seconds"),
+                "finishedAt": finished_at.isoformat(timespec="seconds"),
+                "businessDate": format_business_date(business_date),
+                "lockPath": str(build_lock_path()),
+                "lockDetails": existing_lock_details,
+                "logPath": str(log_path),
+            },
+        )
+        return 0
+
+    progress_window = create_progress_window(
+        started_at=started_at,
+        mode=mode,
+        show_start_message=show_start_message,
+        show_finish_message=show_finish_message,
+    )
+    logger.sink = progress_window.report_log
 
     if not show_start_message:
         progress_window.start_running(auto_started=False)
@@ -440,6 +595,7 @@ def run_scheduled_update(
                 run_dir / "result.json",
                 {
                     "status": "error",
+                    "mode": mode,
                     "startedAt": started_at.isoformat(timespec="seconds"),
                     "finishedAt": finished_at.isoformat(timespec="seconds"),
                     "businessDate": format_business_date(business_date),
@@ -457,6 +613,7 @@ def run_scheduled_update(
             run_dir / "result.json",
             {
                 "status": "success",
+                "mode": mode,
                 "startedAt": started_at.isoformat(timespec="seconds"),
                 "finishedAt": finished_at.isoformat(timespec="seconds"),
                 "businessDate": result.get("businessDate"),
@@ -471,19 +628,28 @@ def run_scheduled_update(
 
     worker_thread = threading.Thread(target=worker, daemon=True, name="scheduled-update-runner")
     worker_thread.start()
-    progress_window.run()
-    worker_thread.join()
-    return int(result_holder["exit_code"])
+    try:
+        progress_window.run()
+        worker_thread.join()
+        return int(result_holder["exit_code"])
+    finally:
+        lock.release()
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    show_start_message, show_finish_message = resolve_message_visibility(
+        args.mode,
+        suppress_start_message=args.suppress_start_message,
+        suppress_finish_message=args.suppress_finish_message,
+    )
     return run_scheduled_update(
+        mode=args.mode,
         business_date_text=args.business_date,
         headless=not args.headed,
         keep_runtime=args.keep_runtime,
-        show_start_message=not args.suppress_start_message,
-        show_finish_message=not args.suppress_finish_message,
+        show_start_message=show_start_message,
+        show_finish_message=show_finish_message,
     )
 
 

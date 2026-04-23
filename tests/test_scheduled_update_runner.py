@@ -1,21 +1,38 @@
 from __future__ import annotations
 
+import json
+import shutil
 import unittest
+import uuid
 from datetime import datetime
 from pathlib import Path
+from unittest import mock
 
 from scripts.scheduled_update_runner import (
     FINISH_AUTO_CLOSE_SECONDS,
+    INTERACTIVE_MODE,
     ProgressUpdate,
+    SILENT_MODE,
+    ScheduledUpdateLock,
+    build_run_dir,
     build_failure_message,
+    build_lock_path,
     build_start_message,
     build_success_message,
     build_waiting_status,
     infer_progress_update,
+    parse_args,
+    resolve_message_visibility,
+    run_scheduled_update,
 )
 
 
 class ScheduledUpdateRunnerTests(unittest.TestCase):
+    def create_repo_temp_dir(self) -> Path:
+        temp_dir = Path(__file__).resolve().parent / f".tmp-scheduled-update-runner-{uuid.uuid4().hex}"
+        temp_dir.mkdir(parents=True, exist_ok=False)
+        return temp_dir
+
     def test_build_start_message_lists_update_flow_and_auto_start_rule(self) -> None:
         started_at = datetime(2026, 4, 22, 9, 0, 0)
 
@@ -31,6 +48,13 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
             build_waiting_status(37),
             "将在 37 秒后自动开始，你也可以立即点击“开始更新”。",
         )
+
+    def test_build_run_dir_includes_microseconds_to_avoid_same_second_collisions(self) -> None:
+        earlier = build_run_dir(datetime(2026, 4, 23, 10, 13, 16, 123456))
+        later = build_run_dir(datetime(2026, 4, 23, 10, 13, 16, 654321))
+
+        self.assertNotEqual(earlier, later)
+        self.assertTrue(str(earlier).endswith("20260423_101316_123456"))
 
     def test_build_success_message_contains_result_summary(self) -> None:
         result = {
@@ -81,6 +105,84 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
             actual,
             ProgressUpdate(progress=64, message="这是一条未命中的调试日志"),
         )
+
+    def test_parse_args_defaults_to_interactive_mode(self) -> None:
+        actual = parse_args([])
+
+        self.assertEqual(actual.mode, INTERACTIVE_MODE)
+
+    def test_resolve_message_visibility_disables_popups_in_silent_mode(self) -> None:
+        actual = resolve_message_visibility(
+            SILENT_MODE,
+            suppress_start_message=False,
+            suppress_finish_message=False,
+        )
+
+        self.assertEqual(actual, (False, False))
+
+    def test_silent_mode_runs_without_popup_window(self) -> None:
+        fake_result = {
+            "businessDate": "2026-04-22",
+            "runtimeDir": r"D:\WorkCode\AI_Digest\.runtime\daily_update\fake-run",
+            "dashboardChanged": True,
+            "summaryChanged": True,
+        }
+
+        runtime_root = self.create_repo_temp_dir()
+        try:
+            with mock.patch("scripts.scheduled_update_runner.SCHEDULED_RUNTIME_ROOT", runtime_root), mock.patch(
+                "scripts.scheduled_update_runner.run_update",
+                return_value=fake_result,
+            ):
+                exit_code = run_scheduled_update(
+                    mode=SILENT_MODE,
+                    business_date_text="2026-04-22",
+                    show_start_message=False,
+                    show_finish_message=False,
+                )
+
+            self.assertEqual(exit_code, 0)
+            result_paths = list(runtime_root.glob("*/result.json"))
+            self.assertEqual(len(result_paths), 1)
+            payload = json.loads(result_paths[0].read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "success")
+            self.assertEqual(payload["mode"], SILENT_MODE)
+        finally:
+            shutil.rmtree(runtime_root, ignore_errors=True)
+
+    def test_lock_prevents_duplicate_silent_run(self) -> None:
+        runtime_root = self.create_repo_temp_dir()
+        try:
+            with mock.patch("scripts.scheduled_update_runner.SCHEDULED_RUNTIME_ROOT", runtime_root):
+                lock = ScheduledUpdateLock(build_lock_path())
+                acquired = lock.acquire(
+                    {
+                        "mode": INTERACTIVE_MODE,
+                        "startedAt": "2026-04-23T09:00:00",
+                        "businessDate": "2026-04-22",
+                    }
+                )
+                self.assertTrue(acquired)
+                try:
+                    with mock.patch("scripts.scheduled_update_runner.run_update") as run_update_mock:
+                        exit_code = run_scheduled_update(
+                            mode=SILENT_MODE,
+                            business_date_text="2026-04-22",
+                            show_start_message=False,
+                            show_finish_message=False,
+                        )
+
+                    self.assertEqual(exit_code, 0)
+                    run_update_mock.assert_not_called()
+                    result_paths = list(runtime_root.glob("*/result.json"))
+                    self.assertEqual(len(result_paths), 1)
+                    payload = json.loads(result_paths[0].read_text(encoding="utf-8"))
+                    self.assertEqual(payload["status"], "skipped")
+                    self.assertEqual(payload["reason"], "another-run-active")
+                finally:
+                    lock.release()
+        finally:
+            shutil.rmtree(runtime_root, ignore_errors=True)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 param(
-  [string]$TaskName = "AI_Digest_Daily_Update",
+  [string]$TaskNamePrefix = "AI_Digest_Daily_Update",
   [string]$Time = "09:00",
+  [int]$SilentDelayMinutes = 1,
   [string]$PythonPath = ""
 )
 
@@ -42,16 +43,48 @@ function Resolve-PythonExecutable {
 
 $pythonExe = Resolve-PythonExecutable -ExplicitPath $PythonPath
 $currentUser = "$env:USERDOMAIN\$env:USERNAME"
+$culture = [System.Globalization.CultureInfo]::InvariantCulture
 
-$action = New-ScheduledTaskAction -Execute $pythonExe -Argument ('"{0}"' -f $runnerScript) -WorkingDirectory $projectRoot
-$trigger = New-ScheduledTaskTrigger -Daily -At $Time
-$principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
-$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+function Resolve-DailyTime {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Value
+  )
 
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+  try {
+    return [datetime]::ParseExact($Value, "HH:mm", $culture)
+  } catch {
+    throw "Time must use HH:mm format, for example 09:00."
+  }
+}
 
-Write-Host "Scheduled task registered successfully." -ForegroundColor Green
-Write-Host "Task name: $TaskName"
-Write-Host "Time: daily at $Time"
+$interactiveRunTime = Resolve-DailyTime -Value $Time
+$silentRunTime = $interactiveRunTime.AddMinutes($SilentDelayMinutes)
+$interactiveTaskName = "${TaskNamePrefix}_Interactive"
+$silentTaskName = "${TaskNamePrefix}_Silent"
+$legacyTaskName = $TaskNamePrefix
+
+$interactiveAction = New-ScheduledTaskAction -Execute $pythonExe -Argument ('"{0}" --mode interactive' -f $runnerScript) -WorkingDirectory $projectRoot
+$silentAction = New-ScheduledTaskAction -Execute $pythonExe -Argument ('"{0}" --mode silent' -f $runnerScript) -WorkingDirectory $projectRoot
+$interactiveTrigger = New-ScheduledTaskTrigger -Daily -At $interactiveRunTime.ToString("HH:mm")
+$silentTrigger = New-ScheduledTaskTrigger -Daily -At $silentRunTime.ToString("HH:mm")
+$interactivePrincipal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
+$silentPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+$interactiveSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+$silentSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+
+if ($legacyTaskName -ne $interactiveTaskName -and $legacyTaskName -ne $silentTaskName) {
+  Unregister-ScheduledTask -TaskName $legacyTaskName -Confirm:$false -ErrorAction SilentlyContinue
+}
+
+Register-ScheduledTask -TaskName $interactiveTaskName -Action $interactiveAction -Trigger $interactiveTrigger -Principal $interactivePrincipal -Settings $interactiveSettings -Force | Out-Null
+Register-ScheduledTask -TaskName $silentTaskName -Action $silentAction -Trigger $silentTrigger -Principal $silentPrincipal -Settings $silentSettings -Force | Out-Null
+
+Write-Host "Scheduled tasks registered successfully." -ForegroundColor Green
+Write-Host "Interactive task: $interactiveTaskName"
+Write-Host "Interactive time: daily at $($interactiveRunTime.ToString("HH:mm"))"
+Write-Host "Silent fallback task: $silentTaskName"
+Write-Host "Silent time: daily at $($silentRunTime.ToString("HH:mm"))"
+Write-Host "Silent delay minutes: $SilentDelayMinutes"
 Write-Host "Python: $pythonExe"
 Write-Host "Runner: $runnerScript"

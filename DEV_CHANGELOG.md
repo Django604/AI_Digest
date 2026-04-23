@@ -1,5 +1,25 @@
 # DEV CHANGELOG
 
+## 2026-04-23 10:53
+- 需求 / 目标：完成定时更新“双通道”系统级验收，确认登录态交互任务与未登录静默任务都能真实执行。
+- 改动内容：提权重注册 `AI_Digest_Daily_Update_Interactive` 与 `AI_Digest_Daily_Update_Silent`，确认静默任务身份已改为 `SYSTEM / ServiceAccount`；手动触发静默任务并持续轮询 `.runtime/scheduled_update/` 运行目录、日志与 `result.json`；同步记录最终验收结果。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Start-ScheduledTask -TaskName AI_Digest_Daily_Update_Silent`、`Get-ScheduledTaskInfo -TaskName AI_Digest_Daily_Update_Silent`
+- 验证结果：交互任务最近一次成功执行时间为 `2026-04-23 10:13:15`，`LastTaskResult = 0`；静默任务已于 `2026-04-23 10:45:30` 通过 `SYSTEM` 成功启动，`2026-04-23 10:49:09` 完成全链路更新，`result.json` 位于 `D:\WorkCode\AI_Digest\.runtime\scheduled_update\20260423_104530_900758\result.json`，`LastTaskResult = 0`。
+- 回滚方法：删除当前双任务并回退调度脚本 / 注册脚本到旧版单任务实现后重新注册。
+- 关联提交（如有）：待补充
+- 备注：这次终于不是“理论双通道”，而是交互和静默两条腿都实打实落地了。
+
+## 2026-04-23 10:40
+- 需求 / 目标：补完定时更新“双通道”系统级验证，修复静默计划任务实际上无法启动的问题。
+- 改动内容：排查 `AI_Digest_Daily_Update_Silent` 的计划任务事件日志，确认原先 `S4U` 登录在 `LogonUserS4U` 阶段失败；调整 `scripts/register_daily_update_task.ps1`，把静默兜底任务改为使用 `SYSTEM` 服务账号执行；同步更新 `README.md`、`SCRIPTS.md` 说明。
+- 涉及文件：`scripts/register_daily_update_task.ps1`、`README.md`、`SCRIPTS.md`
+- 关键命令：`Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational ...`、`powershell -ExecutionPolicy Bypass -File scripts\\register_daily_update_task.ps1`
+- 验证结果：事件日志已确认旧版静默任务失败根因是 `LogonUserS4U` 登录错误 `2147943726`；修复后的重新注册与系统级手动触发验证待补充。
+- 回滚方法：回退注册脚本与文档变更，并重新注册旧版计划任务。
+- 关联提交（如有）：待补充
+- 备注：这次不是脚本装死，是计划任务自己连门禁都刷不过。
+
 ## 2026-04-23 10:29
 - 需求 / 目标：修复 `全国来店日趋势` 中 `ICE本期实绩` 丢失 `4 月 1 日` 数据的问题，并重新生成页面数据。
 - 改动内容：调整 `scripts/build_dashboard.py` 的 `load_arrival_daily_sheet()`，改为从第 1 行开始扫描来店底表，兼容“带表头”和“无表头”两种导出结构；补充 `tests/test_build_dashboard.py`，覆盖无表头 `ICE` 来店底表与 `ICE本期实绩` 首日不再为 `-` 的场景；重建 `docs/data/dashboard.json`。
