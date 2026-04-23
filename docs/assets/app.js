@@ -844,18 +844,27 @@ function renderBriefPage(dashboard) {
     title.textContent = section.title ?? "";
     card.appendChild(title);
 
-    (section.lines ?? []).forEach((line) => {
+    const bodyHtml = buildBriefBodyHtml(section.lines ?? []);
+    if (bodyHtml) {
       const paragraph = document.createElement("p");
       paragraph.className = "brief-page-line";
-      paragraph.innerHTML = formatBriefLine(line);
+      paragraph.innerHTML = bodyHtml;
       card.appendChild(paragraph);
-    });
+    }
 
     grid.appendChild(card);
   });
 
   article.appendChild(grid);
   return article;
+}
+
+function buildBriefBodyHtml(lines) {
+  return lines
+    .map((line) => String(line ?? "").trim())
+    .filter(Boolean)
+    .map((line) => formatBriefLine(line))
+    .join(" ");
 }
 
 function renderSectionDirectory() {
