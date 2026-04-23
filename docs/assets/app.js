@@ -122,8 +122,10 @@ function buildApiUrl(path) {
 }
 
 async function loadDashboard() {
+  const primaryUrl = state.dashboardDataUrl;
+  const staticUrl = "./data/dashboard.json";
   try {
-    const response = await fetch(state.dashboardDataUrl, { cache: "no-store" });
+    const response = await fetch(primaryUrl, { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`加载 dashboard.json 失败，HTTP ${response.status}`);
     }
@@ -143,6 +145,37 @@ async function loadDashboard() {
     updateCaptureTools();
     updateUpdateTools();
   } catch (error) {
+    if (primaryUrl !== staticUrl) {
+      try {
+        const fallbackResponse = await fetch(staticUrl, { cache: "no-store" });
+        if (!fallbackResponse.ok) {
+          throw new Error(`加载静态 dashboard.json 失败，HTTP ${fallbackResponse.status}`);
+        }
+
+        const fallbackPayload = await fallbackResponse.json();
+        const dashboards = Object.values(fallbackPayload.dashboards ?? {});
+        if (!dashboards.length) {
+          throw new Error("静态 dashboard.json 中没有可渲染的页面数据。");
+        }
+
+        state.payload = fallbackPayload;
+        state.activeDashboard = fallbackPayload.dashboards[state.activeDashboard] ? state.activeDashboard : dashboards[0].id;
+
+        renderMeta(fallbackPayload.meta ?? {});
+        renderTabs(dashboards);
+        renderDashboard(fallbackPayload.dashboards[state.activeDashboard]);
+        updateCaptureTools();
+        updateUpdateTools({
+          message: `远端数据服务暂时不可用，已自动回退到静态数据浏览模式。原错误：${error.message}`,
+          stateName: "error",
+        });
+        return;
+      } catch (fallbackError) {
+        renderError(fallbackError);
+        return;
+      }
+    }
+
     renderError(error);
   }
 }

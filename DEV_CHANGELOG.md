@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-04-23 11:17
+- 需求 / 目标：修复 GitHub Pages 在提交了本机 `localhost` 更新服务地址后，其他人打开页面直接 `Failed to fetch` 的问题。
+- 改动内容：将 `docs/data/runtime-config.json` 的默认 `serviceBaseUrl` 清空，恢复为公共静态浏览模式；更新 `docs/assets/app.js`，当远端数据服务不可达时自动回退到静态 `./data/dashboard.json`，不再让整页直接报错；同步更新 `README.md` 说明。
+- 涉及文件：`docs/data/runtime-config.json`、`docs/assets/app.js`、`README.md`
+- 关键命令：待补充
+- 验证结果：代码层面已确认默认不会再请求 `http://localhost:4173`；若未来再次配置不可达远端地址，前端会回退到静态 `dashboard.json` 而非整页失败。
+- 回滚方法：回退本次前端与配置文件修改，恢复旧版远端优先且无静态回退的实现。
+- 关联提交（如有）：待补充
+- 备注：把 `localhost` 推到 GitHub Pages 上，和把家里门牌号写到导航里让别人自己找一样离谱。
+
 ## 2026-04-23 10:53
 - 需求 / 目标：完成定时更新“双通道”系统级验收，确认登录态交互任务与未登录静默任务都能真实执行。
 - 改动内容：提权重注册 `AI_Digest_Daily_Update_Interactive` 与 `AI_Digest_Daily_Update_Silent`，确认静默任务身份已改为 `SYSTEM / ServiceAccount`；手动触发静默任务并持续轮询 `.runtime/scheduled_update/` 运行目录、日志与 `result.json`；同步记录最终验收结果。

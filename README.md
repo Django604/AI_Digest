@@ -57,6 +57,7 @@
 
 注意：
 - `runtime-config.json` 里只放后端访问地址，不要放账号密码之类的敏感信息
+- 不要把 `http://localhost:4173` 这类仅本机可访问的地址直接提交到仓库；这会让别人打开 GitHub Pages 时去请求他自己电脑上的 `localhost`，页面自然直接报 `Failed to fetch`
 - 真正的登录账号、密码、Chrome 环境与 Excel 文件都应保留在后端服务所在机器
 
 ## 测试
@@ -92,3 +93,4 @@
 - 工作流已经改成读取当前实际使用的两本源文件：`NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`。
 - `docs/data/dashboard.summary.json` 提供了报表日期、输入文件修改时间、dashboard 数量和本次是否真的发生内容变更，方便后续定时任务或自动巡检直接读取。
 - 页面上的 `数据更新` 按钮在配置了 `docs/data/runtime-config.json` 的 `serviceBaseUrl` 后，可以从 `GitHub Pages` 直接调用远端后端执行更新；未配置时会退化为静态浏览模式。
+- 即使远端更新服务临时不可达，页面现在也会自动回退到已发布的静态 `docs/data/dashboard.json`，避免整页直接加载失败。
