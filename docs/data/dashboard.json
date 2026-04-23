@@ -4,7 +4,7 @@
     "workbookName": "NEV+ICE_xsai.xlsm",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
-    "generatedAt": "2026-04-23T11:29:03",
+    "generatedAt": "2026-04-23T15:41:13",
     "workbookModifiedAt": "2026-04-23T10:49:05",
     "reportDate": "2026-04-22",
     "reportDateLabel": "2026-04-22",
@@ -110,7 +110,7 @@
     "lead-control": {
       "id": "lead-control",
       "pageType": "dashboard",
-      "title": "全车有效线索管控",
+      "title": "全车系有效线索管控",
       "headline": "",
       "sections": [
         {

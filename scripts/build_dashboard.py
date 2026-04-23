@@ -1113,7 +1113,7 @@ def build_payload(
             "lead-control": {
                 "id": "lead-control",
                 "pageType": "dashboard",
-                "title": "全车有效线索管控",
+                "title": "全车系有效线索管控",
                 "headline": "",
                 "sections": [
                     build_valid_leads_control_section(report_date, valid_leads_total_current, valid_leads_total_previous),

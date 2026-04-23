@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-04-23 15:41
+- 需求 / 目标：将页面文案 `全车有效线索管控` 调整为 `全车系有效线索管控`。
+- 改动内容：更新 `scripts/build_dashboard.py` 中 `lead-control` 页面标题生成文案，并重建 `docs/data/dashboard.json` 以同步发布产物。
+- 涉及文件：`scripts/build_dashboard.py`、`docs/data/dashboard.json`
+- 关键命令：`python -X utf8 scripts\\build_dashboard.py --workbook data\\source\\NEV+ICE_xsai.xlsm --arrival-workbook data\\source\\NEV+ICE_ldai.xlsx --out docs\\data\\dashboard.json --summary-out docs\\data\\dashboard.summary.json`
+- 验证结果：`dashboard.json` 中 `dashboards.lead-control.title` 已更新为 `全车系有效线索管控`；`analysis.sheetNames` 中保留原工作表名 `全车有效线索管控` 不变。
+- 回滚方法：回退本次 `build_dashboard.py` 与 `dashboard.json` 文案变更。
+- 关联提交（如有）：待补充
+- 备注：展示名和 Excel 真实 sheet 名不是一回事，别手痒把底表名也改了。
+
 ## 2026-04-23 15:27
 - 需求 / 目标：让每日简报正文里的 `①②③...` 编号条目继续换行，但不要再出现额外空行。
 - 改动内容：更新 `docs/assets/app.js` 的 `buildBriefBodyHtml()`，将编号条目改为在同一段正文内通过单个 `<br>` 断开，非编号内容仍按行内文本紧凑拼接。
