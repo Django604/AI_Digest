@@ -860,11 +860,21 @@ function renderBriefPage(dashboard) {
 }
 
 function buildBriefBodyHtml(lines) {
+  const numberedLinePattern = /^[①②③④⑤⑥⑦⑧⑨⑩]/;
   return lines
     .map((line) => String(line ?? "").trim())
     .filter(Boolean)
-    .map((line) => formatBriefLine(line))
-    .join(" ");
+    .map((line) => ({
+      html: formatBriefLine(line),
+      isNumbered: numberedLinePattern.test(line),
+    }))
+    .map((item, index) => {
+      if (index === 0) {
+        return item.html;
+      }
+      return `${item.isNumbered ? "<br>" : " "}${item.html}`;
+    })
+    .join("");
 }
 
 function renderSectionDirectory() {
