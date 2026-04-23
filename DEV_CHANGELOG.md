@@ -1,5 +1,25 @@
 # DEV CHANGELOG
 
+## 2026-04-23 10:29
+- 需求 / 目标：修复 `全国来店日趋势` 中 `ICE本期实绩` 丢失 `4 月 1 日` 数据的问题，并重新生成页面数据。
+- 改动内容：调整 `scripts/build_dashboard.py` 的 `load_arrival_daily_sheet()`，改为从第 1 行开始扫描来店底表，兼容“带表头”和“无表头”两种导出结构；补充 `tests/test_build_dashboard.py`，覆盖无表头 `ICE` 来店底表与 `ICE本期实绩` 首日不再为 `-` 的场景；重建 `docs/data/dashboard.json`。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`docs/data/dashboard.json`
+- 关键命令：`python -X utf8 -m unittest tests.test_build_dashboard -v`、`python -X utf8 scripts\\build_dashboard.py --workbook data\\source\\NEV+ICE_xsai.xlsm --arrival-workbook data\\source\\NEV+ICE_ldai.xlsx --out docs\\data\\dashboard.json --summary-out docs\\data\\dashboard.summary.json`
+- 验证结果：`BuildDashboard` 相关单测 `12/12` 通过；重建后的 `dashboard.json` 中 `ICE本期实绩` 前 6 个值已变为 `1187, 1006, 1059, 1942, 2282, 1951`，`4/1` 不再缺失。
+- 回滚方法：回退本次 `build_dashboard.py`、相关测试与 `dashboard.json` 的变更。
+- 关联提交（如有）：待补充
+- 备注：这次不是数据没来，是代码把第一行当空气了。
+
+## 2026-04-23 10:06
+- 需求 / 目标：把定时更新改成“登录时弹窗执行，未登录时静默执行”，并避免两条计划任务重复更新同一批数据。
+- 改动内容：更新 `scripts/scheduled_update_runner.py`，新增 `interactive/silent` 双模式、计划任务文件锁与锁冲突跳过结果；更新 `scripts/register_daily_update_task.ps1`，改为注册 `AI_Digest_Daily_Update_Interactive` 与 `AI_Digest_Daily_Update_Silent` 两条任务，默认分别在 `09:00` 与 `09:01` 执行；补充 `tests/test_scheduled_update_runner.py` 对静默模式、模式解析与重复运行锁的覆盖；同步更新 `README.md`、`SCRIPTS.md` 说明。
+- 涉及文件：`scripts/scheduled_update_runner.py`、`scripts/register_daily_update_task.ps1`、`tests/test_scheduled_update_runner.py`、`README.md`、`SCRIPTS.md`
+- 关键命令：`python -X utf8 -m py_compile scripts\\scheduled_update_runner.py tests\\test_scheduled_update_runner.py`、`python -X utf8 -m unittest tests.test_scheduled_update_runner -v`
+- 验证结果：定时更新相关单测 `10/10` 通过，已确认 `silent` 模式可无弹窗执行，且在已有运行锁时会写出 `skipped` 结果并直接退出。
+- 回滚方法：回退本次提交涉及的调度脚本、注册脚本、测试与文档，并重新注册旧版单任务计划任务。
+- 关联提交（如有）：待补充
+- 备注：这次总算把“人在线给窗看，没人在线也得干活”这件事从口号改成机制了。
+
 ## 2026-04-23 09:54
 - 需求 / 目标：将“2 分钟自动开始 + 常驻进度窗”版本推送到 GitHub，并手动触发一次计划任务，确认在无人点击启动按钮的情况下也能自动完成更新。
 - 改动内容：未新增功能代码；提权执行 `Start-ScheduledTask -TaskName AI_Digest_Daily_Update` 手动拉起计划任务，并持续轮询 `result.json` 与任务状态，验证新交互逻辑不会再卡死在启动提示阶段；同步记录本次验证结果。

@@ -15,6 +15,7 @@ from scripts.build_dashboard import (
     SUMMARY_JSON,
     build_payload,
     build_run_summary,
+    load_arrival_daily_sheet,
     validate_report_date_cell,
     validate_sheet_headers,
     validate_workbook_structure,
@@ -77,6 +78,13 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertIn("nevActual", rows)
         self.assertNotEqual(rows["nevActual"][report_index], "-")
 
+    def test_arrival_dashboard_keeps_first_day_for_ice_actual_row(self) -> None:
+        trend = self.payload["dashboards"]["arrival"]["sections"][0]["trend"]
+        rows = {row["key"]: row["displayValues"] for row in trend["matrix"]["rows"]}
+
+        self.assertIn("iceActual", rows)
+        self.assertNotEqual(rows["iceActual"][0], "-")
+
     def test_write_json_if_changed_ignores_generated_at_only(self) -> None:
         original = {
             "meta": {"generatedAt": "2026-04-15T16:00:00", "reportDate": "2026-04-15"},
@@ -107,6 +115,18 @@ class BuildDashboardPayloadTests(unittest.TestCase):
 
 
 class BuildDashboardValidationTests(unittest.TestCase):
+    def test_load_arrival_daily_sheet_supports_sheets_without_header_row(self) -> None:
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet["A1"] = "2026年4月1日"
+        sheet["B1"] = 1187
+        sheet["A2"] = "2026年4月2日"
+        sheet["B2"] = 1006
+
+        actual = load_arrival_daily_sheet(sheet)
+
+        self.assertEqual(list(actual.values())[:2], [1187, 1006])
+
     def test_validate_workbook_structure_requires_expected_sheets(self) -> None:
         leads = Workbook()
         arrival = Workbook()

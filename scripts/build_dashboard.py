@@ -854,7 +854,7 @@ def aligned_previous_year_date(current_date: date) -> date:
 
 def load_arrival_daily_sheet(ws) -> dict[date, int | float]:
     result: dict[date, int | float] = {}
-    for row in range(2, ws.max_row + 1):
+    for row in range(1, ws.max_row + 1):
         current_date = coerce_date(ws.cell(row, 1).value)
         current_value = num(ws.cell(row, 2).value)
         if current_date is None or current_value is None:
