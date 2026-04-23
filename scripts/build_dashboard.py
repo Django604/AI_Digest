@@ -976,7 +976,7 @@ def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date
 
     trend = {
         "viewType": "arrival",
-        "chartTitle": f"{current_dates[report_index].month}月全国来店日趋势" if current_dates and current_dates[report_index] else "全国来店日趋势",
+        "chartTitle": f"{current_dates[report_index].month}月全车系来店日趋势" if current_dates and current_dates[report_index] else "全车系来店日趋势",
         "chartSubtitle": "同期来店 / 本期目标 / 本期来店 / 累计来店",
         "tableTitle": "全国来店明细表",
         "summary": {
@@ -1054,7 +1054,7 @@ def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date
     return {
         "id": "arrival",
         "pageType": "dashboard",
-        "title": "全国来店日趋势",
+        "title": "全车系来店日趋势",
         "headline": "",
         "sections": [section],
     }

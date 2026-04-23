@@ -414,3 +414,13 @@
 - 回滚方法：回退 `docs/assets/app.js` 与本条 `DEV_CHANGELOG.md` 记录到修改前状态。
 - 关联提交（如有）：待补充
 - 备注：自动化复测过程中仍出现 1 条静态资源 `404` 控制台日志，但不影响页面加载与截图导出结果。
+## 2026-04-23 16:05
+- 需求 / 目标：将页面中的 `全国来店日趋势` 文案改为 `全车系来店日趋势`，并将趋势图标题 `4月全国来店日趋势` 改为 `4月全车系来店日趋势` 后推送到 GitHub。
+- 改动内容：更新 `scripts/build_dashboard.py` 中来店页面标题与趋势图标题的生成文案，并同步重建 `docs/data/dashboard.json` 发布产物。
+- 涉及文件：`scripts/build_dashboard.py`、`docs/data/dashboard.json`
+- 关键命令：`python -X utf8 scripts\\build_dashboard.py --workbook data\\source\\NEV+ICE_xsai.xlsm --arrival-workbook data\\source\\NEV+ICE_ldai.xlsx --out docs\\data\\dashboard.json`
+- 验证结果：已确认 `scripts/build_dashboard.py` 中来店页面标题生成为 `全车系来店日趋势`，并且 `docs/data/dashboard.json` 中 `title = "全车系来店日趋势"`、`chartTitle = "4月全车系来店日趋势"`。
+- 回滚方法：回退本次 `build_dashboard.py` 与 `dashboard.json` 文案变更。
+- 关联提交（如有）：待补充
+- 备注：仅调整页面展示文案，不改动底层数据与工作表结构。
+

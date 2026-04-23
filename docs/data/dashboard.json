@@ -4,7 +4,7 @@
     "workbookName": "NEV+ICE_xsai.xlsm",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
-    "generatedAt": "2026-04-23T15:41:13",
+    "generatedAt": "2026-04-23T17:51:15",
     "workbookModifiedAt": "2026-04-23T10:49:05",
     "reportDate": "2026-04-22",
     "reportDateLabel": "2026-04-22",
@@ -7964,7 +7964,7 @@
     "arrival": {
       "id": "arrival",
       "pageType": "dashboard",
-      "title": "全国来店日趋势",
+      "title": "全车系来店日趋势",
       "headline": "",
       "sections": [
         {
@@ -7977,7 +7977,7 @@
           },
           "trend": {
             "viewType": "arrival",
-            "chartTitle": "4月全国来店日趋势",
+            "chartTitle": "4月全车系来店日趋势",
             "chartSubtitle": "同期来店 / 本期目标 / 本期来店 / 累计来店",
             "tableTitle": "全国来店明细表",
             "summary": {
