@@ -1,5 +1,35 @@
 # DEV CHANGELOG
 
+## 2026-04-23 09:54
+- 需求 / 目标：将“2 分钟自动开始 + 常驻进度窗”版本推送到 GitHub，并手动触发一次计划任务，确认在无人点击启动按钮的情况下也能自动完成更新。
+- 改动内容：未新增功能代码；提权执行 `Start-ScheduledTask -TaskName AI_Digest_Daily_Update` 手动拉起计划任务，并持续轮询 `result.json` 与任务状态，验证新交互逻辑不会再卡死在启动提示阶段；同步记录本次验证结果。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Start-ScheduledTask -TaskName AI_Digest_Daily_Update`、`schtasks /Query /TN AI_Digest_Daily_Update /V /FO LIST`
+- 验证结果：在未手动点击启动按钮的前提下，计划任务于 `2026-04-23 09:48:28` 自动启动，并在 `2026-04-23 09:53:55` 成功完成，业务日期为 `2026-04-22`；结果文件位于 `D:\WorkCode\AI_Digest\.runtime\scheduled_update\20260423_094828\result.json`，对应抓取运行目录为 `D:\WorkCode\AI_Digest\.runtime\daily_update\20260422_20260423-095027`。
+- 回滚方法：无需回滚代码；若后续发现定时任务交互异常，可回退上一版 `scheduled_update_runner.py` 并重新注册计划任务。
+- 关联提交（如有）：待补充
+- 备注：任务查询时仍短暂显示 `Running`，是因为结果窗口会保留一段时间后自动关闭；核心更新流程已经成功结束，不是卡死。
+
+## 2026-04-23 09:23
+- 需求 / 目标：调整定时更新提示框交互，要求在弹框出现后若 2 分钟未点击“确定/开始”，系统自动继续执行；执行过程中提示框不消失，并显示完成进度条。
+- 改动内容：重写 `scripts/scheduled_update_runner.py` 的交互层，弃用阻塞式 `MessageBox`，改为基于 `tkinter` 的常驻进度窗；启动阶段显示更新流程说明和 2 分钟自动开始倒计时，超时后自动进入执行；执行阶段保留窗口并根据 `run_update()` 的日志阶段更新进度条与状态文案；完成或失败后在同一窗口展示结果摘要并自动关闭；补充 `tests/test_scheduled_update_runner.py`，覆盖自动开始提示文案、等待状态文案以及日志驱动进度推断。
+- 涉及文件：`scripts/scheduled_update_runner.py`、`tests/test_scheduled_update_runner.py`、`README.md`、`SCRIPTS.md`
+- 关键命令：`python -X utf8 -m py_compile scripts\\scheduled_update_runner.py tests\\test_scheduled_update_runner.py`、`python -X utf8 -m unittest discover -s tests -v`
+- 验证结果：`AI_Digest` 全量单测 `35/35` 通过；新增调度相关单测通过，确认自动开始文案和进度推断逻辑符合预期。
+- 回滚方法：回退本次提交涉及的调度窗口实现、测试与文档，恢复到原先阻塞式提示框方案。
+- 关联提交（如有）：待补充
+- 备注：由于交互窗口需要桌面会话，本轮未在沙箱中做完整的手动点窗验收；但计划任务后续会直接使用新的常驻进度窗实现。
+
+## 2026-04-22 18:16
+- 需求 / 目标：手动触发一次已注册的 Windows 计划任务 `AI_Digest_Daily_Update`，确认定时自动更新任务能够被即时拉起。
+- 改动内容：未修改功能代码；提权执行 `Start-ScheduledTask -TaskName AI_Digest_Daily_Update` 手动触发计划任务，并通过 `schtasks /Query /TN AI_Digest_Daily_Update /V /FO LIST` 与 `.runtime/scheduled_update/` 运行痕迹确认任务已进入运行态。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Start-ScheduledTask -TaskName AI_Digest_Daily_Update`、`schtasks /Query /TN AI_Digest_Daily_Update /V /FO LIST`
+- 验证结果：计划任务于 `2026-04-22 18:08:16` 成功进入 `Running`，新的运行目录为 `D:\WorkCode\AI_Digest\.runtime\scheduled_update\20260422_180820`，并写入 `run_meta.json`；由于当前设计包含“启动即弹流程提示框”，日志尚未继续写入，说明任务正等待用户确认启动提示框后再继续执行。
+- 回滚方法：无需回滚代码；若不再需要该计划任务，可删除 Windows 任务 `AI_Digest_Daily_Update`。
+- 关联提交（如有）：待补充
+- 备注：手动触发时若看到任务长时间 `Running`，先别一惊一乍，优先检查桌面上是否有启动提示框尚未确认。
+
 ## 2026-04-22 17:53
 - 需求 / 目标：为 `AI_Digest` 增加每天北京时间 `09:00` 自动执行的数据更新能力，替代手动点击网页 `数据更新`，并在任务启动与结束时弹出提示框说明更新流程和结果。
 - 改动内容：新增 `scripts/scheduled_update_runner.py`，复用 `fetch_daily_data.py` 的 `run_update()` 执行全量更新，并把启动说明、成功结果、失败结果分别封装成 Windows MessageBox 提示；新增 `scripts/register_daily_update_task.ps1`，使用 Windows 计划任务 API 注册默认任务 `AI_Digest_Daily_Update`，每天 `09:00` 触发、按交互式登录模式运行并优先使用 `pythonw.exe`；补充 `tests/test_scheduled_update_runner.py`，覆盖提示文案生成；同步更新 `README.md` 与 `SCRIPTS.md`。

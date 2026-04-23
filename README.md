@@ -44,6 +44,7 @@
    其中 `NEV本期来店`、`NEV同期来店` 会通过内部包装器直接走 FineReport 后台 `chart.data` 导出链，`ICE本期来店`、`ICE同期来店` 会通过内部包装器强制走 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
 8. 如需让这台电脑每天自动更新，可执行 `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1`
    默认会注册一个每天 `09:00` 自动运行的 Windows 计划任务；运行时不需要你再打开网页点“数据更新”，但如果你要看到提示框，请保证当时 Windows 处于已登录状态
+9. 定时任务弹出启动窗口后，如果 2 分钟内没有点击“开始更新”，系统会自动继续执行；执行过程中窗口不会消失，而是显示完成进度条，最终在同一窗口展示更新结果后自动关闭
 
 ## GitHub Pages 点击更新
 
