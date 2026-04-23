@@ -4,8 +4,8 @@
     "workbookName": "NEV+ICE_xsai.xlsm",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
-    "generatedAt": "2026-04-23T10:29:20",
-    "workbookModifiedAt": "2026-04-23T10:18:42",
+    "generatedAt": "2026-04-23T11:29:03",
+    "workbookModifiedAt": "2026-04-23T10:49:05",
     "reportDate": "2026-04-22",
     "reportDateLabel": "2026-04-22",
     "dataRangeStart": "2026-04-01",
@@ -122,7 +122,7 @@
             "cards": []
           },
           "trend": {
-            "chartTitle": "4月全车有效线索趋势",
+            "chartTitle": "4月全车系有效线索趋势",
             "summary": {
               "items": [
                 {

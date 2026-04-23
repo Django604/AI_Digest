@@ -518,7 +518,7 @@ def build_valid_leads_control_trend(
     cumulative_previous = prev_cum[report_index]
 
     return {
-        "chartTitle": f"{report_date.month}月全车有效线索趋势",
+        "chartTitle": f"{report_date.month}月全车系有效线索趋势",
         "summary": {
             "items": [
                 {"label": "累计本期实绩", "value": normalize_scalar(cumulative_actual), "displayValue": fmt_count(cumulative_actual)},

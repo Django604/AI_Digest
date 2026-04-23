@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-04-23 11:29
+- 需求 / 目标：将页面文案 `4月全车有效线索趋势` 调整为 `4月全车系有效线索趋势`。
+- 改动内容：更新 `scripts/build_dashboard.py` 的趋势图标题生成文案，并重建 `docs/data/dashboard.json` 以同步页面产物。
+- 涉及文件：`scripts/build_dashboard.py`、`docs/data/dashboard.json`
+- 关键命令：`python -X utf8 scripts\\build_dashboard.py --workbook data\\source\\NEV+ICE_xsai.xlsm --arrival-workbook data\\source\\NEV+ICE_ldai.xlsx --out docs\\data\\dashboard.json --summary-out docs\\data\\dashboard.summary.json`
+- 验证结果：`dashboard.json` 中对应 `chartTitle` 已更新为 `4月全车系有效线索趋势`。
+- 回滚方法：回退本次 `build_dashboard.py` 与 `dashboard.json` 文案变更。
+- 关联提交（如有）：待补充
+- 备注：这次只是改文案，不是改数据，别让小字眼装成大故障。
+
 ## 2026-04-23 11:17
 - 需求 / 目标：修复 GitHub Pages 在提交了本机 `localhost` 更新服务地址后，其他人打开页面直接 `Failed to fetch` 的问题。
 - 改动内容：将 `docs/data/runtime-config.json` 的默认 `serviceBaseUrl` 清空，恢复为公共静态浏览模式；更新 `docs/assets/app.js`，当远端数据服务不可达时自动回退到静态 `./data/dashboard.json`，不再让整页直接报错；同步更新 `README.md` 说明。
