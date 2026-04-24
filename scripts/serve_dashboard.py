@@ -13,25 +13,87 @@ from typing import Callable
 from urllib.parse import unquote, urlparse
 
 try:
-    from .fetch_daily_data import run_update
+    from .fetch_daily_data import format_business_date, parse_business_date, run_update
+    from .scheduled_update_runner import ScheduledUpdateLock, build_lock_path, run_publish_step
 except ImportError:  # pragma: no cover - script entrypoint fallback
-    from fetch_daily_data import run_update
+    from fetch_daily_data import format_business_date, parse_business_date, run_update
+    from scheduled_update_runner import ScheduledUpdateLock, build_lock_path, run_publish_step
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = PROJECT_ROOT / "docs"
 DASHBOARD_JSON_PATH = DOCS_DIR / "data" / "dashboard.json"
 DASHBOARD_SUMMARY_PATH = DOCS_DIR / "data" / "dashboard.summary.json"
+MANUAL_UPDATE_MODE = "manual-web"
+
+
+def build_idle_message(auto_publish: bool) -> str:
+    if auto_publish:
+        return "手动兜底更新服务已就绪，完成后会自动发布到 GitHub。"
+    return "手动兜底更新服务已就绪。"
+
+
+def build_running_message(auto_publish: bool) -> str:
+    if auto_publish:
+        return "手动兜底更新已启动，正在抓取数据并准备自动发布。"
+    return "手动兜底更新已启动，正在抓取数据。"
+
+
+def build_success_message(result: dict[str, object], auto_publish: bool) -> str:
+    business_date = str(result.get("businessDate") or "")
+    publish_status = str(result.get("publishStatus") or "disabled")
+    if auto_publish and publish_status == "success":
+        return f"手动兜底更新完成，业务日期：{business_date}，并已自动发布到 GitHub。"
+    return f"手动兜底更新完成，业务日期：{business_date}。"
+
+
+def summarize_external_lock(lock_details: str) -> str:
+    if not lock_details.strip():
+        return "检测到已有更新任务正在执行，请等当前任务结束后再手动补跑。"
+
+    try:
+        payload = json.loads(lock_details)
+    except json.JSONDecodeError:
+        return f"检测到已有更新任务正在执行，请稍后重试。锁信息：{lock_details}"
+
+    mode = str(payload.get("mode") or "")
+    started_at = str(payload.get("startedAt") or "")
+    business_date = str(payload.get("businessDate") or "")
+
+    mode_label = {
+        "silent": "静默定时任务",
+        "interactive": "交互定时任务",
+        MANUAL_UPDATE_MODE: "网页手动补跑",
+    }.get(mode, mode or "未知任务")
+
+    details: list[str] = [f"来源：{mode_label}"]
+    if business_date:
+        details.append(f"业务日期：{business_date}")
+    if started_at:
+        details.append(f"开始时间：{started_at}")
+    return "检测到已有更新任务正在执行，请等当前任务结束后再手动补跑。" + "（" + "；".join(details) + "）"
 
 
 class UpdateTaskManager:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        auto_publish: bool = True,
+        publish_remote: str = "origin",
+        publish_branch: str = "main",
+        publish_commit_message: str = "",
+    ) -> None:
         self._lock = threading.Lock()
+        self._shared_lock: ScheduledUpdateLock | None = None
+        self._auto_publish = auto_publish
+        self._publish_remote = publish_remote
+        self._publish_branch = publish_branch
+        self._publish_commit_message = publish_commit_message
         self._state = {
             "available": True,
             "running": False,
             "status": "idle",
-            "message": "本地更新服务已就绪。",
+            "message": build_idle_message(auto_publish),
             "result": None,
             "error": "",
             "updatedAt": None,
@@ -49,14 +111,42 @@ class UpdateTaskManager:
             if self._state["running"]:
                 snapshot = self._snapshot_unlocked()
                 return False, snapshot
+
+        started_at = datetime.now()
+        business_date = parse_business_date()
+        shared_lock = ScheduledUpdateLock(build_lock_path())
+        lock_metadata = {
+            "mode": MANUAL_UPDATE_MODE,
+            "startedAt": started_at.isoformat(timespec="seconds"),
+            "businessDate": format_business_date(business_date),
+            "source": "serve_dashboard",
+        }
+        if not shared_lock.acquire(lock_metadata):
+            lock_details = shared_lock.read_metadata()
+            with self._lock:
+                self._state.update(
+                    {
+                        "running": False,
+                        "status": "busy",
+                        "message": summarize_external_lock(lock_details),
+                        "result": None,
+                        "error": "",
+                        "updatedAt": started_at.isoformat(timespec="seconds"),
+                    }
+                )
+                snapshot = self._snapshot_unlocked()
+            return False, snapshot
+
+        with self._lock:
+            self._shared_lock = shared_lock
             self._state.update(
                 {
                     "running": True,
                     "status": "running",
-                    "message": "更新任务已启动，正在准备浏览器取数。",
+                    "message": build_running_message(self._auto_publish),
                     "result": None,
                     "error": "",
-                    "updatedAt": datetime.now().isoformat(timespec="seconds"),
+                    "updatedAt": started_at.isoformat(timespec="seconds"),
                 }
             )
             snapshot = self._snapshot_unlocked()
@@ -71,28 +161,58 @@ class UpdateTaskManager:
             self._state["updatedAt"] = datetime.now().isoformat(timespec="seconds")
 
     def _run(self) -> None:
+        partial_result: dict[str, object] | None = None
         try:
             result = run_update(log=self.log)
+            partial_result = result
+            if self._auto_publish:
+                publish_result = run_publish_step(
+                    business_date=str(result.get("businessDate") or ""),
+                    mode=MANUAL_UPDATE_MODE,
+                    remote=self._publish_remote,
+                    branch=self._publish_branch,
+                    commit_message=self._publish_commit_message,
+                    log=self.log,
+                )
+                result = {**result, **publish_result}
+            else:
+                result = {**result, "publishStatus": "disabled"}
         except Exception as exc:
             with self._lock:
+                error_message = f"手动兜底更新失败：{exc}"
+                result_payload = None
+                if partial_result is not None and self._auto_publish:
+                    error_message = f"数据已更新，但自动发布失败：{exc}"
+                    result_payload = {
+                        **partial_result,
+                        "publishStatus": "error",
+                        "publishRemote": self._publish_remote,
+                        "publishBranch": self._publish_branch,
+                    }
                 self._state.update(
                     {
                         "running": False,
                         "status": "error",
-                        "message": f"更新失败：{exc}",
-                        "result": None,
+                        "message": error_message,
+                        "result": result_payload,
                         "error": str(exc),
                         "updatedAt": datetime.now().isoformat(timespec="seconds"),
                     }
                 )
             return
+        finally:
+            with self._lock:
+                shared_lock = self._shared_lock
+                self._shared_lock = None
+            if shared_lock is not None:
+                shared_lock.release()
 
         with self._lock:
             self._state.update(
                 {
                     "running": False,
                     "status": "success",
-                    "message": f"更新完成，业务日期：{result['businessDate']}",
+                    "message": build_success_message(result, self._auto_publish),
                     "result": result,
                     "error": "",
                     "updatedAt": datetime.now().isoformat(timespec="seconds"),
@@ -199,6 +319,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Serve the AI Digest dashboard with sane defaults.")
     parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=4173, help="Port to listen on (default: 4173)")
+    publish_group = parser.add_mutually_exclusive_group()
+    publish_group.add_argument(
+        "--auto-publish",
+        dest="auto_publish",
+        action="store_true",
+        default=True,
+        help="Automatically publish workbook/dashboard changes to GitHub after a successful manual update (default: on).",
+    )
+    publish_group.add_argument(
+        "--no-auto-publish",
+        dest="auto_publish",
+        action="store_false",
+        help="Disable automatic GitHub publish after a successful manual update.",
+    )
+    parser.add_argument("--publish-remote", default="origin", help="Git remote name used by manual auto publish.")
+    parser.add_argument("--publish-branch", default="main", help="Git branch name used by manual auto publish.")
+    parser.add_argument(
+        "--publish-commit-message",
+        default="",
+        help="Optional git commit message used by manual auto publish.",
+    )
     parser.add_argument(
         "--cors-allow-origin",
         action="append",
@@ -229,6 +370,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[serve_dashboard] docs directory not found: {DOCS_DIR}", file=sys.stderr)
         return 1
 
+    DashboardHandler.update_manager = UpdateTaskManager(
+        auto_publish=args.auto_publish,
+        publish_remote=args.publish_remote,
+        publish_branch=args.publish_branch,
+        publish_commit_message=args.publish_commit_message,
+    )
+
     handler: Callable[..., DashboardHandler] = functools.partial(DashboardHandler, directory=str(DOCS_DIR))
     try:
         with ThreadingHTTPServer((args.host, args.port), handler) as httpd:
@@ -237,6 +385,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Serving {DOCS_DIR} at {url}")
             print("Clean URLs such as /docs or /AI_Digest fall back to index.html. Press Ctrl+C to exit.")
             print("Update API is available at /api/update-status, /api/update-data, /api/dashboard-data and /api/dashboard-summary.")
+            if args.auto_publish:
+                print(
+                    "Manual update button will auto publish to "
+                    f"{args.publish_remote}/{args.publish_branch} after a successful refresh."
+                )
+            else:
+                print("Manual update button will refresh local data only; auto publish is disabled.")
             if args.open_browser:
                 webbrowser.open(url)
             httpd.serve_forever()

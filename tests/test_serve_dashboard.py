@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import shutil
 import threading
 import time
 import unittest
+import uuid
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 from urllib.request import Request, urlopen
 from unittest.mock import patch
 
@@ -12,6 +15,12 @@ from scripts import serve_dashboard
 
 
 class ServeDashboardTests(unittest.TestCase):
+    def create_lock_path(self) -> Path:
+        test_dir = serve_dashboard.PROJECT_ROOT / ".runtime" / "test_serve_dashboard" / str(uuid.uuid4())
+        test_dir.mkdir(parents=True, exist_ok=True)
+        self.addCleanup(lambda: shutil.rmtree(test_dir, ignore_errors=True))
+        return test_dir / ".daily_update.lock"
+
     def wait_for(self, predicate, timeout: float = 3.0) -> bool:
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -21,7 +30,6 @@ class ServeDashboardTests(unittest.TestCase):
         return predicate()
 
     def test_update_task_manager_rejects_duplicate_start_without_deadlock(self) -> None:
-        manager = serve_dashboard.UpdateTaskManager()
         started_event = threading.Event()
         release_event = threading.Event()
 
@@ -31,7 +39,12 @@ class ServeDashboardTests(unittest.TestCase):
             self.assertTrue(release_event.wait(timeout=2))
             return {"businessDate": "2026-04-20"}
 
-        with patch("scripts.serve_dashboard.run_update", side_effect=fake_run_update):
+        lock_path = self.create_lock_path()
+        manager = serve_dashboard.UpdateTaskManager(auto_publish=False)
+        with patch("scripts.serve_dashboard.build_lock_path", return_value=lock_path), patch(
+            "scripts.serve_dashboard.run_update",
+            side_effect=fake_run_update,
+        ):
             started, first_snapshot = manager.start()
             self.assertTrue(started)
             self.assertTrue(first_snapshot["running"])
@@ -47,6 +60,28 @@ class ServeDashboardTests(unittest.TestCase):
             self.assertTrue(self.wait_for(lambda: manager.snapshot()["status"] == "success"))
             self.assertFalse(manager.snapshot()["running"])
 
+    def test_update_task_manager_reports_external_lock_conflict(self) -> None:
+        lock_path = self.create_lock_path()
+        blocker = serve_dashboard.ScheduledUpdateLock(lock_path)
+        self.assertTrue(
+            blocker.acquire(
+                {
+                    "mode": "silent",
+                    "startedAt": "2026-04-24T09:00:00",
+                    "businessDate": "2026-04-23",
+                }
+            )
+        )
+        self.addCleanup(blocker.release)
+
+        manager = serve_dashboard.UpdateTaskManager(auto_publish=False)
+        with patch("scripts.serve_dashboard.build_lock_path", return_value=lock_path):
+            started, snapshot = manager.start()
+
+        self.assertFalse(started)
+        self.assertEqual(snapshot["status"], "busy")
+        self.assertIn("检测到已有更新任务正在执行", snapshot["message"])
+
     def test_update_api_reports_status_and_can_trigger_update(self) -> None:
         started_event = threading.Event()
         release_event = threading.Event()
@@ -55,13 +90,29 @@ class ServeDashboardTests(unittest.TestCase):
             log("fake api run")
             started_event.set()
             self.assertTrue(release_event.wait(timeout=2))
-            return {"businessDate": "2026-04-20"}
+            return {
+                "businessDate": "2026-04-20",
+                "dashboardChanged": True,
+                "summaryChanged": True,
+            }
 
         original_manager = serve_dashboard.DashboardHandler.update_manager
-        serve_dashboard.DashboardHandler.update_manager = serve_dashboard.UpdateTaskManager()
 
         try:
-            with patch("scripts.serve_dashboard.run_update", side_effect=fake_run_update):
+            lock_path = self.create_lock_path()
+            serve_dashboard.DashboardHandler.update_manager = serve_dashboard.UpdateTaskManager()
+            with patch("scripts.serve_dashboard.build_lock_path", return_value=lock_path), patch(
+                "scripts.serve_dashboard.run_update",
+                side_effect=fake_run_update,
+            ), patch(
+                "scripts.serve_dashboard.run_publish_step",
+                return_value={
+                    "publishStatus": "success",
+                    "publishRemote": "origin",
+                    "publishBranch": "main",
+                    "publishCommitMessage": "Manual publish test",
+                },
+            ) as publish_mock:
                 with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
                     server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
                     server_thread.start()
@@ -98,6 +149,9 @@ class ServeDashboardTests(unittest.TestCase):
                         completed_payload = json.loads(response.read().decode("utf-8"))
                     self.assertEqual(completed_payload["status"], "success")
                     self.assertEqual(completed_payload["result"]["businessDate"], "2026-04-20")
+                    self.assertEqual(completed_payload["result"]["publishStatus"], "success")
+                    self.assertEqual(completed_payload["result"]["publishRemote"], "origin")
+                    self.assertTrue(publish_mock.called)
 
                     httpd.shutdown()
                     server_thread.join(timeout=2)

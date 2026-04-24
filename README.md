@@ -39,7 +39,7 @@
    这会同时生成 `docs/data/dashboard.json` 和 `docs/data/dashboard.summary.json`
 4. 运行 `python scripts/serve_dashboard.py --port 4173`，需要自动打开浏览器时可以附加 `--open-browser`
 5. 打开 `http://127.0.0.1:4173`，即使误写成 `/docs` 或 `/AI_Digest` 等路径也会被回退到 `index.html`
-6. 如果需要直接走浏览器取数，可在本地服务页面左侧点击 `数据更新`；它会按当天 `N-1` 抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日`、`NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店`，分别更新 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx` 后再重建页面数据
+6. 如果静默更新失败，需要手动兜底，可在本地服务页面左侧点击 `数据更新`；它会按当天 `N-1` 抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日`、`NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店`，分别更新 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`，重建页面数据，并在成功后自动执行 GitHub 发布
 7. 如需指定业务日期或保留运行痕迹排查问题，可直接执行 `python scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`
    其中 `NEV本期来店`、`NEV同期来店` 会通过内部包装器直接走 FineReport 后台 `chart.data` 导出链，`ICE本期来店`、`ICE同期来店` 会通过内部包装器强制走 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
 8. 如需让这台电脑每天自动更新，可执行 `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1`
@@ -53,7 +53,8 @@
    `python scripts/serve_dashboard.py --host 0.0.0.0 --port 4173 --no-open-browser --cors-allow-origin https://<你的-pages-域名>`
 2. 把 `docs/data/runtime-config.json` 里的 `serviceBaseUrl` 改成这个后端地址，例如 `https://digest-api.example.com`
 3. 如无特殊需要，`dashboardDataUrl` 留空即可，前端会自动改为从 `${serviceBaseUrl}/api/dashboard-data` 读取最新 dashboard 数据
-4. 把这份配置随站点一起发布到 GitHub Pages 后，页面上的 `数据更新` 按钮就会真正调用远端后端执行更新，而不是只显示静态文案
+4. 把这份配置随站点一起发布到 GitHub Pages 后，页面上的 `数据更新` 按钮就会真正调用远端后端执行手动兜底更新，并在成功后自动发布到 GitHub Pages
+5. 如果你想保持仓库里的 `runtime-config.json` 为空，不改公开站点默认行为，也可以只在本机运行 `python scripts/serve_dashboard.py --port 4173`；需要手动兜底时，直接打开本机页面点击同一个 `数据更新` 按钮即可
 
 注意：
 - `runtime-config.json` 里只放后端访问地址，不要放账号密码之类的敏感信息
@@ -92,12 +93,13 @@
 - 当前方案读取的是 Excel 保存后的缓存结果。你更新完源数据后，必须先让 Excel 完成重算并保存，否则页面会拿到旧结果。
 - 工作流已经改成读取当前实际使用的两本源文件：`NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`。
 - `docs/data/dashboard.summary.json` 提供了报表日期、输入文件修改时间、dashboard 数量和本次是否真的发生内容变更，方便后续定时任务或自动巡检直接读取。
-- 页面上的 `数据更新` 按钮在配置了 `docs/data/runtime-config.json` 的 `serviceBaseUrl` 后，可以从 `GitHub Pages` 直接调用远端后端执行更新；未配置时会退化为静态浏览模式。
+- 页面上的 `数据更新` 按钮现在是“静默失败后的手动兜底入口”：在本机 `serve_dashboard.py` 页面或配置了 `docs/data/runtime-config.json.serviceBaseUrl` 的 GitHub Pages 页面上，它都会执行完整的抓取、重建与自动发布链路；未配置时公开页面会退化为静态浏览模式。
 - 即使远端更新服务临时不可达，页面现在也会自动回退到已发布的静态 `docs/data/dashboard.json`，避免整页直接加载失败。
 ## Auto Publish Notes
 
 - To let scheduled updates publish to GitHub Pages automatically, register the tasks with `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -AutoPublish -PublishRemote origin -PublishBranch main`.
 - The scheduled runner now supports `--auto-publish`, `--publish-remote`, `--publish-branch`, and `--publish-commit-message`.
+- `scripts/serve_dashboard.py` now treats the existing `数据更新` button as a manual fallback path and auto publishes by default; use `--no-auto-publish` only if you want local refresh without git push.
 - Auto publish reuses `scripts/publish_dashboard.ps1 -SkipRebuild`, so it stages only the two workbook files plus `docs/data/dashboard.json` and `docs/data/dashboard.summary.json`.
 - No Codex approval is needed when the scheduled task runs later on this machine. The task uses the local account context configured in Windows Task Scheduler.
 - If the silent fallback task runs as `SYSTEM`, Git credentials must also be available to `SYSTEM`; otherwise data refresh may succeed but `git push` can still fail.

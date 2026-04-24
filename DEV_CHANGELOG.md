@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-04-24 13:18
+- 需求 / 目标：保持现有静默更新流程不变，同时让网页现有 `数据更新` 按钮在静默失败后可作为手动兜底入口，并在成功后自动发布到 GitHub。
+- 改动内容：更新 `scripts/serve_dashboard.py`，让 `/api/update-data` 复用定时任务同一把共享锁并在成功后自动调用 `scripts/publish_dashboard.ps1 -SkipRebuild`；补充 `--no-auto-publish`、`--publish-remote`、`--publish-branch`、`--publish-commit-message` 参数；更新 `docs/assets/app.js` 手动兜底提示文案；补充 `tests/test_serve_dashboard.py` 覆盖共享锁冲突与网页手动自动发布；同步更新 `README.md`、`SCRIPTS.md`。
+- 涉及文件：`scripts/serve_dashboard.py`、`docs/assets/app.js`、`tests/test_serve_dashboard.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m py_compile scripts\serve_dashboard.py tests\test_serve_dashboard.py`、`python -X utf8 -m unittest tests.test_serve_dashboard -v`、`python -X utf8 -m unittest tests.test_scheduled_update_runner -v`
+- 验证结果：`tests.test_serve_dashboard` 共 `5/5` 通过，`tests.test_scheduled_update_runner` 共 `14/14` 通过；代码层已确认网页手动更新会走完整抓取、重建、自动发布链路，并与定时任务共享同一把运行锁。
+- 回滚方法：回退 `scripts/serve_dashboard.py`、`docs/assets/app.js`、`tests/test_serve_dashboard.py`、`README.md`、`SCRIPTS.md` 到本次修改前版本，或基于本次提交创建新的反向提交。
+- 关联提交（如有）：待补充
+- 备注：本次未修改 `docs/data/runtime-config.json`，因此公开 GitHub Pages 默认行为保持不变；如需从公开页面直接手动兜底，仍需配置可访问的 `serviceBaseUrl`。
+
 ## 2026-04-24 11:19
 - 需求 / 目标：将本轮静默自动发布相关代码、脚本与文档正式提交并推送到 GitHub，避免验证成功只停留在本机工作区。
 - 改动内容：整理并保留自动发布入口、计划任务注册参数、`SYSTEM` Git 探针脚本、一次性静默测试包装脚本、`publish_dashboard.ps1` 的 Git 退出码修复、相关测试与文档更新；补充本次提交记录。

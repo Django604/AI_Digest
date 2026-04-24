@@ -249,7 +249,7 @@ async function probeUpdateCapability() {
     const payload = await response.json();
     state.updateAvailable = Boolean(payload.available);
     updateUpdateTools({
-      message: payload.message || "本地更新服务已就绪。",
+      message: payload.message || "手动兜底更新服务已就绪。",
       stateName: payload.status === "error" ? "error" : payload.status === "success" ? "success" : "",
     });
     if (payload.running) {
@@ -284,16 +284,16 @@ function updateUpdateTools(options = {}) {
       setUpdateStatus(`已配置远端更新服务 ${state.apiBaseUrl}，但当前无法连通。请检查后端服务是否在线。`, "error");
       return;
     }
-    setUpdateStatus("当前仍在使用静态数据。要让“数据更新”按钮真正执行更新，请在 docs/data/runtime-config.json 中配置可访问的后端 serviceBaseUrl。");
+    setUpdateStatus("当前仍在使用静态数据。若要在静默更新失败后手动补跑，请先启动本机 serve_dashboard 页面，或在 docs/data/runtime-config.json 中配置可访问的后端 serviceBaseUrl。");
     return;
   }
 
   if (!ready) {
-    setUpdateStatus("页面加载完成后可触发本地自动更新。");
+    setUpdateStatus("页面加载完成后可触发手动兜底更新。");
     return;
   }
 
-  setUpdateStatus("点击“数据更新”后，将抓取 3 张日报表并重建当前页面数据。");
+  setUpdateStatus("点击“数据更新”后，将手动补跑 7 张日报抓取、重建当前页面数据，并在成功后自动发布到 GitHub。");
 }
 
 function setUpdateStatus(message, stateName = "") {
@@ -315,7 +315,7 @@ async function handleDataUpdate() {
   }
 
   state.updateBusy = true;
-  updateUpdateTools({ message: "更新任务已提交，正在准备执行。" });
+  updateUpdateTools({ message: "手动兜底更新任务已提交，正在准备执行。" });
 
   try {
     const response = await fetch(buildApiUrl("/api/update-data"), {

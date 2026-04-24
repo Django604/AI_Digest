@@ -147,10 +147,11 @@
 ## scripts/serve_dashboard.py
 
 - 路径：`./scripts/serve_dashboard.py`
-- 作用：启动一个指向 `docs/` 目录的 `ThreadingHTTPServer`，并在访问 `/docs`、`/AI_Digest` 等“干净 URL”时自动回退到 `index.html`；同时暴露可独立部署的更新 API，供页面上的 `数据更新` 按钮触发浏览器取数流程
+- 作用：启动一个指向 `docs/` 目录的 `ThreadingHTTPServer`，并在访问 `/docs`、`/AI_Digest` 等“干净 URL”时自动回退到 `index.html`；同时暴露可独立部署的更新 API，供页面上的 `数据更新` 按钮在静默任务失败后手动兜底触发完整更新与发布流程
 - 使用方法：
   - `python scripts/serve_dashboard.py --port 4173 [--open-browser]`
   - 作为 GitHub Pages 远端后端：`python scripts/serve_dashboard.py --host 0.0.0.0 --port 4173 --no-open-browser --cors-allow-origin https://<你的-pages-域名>`
+  - 只想本地刷新、不自动推 GitHub 时：`python scripts/serve_dashboard.py --port 4173 --no-auto-publish`
 - 运行前提：
   - 本机可用 `Python`（仅使用标准库）
 - 输出结果：
@@ -159,7 +160,8 @@
   - 端口被占用或目录缺失时会在控制台给出错误提示；按 `Ctrl+C` 即可退出
   - API 端点包括 `/api/update-status`、`/api/update-data`、`/api/dashboard-data`、`/api/dashboard-summary`
   - `--cors-allow-origin` 可重复传入多个域名；默认允许 `*`
-  - 本地更新任务会串行执行；已有任务运行中时，再次点击只会返回当前状态，不会重复启动并发任务
+  - 网页手动更新会复用和 `scheduled_update_runner.py` 相同的共享锁；已有交互任务、静默任务或其他网页更新在跑时，再次点击只会返回当前状态，不会并发回写 Excel
+  - 默认会在手动更新成功后自动调用 `scripts/publish_dashboard.ps1 -SkipRebuild` 发布到 GitHub；如只想本地刷新可显式加 `--no-auto-publish`
 
 ## docs/data/runtime-config.json
 
@@ -170,7 +172,7 @@
   - `dashboardDataUrl`：可选；留空时前端默认使用 `${serviceBaseUrl}/api/dashboard-data`
 - 备注：
   - 该文件适合保存公开可见的服务地址，不应放置账号密码等敏感配置
-  - 如果两个字段都留空，页面会回退到静态 `docs/data/dashboard.json` 浏览模式，`数据更新` 按钮不会真正执行更新
+  - 如果两个字段都留空，公开页面会回退到静态 `docs/data/dashboard.json` 浏览模式；此时如需手动兜底，请直接打开本机 `serve_dashboard.py` 页面点击同一个 `数据更新` 按钮
 
 ## tests/test_build_dashboard.py
 
@@ -196,7 +198,7 @@
 ## tests/test_serve_dashboard.py
 
 - 路径：`./tests/test_serve_dashboard.py`
-- 作用：校验本地更新任务管理器不会锁死，并通过真实 HTTP 请求验证 `/api/update-status` 与 `/api/update-data` 的交互
+- 作用：校验本地更新任务管理器不会锁死，能识别共享锁冲突，并通过真实 HTTP 请求验证 `/api/update-status` 与 `/api/update-data` 的交互及手动自动发布链路
 - 使用方法：
   - `python -m unittest discover -s tests -v`
 ## Auto Publish Update
