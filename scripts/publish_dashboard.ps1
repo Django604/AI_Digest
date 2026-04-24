@@ -18,15 +18,55 @@ $publishTargets = @(
   "docs/data/dashboard.summary.json"
 )
 
+function Invoke-GitProcess {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$Arguments
+  )
+
+  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+  $startInfo.FileName = "git"
+  $startInfo.UseShellExecute = $false
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $startInfo.WorkingDirectory = $repoRoot
+  $startInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+  $startInfo.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+
+  $quotedArguments = $Arguments | ForEach-Object {
+    if ($_ -match '[\s"]') {
+      '"' + ($_ -replace '"', '\"') + '"'
+    } else {
+      $_
+    }
+  }
+  $startInfo.Arguments = ($quotedArguments -join " ")
+
+  $process = New-Object System.Diagnostics.Process
+  $process.StartInfo = $startInfo
+  [void]$process.Start()
+  $stdout = $process.StandardOutput.ReadToEnd()
+  $stderr = $process.StandardError.ReadToEnd()
+  $process.WaitForExit()
+
+  $combinedOutput = @($stdout.Trim(), $stderr.Trim()) | Where-Object { $_ }
+  return @{
+    ExitCode = $process.ExitCode
+    Stdout = $stdout
+    Stderr = $stderr
+    Output = $combinedOutput
+  }
+}
+
 function Invoke-Git {
   param(
     [Parameter(Mandatory = $true)]
     [string[]]$Arguments
   )
 
-  $output = & git @Arguments 2>&1
-  if ($LASTEXITCODE -ne 0) {
-    $details = ($output | Out-String).Trim()
+  $result = Invoke-GitProcess -Arguments $Arguments
+  if ($result.ExitCode -ne 0) {
+    $details = ($result.Output | Out-String).Trim()
     $message = "Git command failed: git $($Arguments -join ' ')"
     if ($details) {
       $message += "`n$details"
@@ -43,8 +83,8 @@ function Invoke-Git {
     throw $message
   }
 
-  if ($output) {
-    $output | ForEach-Object { Write-Host $_ }
+  if ($result.Output) {
+    $result.Output | ForEach-Object { Write-Host $_ }
   }
 }
 
@@ -54,11 +94,12 @@ function Get-GitOutput {
     [string[]]$Arguments
   )
 
-  $output = & git @Arguments 2>&1
-  if ($LASTEXITCODE -ne 0) {
-    throw "Git command failed: git $($Arguments -join ' ')`n$output"
+  $result = Invoke-GitProcess -Arguments $Arguments
+  if ($result.ExitCode -ne 0) {
+    $details = ($result.Output | Out-String).Trim()
+    throw "Git command failed: git $($Arguments -join ' ')`n$details"
   }
-  return ($output | Out-String).Trim()
+  return ($result.Output | Out-String).Trim()
 }
 
 Push-Location $repoRoot

@@ -1,5 +1,45 @@
 # DEV CHANGELOG
 
+## 2026-04-24 11:19
+- 需求 / 目标：将本轮静默自动发布相关代码、脚本与文档正式提交并推送到 GitHub，避免验证成功只停留在本机工作区。
+- 改动内容：整理并保留自动发布入口、计划任务注册参数、`SYSTEM` Git 探针脚本、一次性静默测试包装脚本、`publish_dashboard.ps1` 的 Git 退出码修复、相关测试与文档更新；补充本次提交记录。
+- 涉及文件：`scripts/scheduled_update_runner.py`、`scripts/register_daily_update_task.ps1`、`scripts/publish_dashboard.ps1`、`tests/test_scheduled_update_runner.py`、`scripts/probe_system_git_publish.ps1`、`scripts/run_silent_test_once.ps1`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest tests.test_scheduled_update_runner -v`、`git add -- README.md SCRIPTS.md scripts/publish_dashboard.ps1 scripts/register_daily_update_task.ps1 scripts/scheduled_update_runner.py tests/test_scheduled_update_runner.py scripts/probe_system_git_publish.ps1 scripts/run_silent_test_once.ps1 DEV_CHANGELOG.md`、`git commit -m "Enable silent auto publish workflow"`
+- 验证结果：`tests.test_scheduled_update_runner` 单测 `14/14` 通过；相关文件将随本次提交一并推送到 `origin/main`，使仓库状态与已验证成功的本地实现保持一致。
+- 回滚方法：回退本次提交，或仅回退 `publish_dashboard.ps1` / `scheduled_update_runner.py` / `register_daily_update_task.ps1` 等相关文件到上一个稳定版本。
+- 关联提交（如有）：待补充
+- 备注：这次推的是修复和链路代码，不是再重复推一遍业务数据快照。
+
+## 2026-04-24 11:16
+- 需求 / 目标：将发布数据手动回退到 `2026-04-22` 并推送到 GitHub，再验证 `SYSTEM` 静默更新能否把业务日 `2026-04-23` 自动抓回并重新发布。
+- 改动内容：备份当前 4 个发布文件；手动清空源工作簿中 `2026-04-23` / `2025-04-23` 对应行并用 `--report-date 2026-04-22` 重建 `dashboard.json` 与 `dashboard.summary.json`；使用 `publish_dashboard.ps1` 将回退态提交为 `798aa45` 并推送到 `origin/main`；首次 `AI_Digest_Daily_Update_Silent` 运行因 `ICE 全国按日` 与 `十五代轩逸按日` 导出接口 `401 Unauthorized` 失败；第二次同条件重试成功完成全量抓取、回填和自动发布，生成提交 `955939b` 并推送到 GitHub。
+- 涉及文件：`data/source/NEV+ICE_xsai.xlsm`、`data/source/NEV+ICE_ldai.xlsx`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json --summary-out docs/data/dashboard.summary.json --report-date 2026-04-22`、`powershell -ExecutionPolicy Bypass -File scripts/publish_dashboard.ps1 -SkipRebuild -Remote origin -Branch main -CommitMessage "Manually roll dashboard data back to 2026-04-22 for silent update verification"`、`Start-ScheduledTask -TaskName AI_Digest_Daily_Update_Silent`
+- 验证结果：手动回退提交 `798aa45` 已将远端页面退回到 `2026-04-22`；第一次静默任务 `20260424_110558_310327` 在导出 `ICE 全国按日` 与 `十五代轩逸按日` 时收到 `401 Unauthorized`，未写回工作簿也未发布；第二次静默任务 `20260424_111114_500069` 成功恢复源工作簿末尾 `2026-04-23` / `2025-04-23` 数据，`result.json` 为 `success`，自动发布提交 `955939b` 已推送到 `origin/main`，发布目标工作区重新干净。
+- 回滚方法：从 `.runtime/manual_publish_backups/20260424_110354/` 恢复 4 个发布文件，或将仓库回退/重推到 `798aa45` 以回到手动回退态。
+- 关联提交（如有）：`798aa45`、`955939b`
+- 备注：这次真相很直白，静默链路本身能跑通，第一次失败是上游 ICE 导出接口临时抽风，不是 Git 或自动发布又诈尸。
+
+## 2026-04-24 10:43
+- 需求 / 目标：补齐 SYSTEM 自动发布链路的 Git 条件，确认当天更新数据已推上 GitHub，并修复 `publish_dashboard.ps1` 将 `git push` 正常输出误判为失败的问题。
+- 改动内容：确认 SYSTEM `safe.directory`、仓库 `core.sshCommand` 与 `origin` 推送通路可用；重注册 `AI_Digest_Daily_Update_Interactive` 与 `AI_Digest_Daily_Update_Silent` 使其带上 `--auto-publish`；手动执行 `git push origin main` 确认数据提交 `f18f8b4` 已在远端；更新 `scripts/publish_dashboard.ps1`，改用 `System.Diagnostics.Process` 捕获 Git `stdout/stderr`，仅按退出码判定成功失败。
+- 涉及文件：`scripts/publish_dashboard.ps1`、`DEV_CHANGELOG.md`
+- 关键命令：`powershell -ExecutionPolicy Bypass -File scripts\register_daily_update_task.ps1 -AutoPublish -PublishRemote origin -PublishBranch main`、`Start-ScheduledTask -TaskName AI_Digest_Daily_Update_Silent`、`git -C D:\WorkCode\AI_Digest push origin main`
+- 验证结果：SYSTEM 探针 `D:\WorkCode\AI_Digest\.runtime\system_git_probe\probe_20260424_1028.json` 显示 `overallSuccess = true`；`2026-04-24 10:35` 的 silent 任务完成数据更新并创建提交 `f18f8b4`，实际已推送到 `origin/main`，但旧版脚本把 `git push` 的正常输出误记为失败；修复后执行 `powershell -ExecutionPolicy Bypass -File scripts\publish_dashboard.ps1 -SkipRebuild -Remote origin -Branch main` 已能正常退出。
+- 回滚方法：回退 `scripts/publish_dashboard.ps1` 的 Git 进程封装改动，并重新注册不带 `-AutoPublish` 的任务或恢复旧版发布脚本。
+- 关联提交（如有）：待补充
+- 备注：这次不是 Git 没推上去，而是 PowerShell 把 Git 正常喘气声当成了病危通知。
+
+## 2026-04-24 09:27
+- 需求 / 目标：排查“静默模式看起来执行完成，但网页数据没有同步更新”的原因。
+- 改动内容：未修改业务代码；核对 `scheduled_update` 运行结果、前端 `runtime-config` 与发布脚本行为，确认问题位于“本地静态产物已更新，但未同步到网页发布链路”。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Get-Content .runtime\\scheduled_update\\20260424_090009_603061\\result.json`、`Get-Content .runtime\\scheduled_update\\20260424_090102_284397\\result.json`、`git status --short`
+- 验证结果：`2026-04-24 09:00:09` 的交互任务成功完成并更新本地 `docs/data/dashboard.json`；`2026-04-24 09:01:02` 的静默任务因已有运行锁被跳过；当前 `docs/data/runtime-config.json` 为空，前端仍走静态文件；仓库内 `docs/data/dashboard.json` 与 `docs/data/dashboard.summary.json` 处于已修改未发布状态，因此网页未同步。
+- 回滚方法：无需回滚，本次为排查记录。
+- 关联提交（如有）：待补充
+- 备注：这次不是后端没干活，而是发布链路没接上，别把“本地更新成功”和“网页已发布”当成一回事。
+
 ## 2026-04-23 15:41
 - 需求 / 目标：将页面文案 `全车有效线索管控` 调整为 `全车系有效线索管控`。
 - 改动内容：更新 `scripts/build_dashboard.py` 中 `lead-control` 页面标题生成文案，并重建 `docs/data/dashboard.json` 以同步发布产物。
@@ -424,3 +464,66 @@
 - 关联提交（如有）：待补充
 - 备注：仅调整页面展示文案，不改动底层数据与工作表结构。
 
+## 2026-04-24 09:45
+- 需求 / 目标：让定时任务在更新成功后可自动发布到 GitHub Pages，同时本轮先只做本地验证，不实际推送今天的数据。
+- 改动内容：为 `scripts/scheduled_update_runner.py` 增加 `auto publish` 参数、发布步骤调用与结果落盘；为 `scripts/register_daily_update_task.ps1` 增加 `-AutoPublish/-PublishRemote/-PublishBranch` 注册参数；补充 `tests/test_scheduled_update_runner.py` 覆盖自动发布成功与失败场景；同步更新 `README.md` 与 `SCRIPTS.md` 说明。
+- 涉及文件：`scripts/scheduled_update_runner.py`、`scripts/register_daily_update_task.ps1`、`tests/test_scheduled_update_runner.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m py_compile scripts\\scheduled_update_runner.py tests\\test_scheduled_update_runner.py`、`python -X utf8 -m unittest tests.test_scheduled_update_runner -v`
+- 验证结果：`ScheduledUpdateRunner` 相关单测 `14/14` 通过；自动发布分支已确认只在显式开启 `--auto-publish` / `-AutoPublish` 时执行，测试阶段仅通过 mock 验证，未触发真实 `git push`。
+- 回滚方法：回退本次 `scheduled_update_runner.py`、`register_daily_update_task.ps1`、相关测试与文档变更。
+- 关联提交（如有）：待补充
+- 备注：后续若让 `09:01` 的 `SYSTEM` 静默任务也自动发布，Git 凭据必须对 `SYSTEM` 可用，不然会出现“更新成功、推送失败”的经典二段式翻车。
+## 2026-04-24 09:55
+- 需求 / 目标：安排一次锁屏场景下的静默更新测试，在 `2026-04-24 09:55` 由临时计划任务拉起静默更新程序，并在执行后自动删除该测试任务。
+- 改动内容：新增 `scripts/run_silent_test_once.ps1` 作为一次性静默测试包装脚本；以 `SYSTEM` 身份注册临时计划任务 `AI_Digest_Silent_Test_20260424_0955`，触发时间为 `2026-04-24 09:55:00`，脚本执行完成后会自注销该任务；同步登记 `SCRIPTS.md`。
+- 涉及文件：`scripts/run_silent_test_once.ps1`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`schtasks.exe /Create /TN AI_Digest_Silent_Test_20260424_0955 ... /ST 09:55 /SD 2026/04/24 /RU SYSTEM /RL HIGHEST /F`、`[scriptblock]::Create((Get-Content scripts\\run_silent_test_once.ps1 -Raw -Encoding utf8))`
+- 验证结果：`2026-04-24 09:53:03` 确认当前时间后成功注册测试任务；`schtasks /Query` 显示 `Next Run Time = 2026/4/24 9:55:00`、`Run As User = SYSTEM`、`Status = Ready`；测试脚本语法解析通过。
+- 回滚方法：若测试前需要取消，可执行 `schtasks.exe /Delete /TN AI_Digest_Silent_Test_20260424_0955 /F`；正常情况下脚本会在执行后自删任务。
+- 关联提交（如有）：待补充
+- 备注：本次测试针对“锁屏”场景，不是 `Sleep`；锁屏不影响任务运行，休眠才会真把活一起睡过去。
+## 2026-04-24 10:03
+- 需求 / 目标：将锁屏静默更新自动发布测试的触发时间从已过期时点顺延到新的可执行时间。
+- 改动内容：删除已过期的临时测试任务 `AI_Digest_Silent_Test_20260424_1000`，重新注册一次性任务 `AI_Digest_Silent_Test_20260424_1005`，保持 `SYSTEM`、静默更新、自动发布到 `origin/main` 的配置不变。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Register-ScheduledTask -TaskName AI_Digest_Silent_Test_20260424_1005 ... -At 2026-04-24T10:05:00`
+- 验证结果：查询结果显示 `NextRunTime = 2026/4/24 10:05:00`，任务为新的临时测试任务且待运行。
+- 回滚方法：执行 `Unregister-ScheduledTask -TaskName AI_Digest_Silent_Test_20260424_1005 -Confirm:$false` 取消本次测试；正常情况下脚本执行后会自删。
+- 关联提交（如有）：待补充
+- 备注：这次只是顺延测试时间，没有改正式日常计划任务。
+## 2026-04-24 10:11
+- 需求 / 目标：跟踪 `AI_Digest_Silent_Test_20260424_1005` 锁屏静默更新自动发布测试的完成情况。
+- 改动内容：未修改业务代码；读取 `20260424_100501_178677/result.json`、`scheduled_update.log`、`docs/data/dashboard.summary.json` 与临时任务状态，确认静默更新成功完成、本地数据产物已更新，但自动发布在 Git 安全目录校验阶段失败；同时确认临时测试任务已自删。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Get-Content .runtime\\scheduled_update\\20260424_100501_178677\\result.json`、`Get-Content .runtime\\scheduled_update\\20260424_100501_178677\\scheduled_update.log`、`Get-ScheduledTask -TaskName AI_Digest_Silent_Test_20260424_1005`
+- 验证结果：测试于 `2026-04-24 10:05:01` 启动并在 `2026-04-24 10:08:39` 完成本地更新，`dashboard.json` / `dashboard.summary.json` 已更新到业务日期 `2026-04-23`；自动发布失败原因为 `git` 报错 `fatal: detected dubious ownership in repository at 'D:/WorkCode/AI_Digest'`；临时任务 `AI_Digest_Silent_Test_20260424_1005` 已不存在，说明脚本已按预期执行完自删。
+- 回滚方法：无需回滚，本次为测试跟踪记录。
+- 关联提交（如有）：待补充
+- 备注：这次不是锁屏场景失效，而是 `SYSTEM` 账号执行 `git` 时把仓库所有权判成了可疑目录，自动发布卡死在安全校验这一步。
+## 2026-04-24 10:13
+- 需求 / 目标：继续推进锁屏静默自动发布测试，绕开 `SYSTEM` 账号下 Git/SSH 环境缺失导致的自动发布失败。
+- 改动内容：核对仓库远端与 Git 配置后，确认当前仓库使用 `git@github.com:Django604/AI_Digest.git` SSH 远端，且 `safe.directory` 仅配置在当前登录用户的 `C:\Users\sj-liangcg\.gitconfig`；据此放弃继续用 `SYSTEM` 做自动发布测试，改为注册一次性任务 `AI_Digest_Silent_User_Test_20260424_1015`，在 `2026-04-24 10:15:00` 以当前登录用户的 `Interactive` 身份静默执行并自动发布到 `origin/main`。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`git -C .\\AI_Digest remote -v`、`git -C .\\AI_Digest config --show-origin --get-all safe.directory`、`Register-ScheduledTask -TaskName AI_Digest_Silent_User_Test_20260424_1015 ... -UserId <当前用户> -LogonType Interactive`
+- 验证结果：已确认远端为 SSH 地址、用户级 `safe.directory` 存在；新的临时任务查询结果显示 `NextRunTime = 2026/4/24 10:15:00`，后续可在锁屏状态下复用当前用户的 Git 安全目录与 SSH 推送环境执行测试。
+- 回滚方法：执行 `Unregister-ScheduledTask -TaskName AI_Digest_Silent_User_Test_20260424_1015 -Confirm:$false` 取消本次测试；正常情况下脚本执行后会自删。
+- 关联提交（如有）：待补充
+- 备注：这次改的是测试执行身份，不是业务代码；锁屏没问题，`SYSTEM` 才是那个被 Git 和 SSH 联手嫌弃的倒霉蛋。
+## 2026-04-24 10:20
+- 需求 / 目标：排查 `AI_Digest_Silent_User_Test_20260424_1015` 为何在锁屏静默自动发布测试中途停止。
+- 改动内容：未修改业务代码；读取 `20260424_101501_458054/scheduled_update.log`、`run_meta.json`，并查询任务计划状态与事件日志，确认该任务在 `ICE 全国按日 + 十五代轩逸` 阶段中途退出，未写出 `result.json`。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Get-Content .runtime\\scheduled_update\\20260424_101501_458054\\scheduled_update.log`、`Get-ScheduledTask -TaskName AI_Digest_Silent_User_Test_20260424_1015 | Get-ScheduledTaskInfo`、`Get-WinEvent -LogName Microsoft-Windows-TaskScheduler/Operational`
+- 验证结果：任务于 `2026-04-24 10:15:00` 启动，`2026-04-24 10:16:10` 被任务计划器记录为结束，`LastTaskResult = 3221225786 (0xC000013A)`；日志停在 `ICE 全国按日 + 十五代轩逸` 刚启动的位置，说明这次不是正常脚本收尾，而是进程被外部中断；自动发布阶段尚未执行到。
+- 回滚方法：无需回滚，本次为诊断记录。
+- 关联提交（如有）：待补充
+- 备注：当前证据更像是“用户态交互式 PowerShell 任务在锁屏场景下被系统/会话中断”，不是业务脚本自己报错退出。
+## 2026-04-24 10:28
+- 需求 / 目标：回到 `SYSTEM` 静默自动发布方案，并先补齐 `safe.directory` 与 SSH 推送凭据链路。
+- 改动内容：提权检查 `C:\Users\sj-liangcg\.ssh`，确认 GitHub SSH 配置使用 `id_ed25519_github` 且走 `ssh.github.com:443`；将 `D:/WorkCode/AI_Digest` 写入系统级 Git `safe.directory`；把仓库本地 `core.sshCommand` 固定为 `ssh -F C:/Users/sj-liangcg/.ssh/config -o UserKnownHostsFile=C:/Users/sj-liangcg/.ssh/known_hosts`；新增 `scripts/probe_system_git_publish.ps1` 并通过一次性 `SYSTEM` 任务完成 `ls-remote` 与 `push --dry-run` 探针验证；移除旧的用户态临时测试任务。
+- 涉及文件：`scripts/probe_system_git_publish.ps1`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`git config --system --add safe.directory D:/WorkCode/AI_Digest`、`git -C .\\AI_Digest config core.sshCommand "ssh -F C:/Users/sj-liangcg/.ssh/config -o UserKnownHostsFile=C:/Users/sj-liangcg/.ssh/known_hosts"`、`Register-ScheduledTask -TaskName AI_Digest_System_Git_Probe_20260424_1028 ...`
+- 验证结果：`SYSTEM` 探针输出文件显示 `system-safe-directory`、`repo-ssh-command`、`git ls-remote origin`、`git push --dry-run origin HEAD:main` 全部成功，`overallSuccess = true`；说明 `SYSTEM` 账号下的 GitHub SSH 与推送权限链路已打通。
+- 回滚方法：执行 `git -C D:\\WorkCode\\AI_Digest config --unset core.sshCommand` 取消仓库级 SSH 固定；执行 `git config --system --unset-all safe.directory D:/WorkCode/AI_Digest` 移除系统级安全目录；删除 `scripts/probe_system_git_publish.ps1` 与相关文档记录。
+- 关联提交（如有）：待补充
+- 备注：这次终于不是嘴上说“应该能推”，而是让 `SYSTEM` 本人去跑了 `push --dry-run`，结果它老老实实回了 `Everything up-to-date`。

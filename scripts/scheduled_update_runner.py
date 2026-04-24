@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import queue
+import subprocess
 import threading
 import traceback
 from dataclasses import dataclass
@@ -42,6 +43,7 @@ FINISH_AUTO_CLOSE_SECONDS = 180
 INTERACTIVE_MODE = "interactive"
 SILENT_MODE = "silent"
 LOCK_FILENAME = ".daily_update.lock"
+PUBLISH_SCRIPT = PROJECT_ROOT / "scripts" / "publish_dashboard.ps1"
 
 
 @dataclass(frozen=True)
@@ -97,6 +99,8 @@ def build_skip_message(mode: str, existing_lock_details: str) -> str:
 def build_success_message(result: dict[str, object], started_at: datetime, finished_at: datetime, log_path: Path) -> str:
     business_date = str(result.get("businessDate") or "")
     runtime_dir = str(result.get("runtimeDir") or "")
+    publish_status = str(result.get("publishStatus") or "disabled")
+    publish_summary = "disabled" if publish_status == "disabled" else publish_status
     dashboard_changed = "是" if bool(result.get("dashboardChanged")) else "否"
     summary_changed = "是" if bool(result.get("summaryChanged")) else "否"
     duration_seconds = int((finished_at - started_at).total_seconds())
@@ -488,6 +492,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--keep-runtime", action="store_true", help="保留抓取运行目录")
     parser.add_argument("--suppress-start-message", action="store_true", help="测试或静默场景下不显示启动提示窗口")
     parser.add_argument("--suppress-finish-message", action="store_true", help="测试或静默场景下不显示完成结果窗口")
+    parser.add_argument("--auto-publish", action="store_true", help="Enable git commit/push after a successful scheduled update.")
+    parser.add_argument("--publish-remote", default="origin", help="Git remote name used by auto publish.")
+    parser.add_argument("--publish-branch", default="main", help="Git branch name used by auto publish.")
+    parser.add_argument("--publish-commit-message", default="", help="Optional git commit message used by auto publish.")
     return parser.parse_args(argv)
 
 
@@ -502,6 +510,75 @@ def resolve_message_visibility(
     return (not suppress_start_message, not suppress_finish_message)
 
 
+def resolve_publish_commit_message(
+    *,
+    business_date: str,
+    mode: str,
+    explicit_message: str,
+) -> str:
+    if explicit_message.strip():
+        return explicit_message.strip()
+    return f"Auto publish dashboard data {business_date} ({mode})"
+
+
+def run_publish_step(
+    *,
+    business_date: str,
+    mode: str,
+    remote: str,
+    branch: str,
+    commit_message: str,
+    log: Callable[[str], None],
+) -> dict[str, str]:
+    if not PUBLISH_SCRIPT.exists():
+        raise FileNotFoundError(f"Publish script was not found: {PUBLISH_SCRIPT}")
+
+    resolved_commit_message = resolve_publish_commit_message(
+        business_date=business_date,
+        mode=mode,
+        explicit_message=commit_message,
+    )
+    command = [
+        "powershell",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(PUBLISH_SCRIPT),
+        "-SkipRebuild",
+        "-Remote",
+        remote,
+        "-Branch",
+        branch,
+        "-CommitMessage",
+        resolved_commit_message,
+    ]
+    log(f"Starting auto publish: remote={remote} branch={branch}")
+    process = subprocess.Popen(
+        command,
+        cwd=str(PROJECT_ROOT),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert process.stdout is not None
+    for line in process.stdout:
+        text = line.rstrip()
+        if text:
+            log(f"[publish] {text}")
+    exit_code = process.wait()
+    if exit_code != 0:
+        raise RuntimeError(f"Auto publish failed with exit code {exit_code}")
+    log("Auto publish completed.")
+    return {
+        "publishStatus": "success",
+        "publishRemote": remote,
+        "publishBranch": branch,
+        "publishCommitMessage": resolved_commit_message,
+    }
+
+
 def run_scheduled_update(
     *,
     mode: str = INTERACTIVE_MODE,
@@ -510,6 +587,10 @@ def run_scheduled_update(
     keep_runtime: bool = False,
     show_start_message: bool = True,
     show_finish_message: bool = True,
+    auto_publish: bool = False,
+    publish_remote: str = "origin",
+    publish_branch: str = "main",
+    publish_commit_message: str = "",
 ) -> int:
     started_at = datetime.now()
     run_dir = build_run_dir(started_at)
@@ -534,6 +615,9 @@ def run_scheduled_update(
             "keepRuntime": keep_runtime,
             "showStartMessage": show_start_message,
             "showFinishMessage": show_finish_message,
+            "autoPublish": auto_publish,
+            "publishRemote": publish_remote,
+            "publishBranch": publish_branch,
         },
     )
 
@@ -560,6 +644,9 @@ def run_scheduled_update(
                 "businessDate": format_business_date(business_date),
                 "lockPath": str(build_lock_path()),
                 "lockDetails": existing_lock_details,
+                "autoPublish": auto_publish,
+                "publishRemote": publish_remote,
+                "publishBranch": publish_branch,
                 "logPath": str(log_path),
             },
         )
@@ -586,6 +673,18 @@ def run_scheduled_update(
                 headless=headless,
                 keep_runtime=keep_runtime,
             )
+            if auto_publish:
+                publish_result = run_publish_step(
+                    business_date=str(result.get("businessDate") or format_business_date(business_date)),
+                    mode=mode,
+                    remote=publish_remote,
+                    branch=publish_branch,
+                    commit_message=publish_commit_message,
+                    log=logger,
+                )
+                result = {**result, **publish_result}
+            else:
+                result = {**result, "publishStatus": "disabled"}
         except Exception as exc:
             finished_at = datetime.now()
             error_text = str(exc)
@@ -600,6 +699,9 @@ def run_scheduled_update(
                     "finishedAt": finished_at.isoformat(timespec="seconds"),
                     "businessDate": format_business_date(business_date),
                     "error": error_text,
+                    "autoPublish": auto_publish,
+                    "publishRemote": publish_remote,
+                    "publishBranch": publish_branch,
                     "logPath": str(log_path),
                 },
             )
@@ -620,6 +722,10 @@ def run_scheduled_update(
                 "runtimeDir": result.get("runtimeDir"),
                 "dashboardChanged": bool(result.get("dashboardChanged")),
                 "summaryChanged": bool(result.get("summaryChanged")),
+                "publishStatus": result.get("publishStatus", "disabled"),
+                "publishRemote": result.get("publishRemote", publish_remote if auto_publish else ""),
+                "publishBranch": result.get("publishBranch", publish_branch if auto_publish else ""),
+                "publishCommitMessage": result.get("publishCommitMessage", ""),
                 "logPath": str(log_path),
             },
         )
@@ -650,6 +756,10 @@ def main(argv: list[str] | None = None) -> int:
         keep_runtime=args.keep_runtime,
         show_start_message=show_start_message,
         show_finish_message=show_finish_message,
+        auto_publish=args.auto_publish,
+        publish_remote=args.publish_remote,
+        publish_branch=args.publish_branch,
+        publish_commit_message=args.publish_commit_message,
     )
 
 

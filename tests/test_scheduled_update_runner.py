@@ -110,6 +110,30 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
         actual = parse_args([])
 
         self.assertEqual(actual.mode, INTERACTIVE_MODE)
+        self.assertFalse(actual.auto_publish)
+        self.assertEqual(actual.publish_remote, "origin")
+        self.assertEqual(actual.publish_branch, "main")
+
+    def test_parse_args_accepts_auto_publish_options(self) -> None:
+        actual = parse_args(
+            [
+                "--mode",
+                SILENT_MODE,
+                "--auto-publish",
+                "--publish-remote",
+                "upstream",
+                "--publish-branch",
+                "release",
+                "--publish-commit-message",
+                "nightly publish",
+            ]
+        )
+
+        self.assertEqual(actual.mode, SILENT_MODE)
+        self.assertTrue(actual.auto_publish)
+        self.assertEqual(actual.publish_remote, "upstream")
+        self.assertEqual(actual.publish_branch, "release")
+        self.assertEqual(actual.publish_commit_message, "nightly publish")
 
     def test_resolve_message_visibility_disables_popups_in_silent_mode(self) -> None:
         actual = resolve_message_visibility(
@@ -147,6 +171,84 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
             payload = json.loads(result_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(payload["status"], "success")
             self.assertEqual(payload["mode"], SILENT_MODE)
+        finally:
+            shutil.rmtree(runtime_root, ignore_errors=True)
+
+    def test_auto_publish_runs_after_successful_update(self) -> None:
+        fake_result = {
+            "businessDate": "2026-04-22",
+            "runtimeDir": r"D:\WorkCode\AI_Digest\.runtime\daily_update\fake-run",
+            "dashboardChanged": True,
+            "summaryChanged": True,
+        }
+        fake_publish = {
+            "publishStatus": "success",
+            "publishRemote": "origin",
+            "publishBranch": "main",
+            "publishCommitMessage": "Auto publish dashboard data 2026-04-22 (silent)",
+        }
+
+        runtime_root = self.create_repo_temp_dir()
+        try:
+            with mock.patch("scripts.scheduled_update_runner.SCHEDULED_RUNTIME_ROOT", runtime_root), mock.patch(
+                "scripts.scheduled_update_runner.run_update",
+                return_value=fake_result,
+            ), mock.patch(
+                "scripts.scheduled_update_runner.run_publish_step",
+                return_value=fake_publish,
+            ) as publish_mock:
+                exit_code = run_scheduled_update(
+                    mode=SILENT_MODE,
+                    business_date_text="2026-04-22",
+                    show_start_message=False,
+                    show_finish_message=False,
+                    auto_publish=True,
+                )
+
+            self.assertEqual(exit_code, 0)
+            publish_mock.assert_called_once()
+            result_paths = list(runtime_root.glob("*/result.json"))
+            self.assertEqual(len(result_paths), 1)
+            payload = json.loads(result_paths[0].read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "success")
+            self.assertEqual(payload["publishStatus"], "success")
+            self.assertEqual(payload["publishRemote"], "origin")
+            self.assertEqual(payload["publishBranch"], "main")
+        finally:
+            shutil.rmtree(runtime_root, ignore_errors=True)
+
+    def test_auto_publish_failure_marks_run_as_error(self) -> None:
+        fake_result = {
+            "businessDate": "2026-04-22",
+            "runtimeDir": r"D:\WorkCode\AI_Digest\.runtime\daily_update\fake-run",
+            "dashboardChanged": True,
+            "summaryChanged": True,
+        }
+
+        runtime_root = self.create_repo_temp_dir()
+        try:
+            with mock.patch("scripts.scheduled_update_runner.SCHEDULED_RUNTIME_ROOT", runtime_root), mock.patch(
+                "scripts.scheduled_update_runner.run_update",
+                return_value=fake_result,
+            ), mock.patch(
+                "scripts.scheduled_update_runner.run_publish_step",
+                side_effect=RuntimeError("push failed"),
+            ):
+                exit_code = run_scheduled_update(
+                    mode=SILENT_MODE,
+                    business_date_text="2026-04-22",
+                    show_start_message=False,
+                    show_finish_message=False,
+                    auto_publish=True,
+                )
+
+            self.assertEqual(exit_code, 1)
+            result_paths = list(runtime_root.glob("*/result.json"))
+            self.assertEqual(len(result_paths), 1)
+            payload = json.loads(result_paths[0].read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["error"], "push failed")
+            self.assertTrue(payload["autoPublish"])
         finally:
             shutil.rmtree(runtime_root, ignore_errors=True)
 

@@ -2,7 +2,10 @@ param(
   [string]$TaskNamePrefix = "AI_Digest_Daily_Update",
   [string]$Time = "09:00",
   [int]$SilentDelayMinutes = 1,
-  [string]$PythonPath = ""
+  [string]$PythonPath = "",
+  [switch]$AutoPublish,
+  [string]$PublishRemote = "origin",
+  [string]$PublishBranch = "main"
 )
 
 Set-StrictMode -Version Latest
@@ -63,9 +66,12 @@ $silentRunTime = $interactiveRunTime.AddMinutes($SilentDelayMinutes)
 $interactiveTaskName = "${TaskNamePrefix}_Interactive"
 $silentTaskName = "${TaskNamePrefix}_Silent"
 $legacyTaskName = $TaskNamePrefix
-
-$interactiveAction = New-ScheduledTaskAction -Execute $pythonExe -Argument ('"{0}" --mode interactive' -f $runnerScript) -WorkingDirectory $projectRoot
-$silentAction = New-ScheduledTaskAction -Execute $pythonExe -Argument ('"{0}" --mode silent' -f $runnerScript) -WorkingDirectory $projectRoot
+$publishArgs = ""
+if ($AutoPublish) {
+  $publishArgs = (' --auto-publish --publish-remote "{0}" --publish-branch "{1}"' -f $PublishRemote, $PublishBranch)
+}
+$interactiveAction = New-ScheduledTaskAction -Execute $pythonExe -Argument ('"{0}" --mode interactive{1}' -f $runnerScript, $publishArgs) -WorkingDirectory $projectRoot
+$silentAction = New-ScheduledTaskAction -Execute $pythonExe -Argument ('"{0}" --mode silent{1}' -f $runnerScript, $publishArgs) -WorkingDirectory $projectRoot
 $interactiveTrigger = New-ScheduledTaskTrigger -Daily -At $interactiveRunTime.ToString("HH:mm")
 $silentTrigger = New-ScheduledTaskTrigger -Daily -At $silentRunTime.ToString("HH:mm")
 $interactivePrincipal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
@@ -86,5 +92,8 @@ Write-Host "Interactive time: daily at $($interactiveRunTime.ToString("HH:mm"))"
 Write-Host "Silent fallback task: $silentTaskName"
 Write-Host "Silent time: daily at $($silentRunTime.ToString("HH:mm"))"
 Write-Host "Silent delay minutes: $SilentDelayMinutes"
+Write-Host "Auto publish: $AutoPublish"
+Write-Host "Publish remote: $PublishRemote"
+Write-Host "Publish branch: $PublishBranch"
 Write-Host "Python: $pythonExe"
 Write-Host "Runner: $runnerScript"

@@ -94,3 +94,10 @@
 - `docs/data/dashboard.summary.json` 提供了报表日期、输入文件修改时间、dashboard 数量和本次是否真的发生内容变更，方便后续定时任务或自动巡检直接读取。
 - 页面上的 `数据更新` 按钮在配置了 `docs/data/runtime-config.json` 的 `serviceBaseUrl` 后，可以从 `GitHub Pages` 直接调用远端后端执行更新；未配置时会退化为静态浏览模式。
 - 即使远端更新服务临时不可达，页面现在也会自动回退到已发布的静态 `docs/data/dashboard.json`，避免整页直接加载失败。
+## Auto Publish Notes
+
+- To let scheduled updates publish to GitHub Pages automatically, register the tasks with `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -AutoPublish -PublishRemote origin -PublishBranch main`.
+- The scheduled runner now supports `--auto-publish`, `--publish-remote`, `--publish-branch`, and `--publish-commit-message`.
+- Auto publish reuses `scripts/publish_dashboard.ps1 -SkipRebuild`, so it stages only the two workbook files plus `docs/data/dashboard.json` and `docs/data/dashboard.summary.json`.
+- No Codex approval is needed when the scheduled task runs later on this machine. The task uses the local account context configured in Windows Task Scheduler.
+- If the silent fallback task runs as `SYSTEM`, Git credentials must also be available to `SYSTEM`; otherwise data refresh may succeed but `git push` can still fail.

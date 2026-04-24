@@ -199,3 +199,21 @@
 - 作用：校验本地更新任务管理器不会锁死，并通过真实 HTTP 请求验证 `/api/update-status` 与 `/api/update-data` 的交互
 - 使用方法：
   - `python -m unittest discover -s tests -v`
+## Auto Publish Update
+
+- `scripts/scheduled_update_runner.py` now supports `--auto-publish`, `--publish-remote`, `--publish-branch`, and `--publish-commit-message`.
+- `scripts/register_daily_update_task.ps1` now supports `-AutoPublish`, `-PublishRemote`, and `-PublishBranch`.
+- Auto publish calls `scripts/publish_dashboard.ps1 -SkipRebuild`, so the scheduled task reuses the existing guarded git add/commit/push flow instead of rebuilding `dashboard.json` twice.
+- If the silent fallback task runs as `SYSTEM`, make sure `SYSTEM` can use Git credentials on this machine, or the refresh step may succeed while publish still fails.
+## scripts/run_silent_test_once.ps1
+
+- 路径：`./scripts/run_silent_test_once.ps1`
+- 作用：用于本次锁屏静默更新验证，调用 `scheduled_update_runner.py --mode silent --keep-runtime`，并在传入 `TaskName` 时于执行结束后注销对应的临时计划任务
+- 使用方法：一般不单独手动运行，由一次性 Windows 计划任务以 `-File scripts/run_silent_test_once.ps1 -TaskName <task-name>` 方式调用
+- 备注：这是临时测试包装器，不会改动正式日常计划任务的触发时间
+## scripts/probe_system_git_publish.ps1
+
+- 路径：`./scripts/probe_system_git_publish.ps1`
+- 作用：以 `SYSTEM` 身份验证当前仓库的 Git 自动发布前置条件，依次检查系统级 `safe.directory`、仓库 `core.sshCommand`、`git ls-remote origin` 与 `git push --dry-run origin HEAD:main`
+- 使用方法：一般不手动双击运行，而是通过一次性 `SYSTEM` 计划任务调用，并将结果写入 `.runtime/system_git_probe/*.json`
+- 备注：这个脚本只做 Git / SSH 链路探测，不会修改业务数据，也不会执行真实 `git push`
