@@ -7,7 +7,7 @@
 - 关键命令：`python -X utf8 -m py_compile scripts\serve_dashboard.py scripts\fetch_daily_data.py tests\test_serve_dashboard.py`、`python -X utf8 -m unittest tests.test_serve_dashboard tests.test_fetch_daily_data -v`、`Invoke-RestMethod -Uri http://127.0.0.1:4173/api/update-data -Method Post`
 - 验证结果：单测 `12/12` 通过；重启本地 `4173` 服务后再次触发 `/api/update-data`，返回 `success`，提示 `数据已是最新业务日期：2026-04-29，已检查发布链路。`
 - 回滚方法：回退上述 3 个代码 / 测试文件与本条 `DEV_CHANGELOG.md` 记录。
-- 关联提交（如有）：待补充
+- 关联提交（如有）：`3856cd8`
 - 备注：本次确认 `NEV 来店本期` 上游 REPORT2 接口曾连续出现 `ReadTimeout (read timeout=300)`，所以已更新数据时继续硬抓上游属于没事找事。
 
 ## 2026-04-30 10:00
