@@ -4,6 +4,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -162,6 +163,7 @@ def resolve_export_path(output_dir: Path, report_name: str | tuple[str, ...], bu
 
 
 def stream_subprocess(command: list[str], cwd: Path, log: Callable[[str], None], prefix: str) -> None:
+    recent_output: list[str] = []
     process = subprocess.Popen(
         command,
         cwd=str(cwd),
@@ -175,10 +177,15 @@ def stream_subprocess(command: list[str], cwd: Path, log: Callable[[str], None],
     for line in process.stdout:
         text = line.rstrip()
         if text:
+            recent_output.append(text)
+            recent_output = recent_output[-12:]
             log(f"[{prefix}] {text}")
     exit_code = process.wait()
     if exit_code != 0:
-        raise RuntimeError(f"{prefix} 执行失败，退出码：{exit_code}")
+        detail = ""
+        if recent_output:
+            detail = "；最近输出：" + " | ".join(recent_output[-4:])
+        raise RuntimeError(f"{prefix} 执行失败，退出码：{exit_code}{detail}")
 
 
 def run_fetch_task(
@@ -215,8 +222,18 @@ def run_fetch_task(
     if chrome_path:
         command.extend(["--chrome-path", chrome_path])
 
-    log(f"开始抓取：{task.label}")
-    stream_subprocess(command, task.script_path.parent, log, task.label)
+    max_attempts = 2
+    for attempt_index in range(1, max_attempts + 1):
+        suffix = "" if attempt_index == 1 else f"（重试 {attempt_index - 1}/{max_attempts - 1}）"
+        log(f"开始抓取：{task.label}{suffix}")
+        try:
+            stream_subprocess(command, task.script_path.parent, log, task.label)
+            break
+        except RuntimeError as exc:
+            if attempt_index >= max_attempts:
+                raise
+            log(f"{task.label} 本次抓取失败，准备重试。原因：{exc}")
+            time.sleep(5)
     log(f"抓取完成：{task.label}")
     return output_dir
 

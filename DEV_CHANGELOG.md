@@ -1,5 +1,45 @@
 # DEV CHANGELOG
 
+## 2026-04-30 10:40
+- 需求 / 目标：修复网页手动更新在当天数据已更新后仍反复抓取上游、并因上游超时显示失败的问题。
+- 改动内容：更新 `scripts/fetch_daily_data.py`，为单个外部取数子任务增加一次自动重试，并在失败时保留最近子进程输出；更新 `scripts/serve_dashboard.py`，当 `dashboard.summary.json` 已是当前业务日时跳过上游抓取，仅执行发布检查；补充 `tests/test_serve_dashboard.py` 覆盖已是最新数据时不再调用 `run_update()`。
+- 涉及文件：`scripts/fetch_daily_data.py`、`scripts/serve_dashboard.py`、`tests/test_serve_dashboard.py`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m py_compile scripts\serve_dashboard.py scripts\fetch_daily_data.py tests\test_serve_dashboard.py`、`python -X utf8 -m unittest tests.test_serve_dashboard tests.test_fetch_daily_data -v`、`Invoke-RestMethod -Uri http://127.0.0.1:4173/api/update-data -Method Post`
+- 验证结果：单测 `12/12` 通过；重启本地 `4173` 服务后再次触发 `/api/update-data`，返回 `success`，提示 `数据已是最新业务日期：2026-04-29，已检查发布链路。`
+- 回滚方法：回退上述 3 个代码 / 测试文件与本条 `DEV_CHANGELOG.md` 记录。
+- 关联提交（如有）：待补充
+- 备注：本次确认 `NEV 来店本期` 上游 REPORT2 接口曾连续出现 `ReadTimeout (read timeout=300)`，所以已更新数据时继续硬抓上游属于没事找事。
+
+## 2026-04-30 10:00
+- 需求 / 目标：继续修复当天更新失败，并完成 `2026-04-29` 业务日数据回填。
+- 改动内容：更新兄弟项目 `D:\WorkCode\日报取数平台\日报线索ICE源\getdata.py`，在无法稳定识别“新零售营销系统”入口时直接访问目标报表页兜底；更新兄弟项目 `D:\WorkCode\日报取数平台\daily_sources\shared_portal.py`，为登录账号 / 密码输入框增加短等待重试；重新执行正式取数流程，成功回填两本源工作簿并重建页面数据。
+- 涉及文件：`data/source/NEV+ICE_xsai.xlsm`、`data/source/NEV+ICE_ldai.xlsx`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`DEV_CHANGELOG.md`、`D:\WorkCode\日报取数平台\日报线索ICE源\getdata.py`、`D:\WorkCode\日报取数平台\daily_sources\shared_portal.py`
+- 关键命令：`python -X utf8 -m py_compile D:\WorkCode\日报取数平台\daily_sources\shared_portal.py D:\WorkCode\日报取数平台\日报线索ICE源\getdata.py`、`python -X utf8 scripts\fetch_daily_data.py --business-date 2026-04-29 --keep-runtime`
+- 验证结果：修复后正式全量取数成功，7 张导出均生成并回填；`docs/data/dashboard.summary.json` 已更新为 `reportDate = 2026-04-29`。
+- 回滚方法：回退本次发布数据文件与 `DEV_CHANGELOG.md`；如需回滚脚本修复，同步还原兄弟项目中上述两个 Python 文件。
+- 关联提交（如有）：`8bbf8fb`
+- 备注：根因是 ICE 入口识别和登录输入框等待逻辑过脆，叠加上游页面加载时序波动后导致报表导出缺失。
+
+## 2026-04-30 09:30
+- 需求 / 目标：排查当天网页手动兜底更新持续失败的原因。
+- 改动内容：未修改业务代码；读取当天计划任务与手动兜底运行目录，确认失败集中在 `ICE 全国按日 + 十五代轩逸` 两个导出结果缺失。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Get-Content .runtime\\scheduled_update\\20260430_090006_540673\\scheduled_update.log`、`Get-ChildItem .runtime\\daily_update`
+- 验证结果：`2026-04-30 09:00` 计划任务中 `全国按日ICE` 与 `十五代轩逸按日` 均返回 `401 Unauthorized`；后续手动兜底最新运行 `20260429_20260430-092328` 已导出 NEV 与来店文件，但 `ice\\exports` 仍为空，因此最终报 `缺少导出结果：全国接口ICE，十五代轩逸接口`，页面数据仍停在业务日 `2026-04-28`。
+- 回滚方法：无需回滚，本次为排查记录。
+- 关联提交（如有）：待补充
+- 备注：当前更像上游 ICE COC 查询接口鉴权失效或权限策略变化，不是前端按钮、GitHub 发布或本地 JSON 构建问题。
+
+## 2026-04-24 13:31
+- 需求 / 目标：为 `serve_dashboard.py` 增加一个尽量简单、可双击启动的 `.bat` 入口，方便直接拉起本机仪表盘服务。
+- 改动内容：新增根目录 `start_dashboard_server.bat`，默认双击即可启动 `scripts/serve_dashboard.py`，并自动优先尝试项目内虚拟环境、其次回退到 `python` / `py -3`；同步更新 `README.md`、`SCRIPTS.md` 说明。
+- 涉及文件：`start_dashboard_server.bat`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`cmd /c start_dashboard_server.bat --help`
+- 验证结果：已确认批处理可正常透传参数到 `serve_dashboard.py` 并输出帮助信息，适合作为双击启动入口。
+- 回滚方法：删除 `start_dashboard_server.bat`，并回退 `README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md` 的本次修改。
+- 关联提交（如有）：待补充
+- 备注：批处理默认不强行附带额外参数，因此保持与 `serve_dashboard.py` 当前默认行为一致，包括自动打开浏览器与网页手动更新后的自动发布能力。
+
 ## 2026-04-24 13:18
 - 需求 / 目标：保持现有静默更新流程不变，同时让网页现有 `数据更新` 按钮在静默失败后可作为手动兜底入口，并在成功后自动发布到 GitHub。
 - 改动内容：更新 `scripts/serve_dashboard.py`，让 `/api/update-data` 复用定时任务同一把共享锁并在成功后自动调用 `scripts/publish_dashboard.ps1 -SkipRebuild`；补充 `--no-auto-publish`、`--publish-remote`、`--publish-branch`、`--publish-commit-message` 参数；更新 `docs/assets/app.js` 手动兜底提示文案；补充 `tests/test_serve_dashboard.py` 覆盖共享锁冲突与网页手动自动发布；同步更新 `README.md`、`SCRIPTS.md`。

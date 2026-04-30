@@ -42,6 +42,9 @@ class ServeDashboardTests(unittest.TestCase):
         lock_path = self.create_lock_path()
         manager = serve_dashboard.UpdateTaskManager(auto_publish=False)
         with patch("scripts.serve_dashboard.build_lock_path", return_value=lock_path), patch(
+            "scripts.serve_dashboard.build_current_dashboard_result",
+            return_value=None,
+        ), patch(
             "scripts.serve_dashboard.run_update",
             side_effect=fake_run_update,
         ):
@@ -82,6 +85,40 @@ class ServeDashboardTests(unittest.TestCase):
         self.assertEqual(snapshot["status"], "busy")
         self.assertIn("检测到已有更新任务正在执行", snapshot["message"])
 
+    def test_update_task_manager_skips_fetch_when_dashboard_is_current(self) -> None:
+        lock_path = self.create_lock_path()
+        summary_path = lock_path.parent / "dashboard.summary.json"
+        summary_path.write_text(json.dumps({"reportDate": "2026-04-29"}), encoding="utf-8")
+
+        manager = serve_dashboard.UpdateTaskManager()
+        with patch("scripts.serve_dashboard.build_lock_path", return_value=lock_path), patch(
+            "scripts.serve_dashboard.DASHBOARD_SUMMARY_PATH",
+            summary_path,
+        ), patch(
+            "scripts.serve_dashboard.parse_business_date",
+            return_value=serve_dashboard.date(2026, 4, 29),
+        ), patch(
+            "scripts.serve_dashboard.run_update",
+        ) as run_update_mock, patch(
+            "scripts.serve_dashboard.run_publish_step",
+            return_value={
+                "publishStatus": "success",
+                "publishRemote": "origin",
+                "publishBranch": "main",
+                "publishCommitMessage": "Manual publish test",
+            },
+        ) as publish_mock:
+            started, snapshot = manager.start()
+            self.assertTrue(started)
+            self.assertEqual(snapshot["status"], "running")
+            self.assertTrue(self.wait_for(lambda: manager.snapshot()["status"] == "success"))
+
+        run_update_mock.assert_not_called()
+        publish_mock.assert_called_once()
+        completed = manager.snapshot()
+        self.assertTrue(completed["result"]["skippedRefresh"])
+        self.assertEqual(completed["result"]["businessDate"], "2026-04-29")
+
     def test_update_api_reports_status_and_can_trigger_update(self) -> None:
         started_event = threading.Event()
         release_event = threading.Event()
@@ -102,6 +139,9 @@ class ServeDashboardTests(unittest.TestCase):
             lock_path = self.create_lock_path()
             serve_dashboard.DashboardHandler.update_manager = serve_dashboard.UpdateTaskManager()
             with patch("scripts.serve_dashboard.build_lock_path", return_value=lock_path), patch(
+                "scripts.serve_dashboard.build_current_dashboard_result",
+                return_value=None,
+            ), patch(
                 "scripts.serve_dashboard.run_update",
                 side_effect=fake_run_update,
             ), patch(

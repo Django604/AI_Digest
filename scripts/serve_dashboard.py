@@ -6,7 +6,7 @@ import json
 import sys
 import threading
 import webbrowser
-from datetime import datetime
+from datetime import date, datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable
@@ -41,6 +41,10 @@ def build_running_message(auto_publish: bool) -> str:
 
 def build_success_message(result: dict[str, object], auto_publish: bool) -> str:
     business_date = str(result.get("businessDate") or "")
+    if result.get("skippedRefresh"):
+        if auto_publish and str(result.get("publishStatus") or "") == "success":
+            return f"数据已是最新业务日期：{business_date}，已检查发布链路。"
+        return f"数据已是最新业务日期：{business_date}。"
     publish_status = str(result.get("publishStatus") or "disabled")
     if auto_publish and publish_status == "success":
         return f"手动兜底更新完成，业务日期：{business_date}，并已自动发布到 GitHub。"
@@ -72,6 +76,26 @@ def summarize_external_lock(lock_details: str) -> str:
     if started_at:
         details.append(f"开始时间：{started_at}")
     return "检测到已有更新任务正在执行，请等当前任务结束后再手动补跑。" + "（" + "；".join(details) + "）"
+
+
+def build_current_dashboard_result(business_date: date) -> dict[str, object] | None:
+    try:
+        summary = load_json_payload(DASHBOARD_SUMMARY_PATH)
+    except Exception:
+        return None
+
+    current_report_date = str(summary.get("reportDate") or "").strip()
+    expected_report_date = format_business_date(business_date)
+    if current_report_date != expected_report_date:
+        return None
+
+    return {
+        "businessDate": expected_report_date,
+        "dashboardChanged": False,
+        "summaryChanged": False,
+        "skippedRefresh": True,
+        "skipReason": "dashboard-already-current",
+    }
 
 
 class UpdateTaskManager:
@@ -163,7 +187,13 @@ class UpdateTaskManager:
     def _run(self) -> None:
         partial_result: dict[str, object] | None = None
         try:
-            result = run_update(log=self.log)
+            business_date = parse_business_date()
+            current_result = build_current_dashboard_result(business_date)
+            if current_result is not None:
+                self.log(f"本地数据已是最新业务日期 {current_result['businessDate']}，跳过上游抓取。")
+                result = current_result
+            else:
+                result = run_update(log=self.log)
             partial_result = result
             if self._auto_publish:
                 publish_result = run_publish_step(
