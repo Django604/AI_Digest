@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import calendar
 import json
+from datetime import date
 from pathlib import Path
 import shutil
 import unittest
@@ -28,6 +30,19 @@ class BuildDashboardPayloadTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.payload = build_payload(LEADS_BOOK, ARRIVAL_BOOK)
+        report_date = date.fromisoformat(cls.payload["meta"]["reportDate"])
+        previous_year = report_date.year if report_date.month > 1 else report_date.year - 1
+        previous_month = report_date.month - 1 if report_date.month > 1 else 12
+        previous_month_end = date(
+            previous_year,
+            previous_month,
+            calendar.monthrange(previous_year, previous_month)[1],
+        )
+        cls.previous_month_payload = build_payload(
+            LEADS_BOOK,
+            ARRIVAL_BOOK,
+            report_date_override=previous_month_end,
+        )
 
     def test_expected_dashboards_exist(self) -> None:
         self.assertEqual(
@@ -94,7 +109,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertTrue(summary["outputs"]["archiveDashboardChanged"])
 
     def test_arrival_dashboard_uses_nev_daily_arrivals_for_nev_actual_row(self) -> None:
-        trend = self.payload["dashboards"]["arrival"]["sections"][0]["trend"]
+        trend = self.previous_month_payload["dashboards"]["arrival"]["sections"][0]["trend"]
         rows = {row["key"]: row["displayValues"] for row in trend["matrix"]["rows"]}
         report_index = trend["chart"]["reportDayIndex"]
 
@@ -102,7 +117,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertNotEqual(rows["nevActual"][report_index], "-")
 
     def test_arrival_dashboard_keeps_first_day_for_ice_actual_row(self) -> None:
-        trend = self.payload["dashboards"]["arrival"]["sections"][0]["trend"]
+        trend = self.previous_month_payload["dashboards"]["arrival"]["sections"][0]["trend"]
         rows = {row["key"]: row["displayValues"] for row in trend["matrix"]["rows"]}
 
         self.assertIn("iceActual", rows)
@@ -142,6 +157,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         try:
             archive_root = temp_dir / "monthly"
             index_path = archive_root / "index.json"
+            expected_month = self.payload["meta"]["reportDate"][:7]
             summary_payload = build_run_summary(
                 self.payload,
                 LEADS_BOOK,
@@ -159,12 +175,12 @@ class BuildDashboardPayloadTests(unittest.TestCase):
                 docs_root=temp_dir,
             )
 
-            self.assertEqual(archive_info["monthKey"], "2026-04")
-            self.assertTrue((archive_root / "2026-04" / "dashboard.json").exists())
-            self.assertTrue((archive_root / "2026-04" / "dashboard.summary.json").exists())
+            self.assertEqual(archive_info["monthKey"], expected_month)
+            self.assertTrue((archive_root / expected_month / "dashboard.json").exists())
+            self.assertTrue((archive_root / expected_month / "dashboard.summary.json").exists())
             index_payload = json.loads(index_path.read_text(encoding="utf-8"))
-            self.assertEqual(index_payload["latestMonth"], "2026-04")
-            self.assertEqual(index_payload["months"][0]["dashboardPath"], "./monthly/2026-04/dashboard.json")
+            self.assertEqual(index_payload["latestMonth"], expected_month)
+            self.assertEqual(index_payload["months"][0]["dashboardPath"], f"./monthly/{expected_month}/dashboard.json")
         finally:
             shutil.rmtree(temp_dir.parent, ignore_errors=True)
 

@@ -607,3 +607,23 @@
 - 回滚方法：执行 `git -C D:\\WorkCode\\AI_Digest config --unset core.sshCommand` 取消仓库级 SSH 固定；执行 `git config --system --unset-all safe.directory D:/WorkCode/AI_Digest` 移除系统级安全目录；删除 `scripts/probe_system_git_publish.ps1` 与相关文档记录。
 - 关联提交（如有）：待补充
 - 备注：这次终于不是嘴上说“应该能推”，而是让 `SYSTEM` 本人去跑了 `push --dry-run`，结果它老老实实回了 `Everything up-to-date`。
+
+## 2026-05-02 00:32
+- 需求 / 目标：进入 `AI_Digest` 项目目录，仅完成工作上下文切换。
+- 改动内容：读取项目根目录 `DEV_CHANGELOG.md`、`SCRIPTS.md`、`README.md`，确认当前工作目录为 `D:\WorkCode\AI_Digest`，未修改业务代码。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Get-ChildItem -Name *.md`、`Get-Content -Raw DEV_CHANGELOG.md`、`Get-Content -Raw SCRIPTS.md`、`Get-Content -Raw README.md`、`Get-Location`
+- 验证结果：已确认当前工作目录为 `D:\WorkCode\AI_Digest`
+- 回滚方法：删除本条变更记录
+- 关联提交（如有）：待补充
+- 备注：本次仅切换上下文，未启动服务、未运行测试、未修改代码
+
+## 2026-05-02 00:42
+- 需求 / 目标：基于已更新的 5 月目标数据刷新网页数据，生成 5 月月份页面，并保留 4 月线索与来店历史供网页查询。
+- 改动内容：执行 `scripts/build_dashboard.py` 重建当前 `dashboard.json` 与 `dashboard.summary.json`，生成 `docs/data/monthly/2026-05/` 月度快照并更新 `docs/data/monthly/index.json`；同时更新 `tests/test_build_dashboard.py`，将月度归档断言改为跟随 `reportDate` 与上月归档数据，避免换月后测试写死 4 月而失效。
+- 涉及文件：`data/source/NEV+ICE_xsai.xlsm`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/index.json`、`docs/data/monthly/2026-05/dashboard.json`、`docs/data/monthly/2026-05/dashboard.summary.json`、`tests/test_build_dashboard.py`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 scripts\build_dashboard.py --workbook data\source\NEV+ICE_xsai.xlsm --arrival-workbook data\source\NEV+ICE_ldai.xlsx --out docs\data\dashboard.json --summary-out docs\data\dashboard.summary.json`、`python -X utf8 -m unittest tests.test_build_dashboard tests.test_serve_dashboard -v`
+- 验证结果：已确认当前报表日期为 `2026-05-01`，`docs/data/monthly/index.json` 中 `latestMonth = 2026-05` 且同时保留 `2026-04` 与 `2026-05` 两个月份入口；相关测试 `22/22` 全部通过。
+- 回滚方法：回退本次 `dashboard` 数据文件、`docs/data/monthly/2026-05/` 快照、`docs/data/monthly/index.json` 与 `tests/test_build_dashboard.py` 改动。
+- 关联提交（如有）：待补充
+- 备注：本次未推送远端；工作区中 `scripts/scheduled_update_runner.py`、`tests/test_scheduled_update_runner.py` 等无关改动保持原样未处理。
