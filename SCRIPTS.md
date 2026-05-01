@@ -163,6 +163,20 @@
   - 网页手动更新会复用和 `scheduled_update_runner.py` 相同的共享锁；已有交互任务、静默任务或其他网页更新在跑时，再次点击只会返回当前状态，不会并发回写 Excel
   - 默认会在手动更新成功后自动调用 `scripts/publish_dashboard.ps1 -SkipRebuild` 发布到 GitHub；如只想本地刷新可显式加 `--no-auto-publish`
 
+## start_dashboard_server.bat
+
+- 路径：`./start_dashboard_server.bat`
+- 作用：为 `scripts/serve_dashboard.py` 提供双击即可启动的 Windows 快捷入口，默认启动本机仪表盘服务并自动打开浏览器
+- 使用方法：
+  - 资源管理器中双击 `start_dashboard_server.bat`
+  - 需要透传参数时也可在命令行执行：`start_dashboard_server.bat --no-auto-publish`
+- 运行前提：
+  - 本机已安装 `Python`，或项目目录下存在 `.venv\Scripts\python.exe` / `venv\Scripts\python.exe`
+- 备注：
+  - 脚本会优先使用项目内虚拟环境，其次尝试 `python`，最后回退到 `py -3`
+  - 额外参数会原样转发给 `scripts/serve_dashboard.py`
+  - 启动后按 `Ctrl+C` 即可停止服务；若启动失败，窗口会保留错误信息，避免一闪而过
+
 ## docs/data/runtime-config.json
 
 - 路径：`./docs/data/runtime-config.json`
@@ -213,6 +227,11 @@
 - 作用：用于本次锁屏静默更新验证，调用 `scheduled_update_runner.py --mode silent --keep-runtime`，并在传入 `TaskName` 时于执行结束后注销对应的临时计划任务
 - 使用方法：一般不单独手动运行，由一次性 Windows 计划任务以 `-File scripts/run_silent_test_once.ps1 -TaskName <task-name>` 方式调用
 - 备注：这是临时测试包装器，不会改动正式日常计划任务的触发时间
+## 月度归档
+
+- `scripts/build_dashboard.py`：除当前 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 外，还会同步生成 `docs/data/monthly/YYYY-MM/dashboard.json`、`docs/data/monthly/YYYY-MM/dashboard.summary.json`，并维护 `docs/data/monthly/index.json`。
+- `scripts/serve_dashboard.py`：新增 `/api/dashboard-archive`；`/api/dashboard-data` 与 `/api/dashboard-summary` 支持 `?month=YYYY-MM`，供前端按年月加载历史归档。
+
 ## scripts/probe_system_git_publish.ps1
 
 - 路径：`./scripts/probe_system_git_publish.ps1`

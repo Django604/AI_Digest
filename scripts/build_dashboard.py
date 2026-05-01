@@ -15,10 +15,13 @@ from openpyxl.utils.datetime import from_excel
 
 
 ROOT = Path(__file__).resolve().parents[1]
+DOCS_DIR = ROOT / "docs"
 LEADS_BOOK = ROOT / "data" / "source" / "NEV+ICE_xsai.xlsm"
 ARRIVAL_BOOK = ROOT / "data" / "source" / "NEV+ICE_ldai.xlsx"
 OUT_JSON = ROOT / "docs" / "data" / "dashboard.json"
 SUMMARY_JSON = ROOT / "docs" / "data" / "dashboard.summary.json"
+MONTHLY_ARCHIVE_DIR = ROOT / "docs" / "data" / "monthly"
+MONTHLY_ARCHIVE_INDEX = MONTHLY_ARCHIVE_DIR / "index.json"
 
 NEV_MODELS = [
     ("nx8", "NX8", "NX8"),
@@ -56,6 +59,10 @@ def month_start(value: date) -> date:
 
 def month_end(value: date) -> date:
     return value.replace(day=calendar.monthrange(value.year, value.month)[1])
+
+
+def month_key(value: date) -> str:
+    return f"{value.year:04d}-{value.month:02d}"
 
 
 def previous_month(value: date) -> date:
@@ -138,6 +145,11 @@ def normalize_path_display(path: Path) -> str:
     if len(text) >= 2 and text[1] == ":":
         return text[0].upper() + text[1:]
     return text
+
+
+def build_docs_data_url(path: Path, *, docs_root: Path = DOCS_DIR) -> str:
+    relative = path.relative_to(docs_root).as_posix()
+    return f"./{relative}"
 
 
 def serialize_payload(payload: dict[str, Any]) -> str:
@@ -1180,11 +1192,32 @@ def build_run_summary(
     out_path: Path,
     summary_path: Path,
     dashboard_changed: bool,
+    archive_info: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     dashboards = payload.get("dashboards", {})
     analysis = payload.get("analysis", {})
     issues = analysis.get("issues", [])
     meta = payload.get("meta", {})
+    outputs = {
+        "dashboardJson": normalize_path_display(out_path),
+        "dashboardJsonName": out_path.name,
+        "dashboardChanged": dashboard_changed,
+        "dashboardStatus": "updated" if dashboard_changed else "unchanged",
+        "summaryJson": normalize_path_display(summary_path),
+        "summaryJsonName": summary_path.name,
+    }
+    if archive_info:
+        outputs.update(
+            {
+                "archiveMonth": archive_info.get("monthKey"),
+                "archiveDashboardJson": archive_info.get("dashboardPath"),
+                "archiveSummaryJson": archive_info.get("summaryPath"),
+                "archiveIndexJson": archive_info.get("indexPath"),
+                "archiveDashboardChanged": archive_info.get("dashboardChanged"),
+                "archiveSummaryChanged": archive_info.get("summaryChanged"),
+                "archiveIndexChanged": archive_info.get("indexChanged"),
+            }
+        )
     return {
         "generatedAt": datetime.now().isoformat(timespec="seconds"),
         "reportDate": meta.get("reportDate"),
@@ -1197,14 +1230,7 @@ def build_run_summary(
             "arrivalWorkbookName": arrival_path.name,
             "arrivalWorkbookModifiedAt": file_mtime_iso(arrival_path),
         },
-        "outputs": {
-            "dashboardJson": normalize_path_display(out_path),
-            "dashboardJsonName": out_path.name,
-            "dashboardChanged": dashboard_changed,
-            "dashboardStatus": "updated" if dashboard_changed else "unchanged",
-            "summaryJson": normalize_path_display(summary_path),
-            "summaryJsonName": summary_path.name,
-        },
+        "outputs": outputs,
         "stats": {
             "dashboardCount": len(dashboards),
             "sectionCounts": {
@@ -1219,6 +1245,81 @@ def build_run_summary(
             for issue in issues
             if isinstance(issue, dict) and issue.get("summary")
         ],
+    }
+
+
+def write_monthly_archive(
+    payload: dict[str, Any],
+    summary_payload: dict[str, Any],
+    *,
+    archive_root: Path = MONTHLY_ARCHIVE_DIR,
+    index_path: Path = MONTHLY_ARCHIVE_INDEX,
+    docs_root: Path = DOCS_DIR,
+) -> dict[str, Any]:
+    meta = payload.get("meta", {})
+    report_date = coerce_date(meta.get("reportDate"))
+    if report_date is None:
+        raise ValueError("无法为月度归档确定 reportDate。")
+
+    report_month = month_key(report_date)
+    archive_dir = archive_root / report_month
+    archive_dashboard_path = archive_dir / "dashboard.json"
+    archive_summary_path = archive_dir / "dashboard.summary.json"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    archive_dashboard_changed, archive_dashboard_existing = write_json_if_changed(
+        archive_dashboard_path,
+        payload,
+        encoding="utf-8",
+        volatile_field_paths=(("meta", "generatedAt"),),
+    )
+    archive_summary_changed, archive_summary_existing = write_json_if_changed(
+        archive_summary_path,
+        summary_payload,
+        encoding="utf-8",
+        volatile_field_paths=(("generatedAt",),),
+    )
+
+    archive_payload = archive_dashboard_existing if not archive_dashboard_changed and archive_dashboard_existing is not None else payload
+    archive_summary = archive_summary_existing if not archive_summary_changed and archive_summary_existing is not None else summary_payload
+    report_date_label = str(archive_payload.get("meta", {}).get("reportDateLabel") or report_date.isoformat())
+    archive_index = read_json_file(index_path, encoding="utf-8") or {}
+    existing_months = archive_index.get("months", [])
+    month_entries = [item for item in existing_months if isinstance(item, dict) and item.get("key") != report_month]
+    month_entries.append(
+        {
+            "key": report_month,
+            "year": report_date.year,
+            "month": report_date.month,
+            "label": f"{report_date.year} 年 {report_date.month} 月",
+            "reportDate": report_date.isoformat(),
+            "reportDateLabel": report_date_label,
+            "dashboardPath": build_docs_data_url(archive_dashboard_path, docs_root=docs_root),
+            "summaryPath": build_docs_data_url(archive_summary_path, docs_root=docs_root),
+            "generatedAt": archive_summary.get("generatedAt"),
+        }
+    )
+    month_entries.sort(key=lambda item: str(item.get("key") or ""), reverse=True)
+    index_payload = {
+        "generatedAt": datetime.now().isoformat(timespec="seconds"),
+        "latestMonth": report_month,
+        "months": month_entries,
+    }
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_changed, _ = write_json_if_changed(
+        index_path,
+        index_payload,
+        encoding="utf-8",
+        volatile_field_paths=(("generatedAt",),),
+    )
+    return {
+        "monthKey": report_month,
+        "dashboardPath": build_docs_data_url(archive_dashboard_path, docs_root=docs_root),
+        "summaryPath": build_docs_data_url(archive_summary_path, docs_root=docs_root),
+        "indexPath": build_docs_data_url(index_path, docs_root=docs_root),
+        "dashboardChanged": archive_dashboard_changed,
+        "summaryChanged": archive_summary_changed,
+        "indexChanged": index_changed,
     }
 
 
@@ -1256,7 +1357,17 @@ def main() -> int:
     status = "updated" if changed else "unchanged"
     print(f"dashboard.json {status}: {out_path}")
     summary_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_payload = build_run_summary(payload, leads_path, arrival_path, out_path, summary_path, changed)
+    archive_seed_summary = build_run_summary(payload, leads_path, arrival_path, out_path, summary_path, changed)
+    archive_info = write_monthly_archive(payload, archive_seed_summary)
+    summary_payload = build_run_summary(
+        payload,
+        leads_path,
+        arrival_path,
+        out_path,
+        summary_path,
+        changed,
+        archive_info=archive_info,
+    )
     summary_changed, _ = write_json_if_changed(
         summary_path,
         summary_payload,
@@ -1265,6 +1376,8 @@ def main() -> int:
     )
     summary_status = "updated" if summary_changed else "unchanged"
     print(f"dashboard.summary.json {summary_status}: {summary_path}")
+    archive_status = "updated" if archive_info["dashboardChanged"] or archive_info["summaryChanged"] or archive_info["indexChanged"] else "unchanged"
+    print(f"dashboard archive {archive_status}: {archive_info['monthKey']}")
     return 0
 
 

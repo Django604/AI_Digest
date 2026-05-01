@@ -10,7 +10,7 @@ from datetime import date, datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 try:
     from .fetch_daily_data import format_business_date, parse_business_date, run_update
@@ -24,6 +24,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = PROJECT_ROOT / "docs"
 DASHBOARD_JSON_PATH = DOCS_DIR / "data" / "dashboard.json"
 DASHBOARD_SUMMARY_PATH = DOCS_DIR / "data" / "dashboard.summary.json"
+MONTHLY_ARCHIVE_DIR = DOCS_DIR / "data" / "monthly"
+MONTHLY_ARCHIVE_INDEX_PATH = MONTHLY_ARCHIVE_DIR / "index.json"
 MANUAL_UPDATE_MODE = "manual-web"
 
 
@@ -96,6 +98,27 @@ def build_current_dashboard_result(business_date: date) -> dict[str, object] | N
         "skippedRefresh": True,
         "skipReason": "dashboard-already-current",
     }
+
+
+def normalize_month_key(value: str | None) -> str | None:
+    text = str(value or "").strip()
+    if len(text) != 7 or text[4] != "-":
+        return None
+    year_text, month_text = text.split("-", 1)
+    if not (year_text.isdigit() and month_text.isdigit()):
+        return None
+    month_value = int(month_text)
+    if not 1 <= month_value <= 12:
+        return None
+    return f"{int(year_text):04d}-{month_value:02d}"
+
+
+def resolve_archived_dashboard_path(month_key: str) -> Path:
+    return MONTHLY_ARCHIVE_DIR / month_key / "dashboard.json"
+
+
+def resolve_archived_summary_path(month_key: str) -> Path:
+    return MONTHLY_ARCHIVE_DIR / month_key / "dashboard.summary.json"
 
 
 class UpdateTaskManager:
@@ -309,20 +332,33 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        query = parse_qs(parsed.query)
         if parsed.path == "/api/update-status":
             self._send_json(self.update_manager.snapshot())
             return
         if parsed.path == "/api/dashboard-data":
+            requested_month = normalize_month_key(query.get("month", [""])[0])
+            target_path = resolve_archived_dashboard_path(requested_month) if requested_month else DASHBOARD_JSON_PATH
             try:
-                self._send_json(load_json_payload(DASHBOARD_JSON_PATH))
+                self._send_json(load_json_payload(target_path))
             except FileNotFoundError:
-                self._send_json({"error": f"dashboard data not found: {DASHBOARD_JSON_PATH.name}"}, status_code=404)
+                target_name = f"{requested_month}/dashboard.json" if requested_month else DASHBOARD_JSON_PATH.name
+                self._send_json({"error": f"dashboard data not found: {target_name}"}, status_code=404)
             return
         if parsed.path == "/api/dashboard-summary":
+            requested_month = normalize_month_key(query.get("month", [""])[0])
+            target_path = resolve_archived_summary_path(requested_month) if requested_month else DASHBOARD_SUMMARY_PATH
             try:
-                self._send_json(load_json_payload(DASHBOARD_SUMMARY_PATH))
+                self._send_json(load_json_payload(target_path))
             except FileNotFoundError:
-                self._send_json({"error": f"dashboard summary not found: {DASHBOARD_SUMMARY_PATH.name}"}, status_code=404)
+                target_name = f"{requested_month}/dashboard.summary.json" if requested_month else DASHBOARD_SUMMARY_PATH.name
+                self._send_json({"error": f"dashboard summary not found: {target_name}"}, status_code=404)
+            return
+        if parsed.path == "/api/dashboard-archive":
+            try:
+                self._send_json(load_json_payload(MONTHLY_ARCHIVE_INDEX_PATH))
+            except FileNotFoundError:
+                self._send_json({"latestMonth": "", "months": []})
             return
         super().do_GET()
 
@@ -414,7 +450,10 @@ def main(argv: list[str] | None = None) -> int:
             url = f"http://{args.host}:{args.port}"
             print(f"Serving {DOCS_DIR} at {url}")
             print("Clean URLs such as /docs or /AI_Digest fall back to index.html. Press Ctrl+C to exit.")
-            print("Update API is available at /api/update-status, /api/update-data, /api/dashboard-data and /api/dashboard-summary.")
+            print(
+                "Update API is available at /api/update-status, /api/update-data, "
+                "/api/dashboard-data, /api/dashboard-summary and /api/dashboard-archive."
+            )
             if args.auto_publish:
                 print(
                     "Manual update button will auto publish to "

@@ -207,6 +207,7 @@ button,
 .panel-switcher,
 .branch-switcher,
 .capture-tools,
+.month-tools,
 .update-tools {
   padding: 0;
   display: grid;
@@ -260,6 +261,119 @@ button,
 }
 
 .capture-status[data-state="error"] {
+  color: var(--negative);
+}
+
+.month-picker-toggle,
+.month-apply-button,
+.month-current-button {
+  width: 100%;
+  border-radius: 14px;
+  padding: 11px 14px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.1;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
+}
+
+.month-picker-toggle,
+.month-apply-button {
+  border: 1px solid rgba(115, 137, 163, 0.18);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 244, 249, 0.98));
+  color: #33465b;
+  box-shadow: 0 10px 24px rgba(115, 137, 163, 0.1);
+}
+
+.month-current-button {
+  border: 1px solid rgba(22, 28, 36, 0.08);
+  background: rgba(246, 247, 249, 0.98);
+  color: var(--stone);
+  box-shadow: none;
+}
+
+.month-picker-toggle:hover:not(:disabled),
+.month-apply-button:hover:not(:disabled),
+.month-current-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.month-picker-toggle:hover:not(:disabled),
+.month-apply-button:hover:not(:disabled) {
+  border-color: rgba(115, 137, 163, 0.32);
+  background: linear-gradient(135deg, rgba(247, 250, 253, 1), rgba(233, 240, 248, 1));
+  box-shadow: 0 14px 28px rgba(115, 137, 163, 0.14);
+}
+
+.month-current-button:hover:not(:disabled) {
+  border-color: rgba(22, 28, 36, 0.16);
+  background: rgba(238, 242, 246, 1);
+}
+
+.month-picker-toggle:disabled,
+.month-apply-button:disabled,
+.month-current-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+  box-shadow: none;
+}
+
+.month-picker-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(22, 28, 36, 0.06);
+}
+
+.month-picker-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.month-picker-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--stone);
+  letter-spacing: 0.04em;
+}
+
+.month-picker-field select {
+  width: 100%;
+  border: 1px solid rgba(22, 28, 36, 0.1);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 700;
+  appearance: none;
+}
+
+.month-picker-field select:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.month-picker-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.month-status {
+  margin: 0 2px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.month-status[data-state="success"] {
+  color: var(--positive);
+}
+
+.month-status[data-state="error"] {
   color: var(--negative);
 }
 
@@ -1245,6 +1359,11 @@ tbody tr:last-child td {
     grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   }
 
+  .month-picker-grid,
+  .month-picker-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .hero-topline,
   .dashboard-header,
   .section-topline,
@@ -1377,6 +1496,11 @@ tbody tr:last-child td {
 
   .sidebar-tab-list,
   .section-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .month-picker-grid,
+  .month-picker-actions {
     grid-template-columns: 1fr;
   }
 

@@ -1,5 +1,35 @@
 # DEV CHANGELOG
 
+## 2026-05-01 13:10
+- 需求 / 目标：为 `AI_Digest` 页面增加按年月切换能力，默认仍展示当前月，同时把月度数据归档下来，确保后续更新 5 月数据时仍可查看 4 月整月快照。
+- 改动内容：更新 `scripts/build_dashboard.py`，在生成当前 `dashboard.json` / `dashboard.summary.json` 的同时，额外写入 `docs/data/monthly/YYYY-MM/` 月度归档并维护 `docs/data/monthly/index.json`；更新 `scripts/serve_dashboard.py`，新增 `/api/dashboard-archive`，并让 `/api/dashboard-data`、`/api/dashboard-summary` 支持 `?month=YYYY-MM`；更新 `docs/index.html`、`docs/assets/app.js`、`docs/assets/styles.css`，在截图工具下方新增“切换年月”按钮、年份/月选择面板与“回到当前月”入口；同步补充 `README.md`、`SCRIPTS.md`、测试与归档产物。
+- 涉及文件：`scripts/build_dashboard.py`、`scripts/serve_dashboard.py`、`docs/index.html`、`docs/assets/app.js`、`docs/assets/styles.css`、`tests/test_build_dashboard.py`、`tests/test_serve_dashboard.py`、`README.md`、`SCRIPTS.md`、`docs/data/dashboard.summary.json`、`docs/data/monthly/index.json`、`docs/data/monthly/2026-04/dashboard.json`、`docs/data/monthly/2026-04/dashboard.summary.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m py_compile scripts\build_dashboard.py scripts\serve_dashboard.py`、`python -X utf8 -m unittest tests.test_build_dashboard tests.test_serve_dashboard -v`、`python -X utf8 scripts\build_dashboard.py --workbook data\source\NEV+ICE_xsai.xlsm --arrival-workbook data\source\NEV+ICE_ldai.xlsx --out docs\data\dashboard.json --summary-out docs\data\dashboard.summary.json`
+- 验证结果：Python 语法检查通过；`tests.test_build_dashboard` 与 `tests.test_serve_dashboard` 共 `22/22` 通过；已实际生成 `2026-04` 月度归档与月份索引。
+- 回滚方法：回退上述前端 / 脚本 / 测试文件，并删除 `docs/data/monthly/` 下新增的月度归档文件与索引。
+- 关联提交（如有）：待补充
+- 备注：当前环境未安装 `node`，因此未执行 `node --check docs/assets/app.js`；前端语法主要依赖代码审查与浏览器实际加载验证。
+
+## 2026-05-01 10:45
+- 需求 / 目标：检查网页手动更新是否成功，并修复前端页面对成功结果感知不明显的问题。
+- 改动内容：核对本机 `serve_dashboard` 更新状态接口与 `dashboard.summary.json`，确认最近一次手动更新已成功完成并自动发布到 GitHub；更新 `docs/assets/app.js`，让前端持久保存最近一次 `/api/update-status` 快照，优先展示最近一次成功 / 失败 / 忙碌状态，避免 `loadDashboard()` 在刷新数据后把成功提示重置成默认文案。
+- 涉及文件：`docs/assets/app.js`、`DEV_CHANGELOG.md`
+- 关键命令：`Invoke-RestMethod -Uri http://127.0.0.1:4173/api/update-status -Method Get`、`Invoke-RestMethod -Uri http://127.0.0.1:4173/api/dashboard-summary -Method Get`、`python -X utf8 -m unittest tests.test_serve_dashboard -v`
+- 验证结果：本机接口返回 `status = success`、`businessDate = 2026-04-30`、`updatedAt = 2026-05-01T10:38:08`、`publishStatus = success`；`docs/data/dashboard.summary.json` 显示 `generatedAt = 2026-05-01T10:38:01` 且 `reportDate = 2026-04-30`；`tests.test_serve_dashboard` 共 `6/6` 通过。
+- 回滚方法：回退 `docs/assets/app.js` 与本条 `DEV_CHANGELOG.md` 记录。
+- 关联提交（如有）：待补充
+- 备注：`docs/data/runtime-config.json` 目前仍为空，公开静态页面不会直连本机更新 API；若要让 GitHub Pages 页面也能感知并触发更新，仍需配置可访问的 `serviceBaseUrl`。
+
+## 2026-05-01 11:28
+- 需求 / 目标：让定时更新 / 手动补跑在 Excel COM 保存目标工作簿时也能显示整体百分比进度，不再卡在回填阶段像哑巴一样没反馈。
+- 改动内容：更新 `scripts/scheduled_update_runner.py` 的日志进度规则，新增 `[Excel COM] saving target workbook` -> `93%` 与 `[Excel COM] saved target workbook` -> `95%` 两个保存阶段提示；补充 `tests/test_scheduled_update_runner.py` 覆盖 Excel 保存阶段的进度推断。
+- 涉及文件：`scripts/scheduled_update_runner.py`、`tests/test_scheduled_update_runner.py`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest tests.test_scheduled_update_runner -v`
+- 验证结果：`tests.test_scheduled_update_runner` 共 `15/15` 通过；已确认保存阶段日志命中后会把进度从回填阶段推进到 `93%` / `95%`。
+- 回滚方法：回退 `scripts/scheduled_update_runner.py`、`tests/test_scheduled_update_runner.py` 与本条 `DEV_CHANGELOG.md` 记录。
+- 关联提交（如有）：待补充
+- 备注：当前百分比仍是“日志节点映射”的阶段性进度，不是 Excel COM 原生提供的逐字节保存进度；但对用户感知已经比之前那种装死强多了。
+
 ## 2026-04-30 10:40
 - 需求 / 目标：修复网页手动更新在当天数据已更新后仍反复抓取上游、并因上游超时显示失败的问题。
 - 改动内容：更新 `scripts/fetch_daily_data.py`，为单个外部取数子任务增加一次自动重试，并在失败时保留最近子进程输出；更新 `scripts/serve_dashboard.py`，当 `dashboard.summary.json` 已是当前业务日时跳过上游抓取，仅执行发布检查；补充 `tests/test_serve_dashboard.py` 覆盖已是最新数据时不再调用 `run_update()`。

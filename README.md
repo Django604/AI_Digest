@@ -25,6 +25,7 @@
 - `scripts/scheduled_update_runner.py`：定时自动更新执行入口，支持登录态弹窗执行与未登录静默执行
 - `scripts/register_daily_update_task.ps1`：Windows 计划任务注册脚本，默认注册“登录态弹窗 + 未登录静默兜底”两条计划任务
 - `scripts/rebuild_dashboard.ps1`：Windows 下本地一键重建 `dashboard.json`
+- `start_dashboard_server.bat`：Windows 下双击启动 `serve_dashboard.py` 的快捷入口
 - `docs/data/runtime-config.json`：前端远端更新服务配置
 - `scripts/publish_dashboard.ps1`：Windows 下本地一键重建并推送到 GitHub
 - `docs/`：静态站点
@@ -37,7 +38,7 @@
 2. 首次运行先执行 `pip install -r requirements.txt`
 3. 运行 `powershell -ExecutionPolicy Bypass -File scripts/rebuild_dashboard.ps1`
    这会同时生成 `docs/data/dashboard.json` 和 `docs/data/dashboard.summary.json`
-4. 运行 `python scripts/serve_dashboard.py --port 4173`，需要自动打开浏览器时可以附加 `--open-browser`
+4. 双击 `start_dashboard_server.bat`，或手动运行 `python scripts/serve_dashboard.py --port 4173`
 5. 打开 `http://127.0.0.1:4173`，即使误写成 `/docs` 或 `/AI_Digest` 等路径也会被回退到 `index.html`
 6. 如果静默更新失败，需要手动兜底，可在本地服务页面左侧点击 `数据更新`；它会按当天 `N-1` 抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日`、`NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店`，分别更新 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`，重建页面数据，并在成功后自动执行 GitHub 发布
 7. 如需指定业务日期或保留运行痕迹排查问题，可直接执行 `python scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`
@@ -94,6 +95,7 @@
 - 工作流已经改成读取当前实际使用的两本源文件：`NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`。
 - `docs/data/dashboard.summary.json` 提供了报表日期、输入文件修改时间、dashboard 数量和本次是否真的发生内容变更，方便后续定时任务或自动巡检直接读取。
 - 页面上的 `数据更新` 按钮现在是“静默失败后的手动兜底入口”：在本机 `serve_dashboard.py` 页面或配置了 `docs/data/runtime-config.json.serviceBaseUrl` 的 GitHub Pages 页面上，它都会执行完整的抓取、重建与自动发布链路；未配置时公开页面会退化为静态浏览模式。
+- `start_dashboard_server.bat` 默认会自动打开浏览器，并把额外参数原样转发给 `serve_dashboard.py`；例如可用 `start_dashboard_server.bat --no-auto-publish` 做只更新本地不自动推 GitHub 的临时调试。
 - 即使远端更新服务临时不可达，页面现在也会自动回退到已发布的静态 `docs/data/dashboard.json`，避免整页直接加载失败。
 ## Auto Publish Notes
 
@@ -103,3 +105,10 @@
 - Auto publish reuses `scripts/publish_dashboard.ps1 -SkipRebuild`, so it stages only the two workbook files plus `docs/data/dashboard.json` and `docs/data/dashboard.summary.json`.
 - No Codex approval is needed when the scheduled task runs later on this machine. The task uses the local account context configured in Windows Task Scheduler.
 - If the silent fallback task runs as `SYSTEM`, Git credentials must also be available to `SYSTEM`; otherwise data refresh may succeed but `git push` can still fail.
+
+## 月度归档
+
+- `scripts/build_dashboard.py` 现在会在刷新当前 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 的同时，同步写入 `docs/data/monthly/YYYY-MM/dashboard.json` 与 `docs/data/monthly/YYYY-MM/dashboard.summary.json`。
+- 所有可切换月份会汇总到 `docs/data/monthly/index.json`，页面侧边栏的“切换年月”按钮会读取这里的归档清单。
+- 页面默认仍展示当前这份 dashboard 数据；切到历史月份后，读取的是对应月份的归档快照，不会被后续新月份的数据覆盖。
+- `scripts/serve_dashboard.py` 现已新增 `/api/dashboard-archive`，并让 `/api/dashboard-data`、`/api/dashboard-summary` 支持 `?month=YYYY-MM` 查询参数。

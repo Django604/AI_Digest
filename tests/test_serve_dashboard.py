@@ -215,6 +215,63 @@ class ServeDashboardTests(unittest.TestCase):
                 httpd.shutdown()
                 server_thread.join(timeout=2)
 
+    def test_dashboard_data_endpoint_supports_archived_month(self) -> None:
+        temp_dir = serve_dashboard.PROJECT_ROOT / "tests" / ".tmp" / f"serve-dashboard-archive-{uuid.uuid4()}"
+        archive_dir = temp_dir / "monthly" / "2026-04"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        archive_payload = {"meta": {"reportDate": "2026-04-30"}, "dashboards": {"brief": {"id": "brief"}}}
+        (archive_dir / "dashboard.json").write_text(json.dumps(archive_payload), encoding="utf-8")
+        self.addCleanup(lambda: shutil.rmtree(temp_dir, ignore_errors=True))
+
+        with patch("scripts.serve_dashboard.MONTHLY_ARCHIVE_DIR", temp_dir / "monthly"):
+            with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
+                httpd.cors_allow_origins = ("*",)
+                server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                server_thread.start()
+                base_url = f"http://127.0.0.1:{httpd.server_port}"
+
+                try:
+                    with urlopen(f"{base_url}/api/dashboard-data?month=2026-04", timeout=2) as response:
+                        self.assertEqual(response.status, 200)
+                        payload = json.loads(response.read().decode("utf-8"))
+                    self.assertEqual(payload["meta"]["reportDate"], "2026-04-30")
+                finally:
+                    httpd.shutdown()
+                    server_thread.join(timeout=2)
+
+    def test_dashboard_archive_endpoint_returns_index_payload(self) -> None:
+        temp_dir = serve_dashboard.PROJECT_ROOT / "tests" / ".tmp" / f"serve-dashboard-index-{uuid.uuid4()}"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        archive_index_path = temp_dir / "index.json"
+        archive_index_path.write_text(
+            json.dumps(
+                {
+                    "latestMonth": "2026-04",
+                    "months": [{"key": "2026-04", "label": "2026 年 4 月"}],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        self.addCleanup(lambda: shutil.rmtree(temp_dir, ignore_errors=True))
+
+        with patch("scripts.serve_dashboard.MONTHLY_ARCHIVE_INDEX_PATH", archive_index_path):
+            with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
+                httpd.cors_allow_origins = ("*",)
+                server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                server_thread.start()
+                base_url = f"http://127.0.0.1:{httpd.server_port}"
+
+                try:
+                    with urlopen(f"{base_url}/api/dashboard-archive", timeout=2) as response:
+                        self.assertEqual(response.status, 200)
+                        payload = json.loads(response.read().decode("utf-8"))
+                    self.assertEqual(payload["latestMonth"], "2026-04")
+                    self.assertEqual(payload["months"][0]["key"], "2026-04")
+                finally:
+                    httpd.shutdown()
+                    server_thread.join(timeout=2)
+
     def test_options_request_includes_cors_headers(self) -> None:
         with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
             httpd.cors_allow_origins = ("https://django604.github.io",)

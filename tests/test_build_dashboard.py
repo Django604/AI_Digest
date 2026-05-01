@@ -19,6 +19,7 @@ from scripts.build_dashboard import (
     validate_report_date_cell,
     validate_sheet_headers,
     validate_workbook_structure,
+    write_monthly_archive,
     write_json_if_changed,
 )
 
@@ -70,6 +71,28 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertEqual(summary["stats"]["dashboardCount"], 5)
         self.assertEqual(summary["stats"]["sectionCounts"]["lead-control"], 1)
 
+    def test_build_run_summary_includes_archive_outputs_when_provided(self) -> None:
+        summary = build_run_summary(
+            self.payload,
+            LEADS_BOOK,
+            ARRIVAL_BOOK,
+            OUT_JSON,
+            SUMMARY_JSON,
+            True,
+            archive_info={
+                "monthKey": "2026-04",
+                "dashboardPath": "./data/monthly/2026-04/dashboard.json",
+                "summaryPath": "./data/monthly/2026-04/dashboard.summary.json",
+                "indexPath": "./data/monthly/index.json",
+                "dashboardChanged": True,
+                "summaryChanged": False,
+                "indexChanged": True,
+            },
+        )
+        self.assertEqual(summary["outputs"]["archiveMonth"], "2026-04")
+        self.assertEqual(summary["outputs"]["archiveIndexJson"], "./data/monthly/index.json")
+        self.assertTrue(summary["outputs"]["archiveDashboardChanged"])
+
     def test_arrival_dashboard_uses_nev_daily_arrivals_for_nev_actual_row(self) -> None:
         trend = self.payload["dashboards"]["arrival"]["sections"][0]["trend"]
         rows = {row["key"]: row["displayValues"] for row in trend["matrix"]["rows"]}
@@ -110,6 +133,38 @@ class BuildDashboardPayloadTests(unittest.TestCase):
             self.assertEqual(existing_payload, original)
             persisted = json.loads(json_path.read_text(encoding="utf-8"))
             self.assertEqual(persisted["meta"]["generatedAt"], original["meta"]["generatedAt"])
+        finally:
+            shutil.rmtree(temp_dir.parent, ignore_errors=True)
+
+    def test_write_monthly_archive_creates_snapshot_and_index(self) -> None:
+        temp_dir = Path("tests/.tmp/monthly-archive")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            archive_root = temp_dir / "monthly"
+            index_path = archive_root / "index.json"
+            summary_payload = build_run_summary(
+                self.payload,
+                LEADS_BOOK,
+                ARRIVAL_BOOK,
+                OUT_JSON,
+                SUMMARY_JSON,
+                True,
+            )
+
+            archive_info = write_monthly_archive(
+                self.payload,
+                summary_payload,
+                archive_root=archive_root,
+                index_path=index_path,
+                docs_root=temp_dir,
+            )
+
+            self.assertEqual(archive_info["monthKey"], "2026-04")
+            self.assertTrue((archive_root / "2026-04" / "dashboard.json").exists())
+            self.assertTrue((archive_root / "2026-04" / "dashboard.summary.json").exists())
+            index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+            self.assertEqual(index_payload["latestMonth"], "2026-04")
+            self.assertEqual(index_payload["months"][0]["dashboardPath"], "./monthly/2026-04/dashboard.json")
         finally:
             shutil.rmtree(temp_dir.parent, ignore_errors=True)
 

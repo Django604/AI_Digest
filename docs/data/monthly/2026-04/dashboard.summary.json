@@ -16,14 +16,7 @@
     "dashboardChanged": false,
     "dashboardStatus": "unchanged",
     "summaryJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.summary.json",
-    "summaryJsonName": "dashboard.summary.json",
-    "archiveMonth": "2026-04",
-    "archiveDashboardJson": "./data/monthly/2026-04/dashboard.json",
-    "archiveSummaryJson": "./data/monthly/2026-04/dashboard.summary.json",
-    "archiveIndexJson": "./data/monthly/index.json",
-    "archiveDashboardChanged": true,
-    "archiveSummaryChanged": true,
-    "archiveIndexChanged": true
+    "summaryJsonName": "dashboard.summary.json"
   },
   "stats": {
     "dashboardCount": 5,

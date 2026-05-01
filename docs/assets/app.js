@@ -6,6 +6,13 @@ const metaStrip = document.querySelector("#meta-strip");
 const reportDateHighlight = document.querySelector("#report-date-highlight");
 const captureAllButton = document.querySelector("#capture-all-button");
 const captureStatus = document.querySelector("#capture-status");
+const monthPickerToggle = document.querySelector("#month-picker-toggle");
+const monthPickerPanel = document.querySelector("#month-picker-panel");
+const monthYearSelect = document.querySelector("#month-year-select");
+const monthMonthSelect = document.querySelector("#month-month-select");
+const monthApplyButton = document.querySelector("#month-apply-button");
+const monthCurrentButton = document.querySelector("#month-current-button");
+const monthStatus = document.querySelector("#month-status");
 const updateButton = document.querySelector("#update-button");
 const updateStatus = document.querySelector("#update-status");
 const dashboardTemplate = document.querySelector("#dashboard-template");
@@ -41,13 +48,21 @@ const trendAxisConfig = {
 
 const state = {
   payload: null,
+  archiveIndex: { latestMonth: "", months: [] },
   activeDashboard: "brief",
   activeAnchor: null,
   sectionObserver: null,
   captureBusy: false,
+  monthPickerOpen: false,
+  monthViewMode: "current",
+  liveMonthKey: "",
+  selectedMonthKey: "",
+  desiredMonthKey: "",
+  monthSwitchBusy: false,
   updateBusy: false,
   updateAvailable: false,
   updatePollTimer: null,
+  lastUpdateSnapshot: null,
   runtimeConfig: { ...defaultRuntimeConfig },
   apiBaseUrl: "",
   dashboardDataUrl: "./data/dashboard.json",
@@ -58,8 +73,11 @@ void bootstrapApp();
 async function bootstrapApp() {
   await loadRuntimeConfig();
   setupCaptureTools();
+  setupMonthTools();
   setupUpdateTools();
   await loadDashboard();
+  await loadArchiveIndex();
+  renderMonthTools();
 }
 
 async function loadRuntimeConfig() {
@@ -121,16 +139,127 @@ function buildApiUrl(path) {
   return `.${suffix}`;
 }
 
-async function loadDashboard() {
-  const primaryUrl = state.dashboardDataUrl;
-  const staticUrl = "./data/dashboard.json";
+function normalizeMonthKey(value) {
+  const text = String(value ?? "").trim();
+  if (!/^\d{4}-\d{2}$/.test(text)) {
+    return "";
+  }
+  const monthValue = Number(text.slice(5, 7));
+  if (!Number.isInteger(monthValue) || monthValue < 1 || monthValue > 12) {
+    return "";
+  }
+  return text;
+}
+
+function getMonthKeyFromMeta(meta) {
+  const reportDate = String(meta?.reportDate ?? "").trim();
+  return normalizeMonthKey(reportDate.slice(0, 7));
+}
+
+function buildMonthLabel(monthKey) {
+  const normalized = normalizeMonthKey(monthKey);
+  if (!normalized) {
+    return "未知月份";
+  }
+  const [year, month] = normalized.split("-");
+  return `${year} 年 ${Number(month)} 月`;
+}
+
+function buildArchiveIndexUrl() {
+  if (state.apiBaseUrl) {
+    return buildApiUrl("/api/dashboard-archive");
+  }
+  return "./data/monthly/index.json";
+}
+
+function buildDashboardRequest(monthKey = "") {
+  const normalizedMonthKey = normalizeMonthKey(monthKey);
+  if (!normalizedMonthKey) {
+    const primaryUrl = state.dashboardDataUrl;
+    return {
+      mode: "current",
+      monthKey: "",
+      primaryUrl,
+      fallbackUrl: primaryUrl !== "./data/dashboard.json" ? "./data/dashboard.json" : "",
+    };
+  }
+
+  const staticUrl = `./data/monthly/${normalizedMonthKey}/dashboard.json`;
+  return {
+    mode: "archive",
+    monthKey: normalizedMonthKey,
+    primaryUrl: state.apiBaseUrl
+      ? `${buildApiUrl("/api/dashboard-data")}?month=${encodeURIComponent(normalizedMonthKey)}`
+      : staticUrl,
+    fallbackUrl: state.apiBaseUrl ? staticUrl : "",
+  };
+}
+
+function applyLoadedDashboardState(payload, requestMode) {
+  const dashboards = Object.values(payload.dashboards ?? {});
+  if (!dashboards.length) {
+    throw new Error("dashboard.json 中没有可渲染的页面数据。");
+  }
+
+  const loadedMonthKey = getMonthKeyFromMeta(payload.meta ?? {});
+  state.payload = payload;
+  state.activeDashboard = payload.dashboards[state.activeDashboard] ? state.activeDashboard : dashboards[0].id;
+  state.selectedMonthKey = loadedMonthKey;
+  state.desiredMonthKey = loadedMonthKey;
+  state.monthViewMode = requestMode;
+  if (requestMode === "current") {
+    state.liveMonthKey = loadedMonthKey;
+  }
+
+  renderMeta(payload.meta ?? {});
+  renderTabs(dashboards);
+  renderDashboard(payload.dashboards[state.activeDashboard]);
+  updateCaptureTools();
+  updateUpdateTools();
+  renderMonthTools();
+}
+
+async function loadArchiveIndex() {
+  const primaryUrl = buildArchiveIndexUrl();
+  const staticUrl = "./data/monthly/index.json";
+  const fallbackUrl = primaryUrl !== staticUrl ? staticUrl : "";
+
   try {
     const response = await fetch(primaryUrl, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    state.archiveIndex = payload && typeof payload === "object" ? payload : { latestMonth: "", months: [] };
+  } catch (_error) {
+    if (fallbackUrl) {
+      try {
+        const response = await fetch(fallbackUrl, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        state.archiveIndex = payload && typeof payload === "object" ? payload : { latestMonth: "", months: [] };
+        return;
+      } catch (_fallbackError) {
+        // Ignore and fall through to an empty archive list.
+      }
+    }
+    state.archiveIndex = { latestMonth: "", months: [] };
+  }
+}
+
+async function loadDashboard(options = {}) {
+  const request = buildDashboardRequest(options.monthKey);
+  try {
+    const response = await fetch(request.primaryUrl, { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`加载 dashboard.json 失败，HTTP ${response.status}`);
     }
 
     const payload = await response.json();
+    applyLoadedDashboardState(payload, request.mode);
+    return true;
     const dashboards = Object.values(payload.dashboards ?? {});
     if (!dashboards.length) {
       throw new Error("dashboard.json 中没有可渲染的页面数据。");
@@ -145,14 +274,15 @@ async function loadDashboard() {
     updateCaptureTools();
     updateUpdateTools();
   } catch (error) {
-    if (primaryUrl !== staticUrl) {
+    if (request.fallbackUrl) {
       try {
-        const fallbackResponse = await fetch(staticUrl, { cache: "no-store" });
+        const fallbackResponse = await fetch(request.fallbackUrl, { cache: "no-store" });
         if (!fallbackResponse.ok) {
           throw new Error(`加载静态 dashboard.json 失败，HTTP ${fallbackResponse.status}`);
         }
 
         const fallbackPayload = await fallbackResponse.json();
+        applyLoadedDashboardState(fallbackPayload, request.mode);
         const dashboards = Object.values(fallbackPayload.dashboards ?? {});
         if (!dashboards.length) {
           throw new Error("静态 dashboard.json 中没有可渲染的页面数据。");
@@ -169,14 +299,15 @@ async function loadDashboard() {
           message: `远端数据服务暂时不可用，已自动回退到静态数据浏览模式。原错误：${error.message}`,
           stateName: "error",
         });
-        return;
+        return true;
       } catch (fallbackError) {
         renderError(fallbackError);
-        return;
+        return false;
       }
     }
 
     renderError(error);
+    return false;
   }
 }
 
@@ -185,6 +316,198 @@ function setupCaptureTools() {
     void handleGlobalTrendCapture();
   });
   updateCaptureTools();
+}
+
+function setupMonthTools() {
+  monthPickerToggle?.addEventListener("click", () => {
+    state.monthPickerOpen = !state.monthPickerOpen;
+    renderMonthTools();
+  });
+
+  monthYearSelect?.addEventListener("change", () => {
+    syncDesiredMonthFromPicker();
+    renderMonthTools();
+  });
+
+  monthMonthSelect?.addEventListener("change", () => {
+    syncDesiredMonthFromPicker();
+    renderMonthTools();
+  });
+
+  monthApplyButton?.addEventListener("click", () => {
+    void handleMonthSelection();
+  });
+
+  monthCurrentButton?.addEventListener("click", () => {
+    void handleReturnToCurrentMonth();
+  });
+}
+
+function getArchiveMonthOptions() {
+  const monthMap = new Map();
+  const archiveMonths = Array.isArray(state.archiveIndex?.months) ? state.archiveIndex.months : [];
+  archiveMonths.forEach((item) => {
+    const key = normalizeMonthKey(item?.key);
+    if (!key) {
+      return;
+    }
+    monthMap.set(key, {
+      key,
+      year: Number(key.slice(0, 4)),
+      month: Number(key.slice(5, 7)),
+      label: typeof item?.label === "string" && item.label.trim() ? item.label.trim() : buildMonthLabel(key),
+    });
+  });
+
+  [state.liveMonthKey, state.selectedMonthKey].forEach((key) => {
+    const normalized = normalizeMonthKey(key);
+    if (!normalized || monthMap.has(normalized)) {
+      return;
+    }
+    monthMap.set(normalized, {
+      key: normalized,
+      year: Number(normalized.slice(0, 4)),
+      month: Number(normalized.slice(5, 7)),
+      label: buildMonthLabel(normalized),
+    });
+  });
+
+  return [...monthMap.values()].sort((left, right) => right.key.localeCompare(left.key));
+}
+
+function syncDesiredMonthFromPicker() {
+  const yearValue = String(monthYearSelect?.value ?? "");
+  const monthValue = String(monthMonthSelect?.value ?? "").padStart(2, "0");
+  const nextKey = normalizeMonthKey(yearValue && monthValue ? `${yearValue}-${monthValue}` : "");
+  if (nextKey) {
+    state.desiredMonthKey = nextKey;
+  }
+}
+
+function setMonthStatus(message, stateName = "") {
+  if (!monthStatus) {
+    return;
+  }
+
+  monthStatus.textContent = message;
+  if (stateName) {
+    monthStatus.dataset.state = stateName;
+  } else {
+    delete monthStatus.dataset.state;
+  }
+}
+
+function renderMonthTools(options = {}) {
+  if (!monthPickerToggle || !monthPickerPanel || !monthYearSelect || !monthMonthSelect || !monthApplyButton || !monthCurrentButton) {
+    return;
+  }
+
+  const { message, stateName = "" } = options;
+  const monthOptions = getArchiveMonthOptions();
+  const currentSelectedKey = normalizeMonthKey(state.desiredMonthKey || state.selectedMonthKey || monthOptions[0]?.key);
+  if (currentSelectedKey) {
+    state.desiredMonthKey = currentSelectedKey;
+  }
+
+  const yearOptions = [...new Set(monthOptions.map((item) => item.year))].sort((left, right) => right - left);
+  const selectedYear = yearOptions.includes(Number(String(currentSelectedKey).slice(0, 4)))
+    ? Number(String(currentSelectedKey).slice(0, 4))
+    : (yearOptions[0] ?? 0);
+  const monthsForYear = monthOptions.filter((item) => item.year === selectedYear);
+  const selectedMonth = monthsForYear.find((item) => item.key === currentSelectedKey) ?? monthsForYear[0] ?? null;
+  if (selectedMonth) {
+    state.desiredMonthKey = selectedMonth.key;
+  }
+
+  monthPickerToggle.disabled = !monthOptions.length;
+  monthPickerToggle.textContent = state.monthPickerOpen ? "收起年月选择" : "切换年月";
+  monthPickerPanel.hidden = !state.monthPickerOpen || !monthOptions.length;
+
+  monthYearSelect.innerHTML = yearOptions
+    .map((year) => `<option value="${year}">${year} 年</option>`)
+    .join("");
+  monthYearSelect.value = selectedYear ? String(selectedYear) : "";
+  monthYearSelect.disabled = !monthOptions.length || state.monthSwitchBusy;
+
+  monthMonthSelect.innerHTML = monthsForYear
+    .map((item) => `<option value="${String(item.month).padStart(2, "0")}">${item.month} 月</option>`)
+    .join("");
+  monthMonthSelect.value = selectedMonth ? String(selectedMonth.month).padStart(2, "0") : "";
+  monthMonthSelect.disabled = !monthOptions.length || state.monthSwitchBusy;
+
+  const selectedKey = normalizeMonthKey(state.desiredMonthKey);
+  monthApplyButton.disabled = !selectedKey || state.monthSwitchBusy;
+  monthApplyButton.textContent = state.monthSwitchBusy ? "切换中..." : "查看所选月份";
+  monthCurrentButton.disabled = !state.liveMonthKey || state.monthSwitchBusy || state.monthViewMode === "current";
+
+  if (typeof message === "string") {
+    setMonthStatus(message, stateName);
+    return;
+  }
+
+  if (!monthOptions.length) {
+    setMonthStatus("当前还没有可切换的月度归档数据，后续生成的新月份会自动出现在这里。");
+    return;
+  }
+
+  if (state.monthViewMode === "current" && state.liveMonthKey) {
+    setMonthStatus(`当前查看当前月：${buildMonthLabel(state.liveMonthKey)}。如需保留旧月份，请展开后切换。`);
+    return;
+  }
+
+  if (state.selectedMonthKey) {
+    setMonthStatus(`当前查看历史归档：${buildMonthLabel(state.selectedMonthKey)}。点击“回到当前月”可切回最新数据。`);
+    return;
+  }
+
+  setMonthStatus("默认展示当前月份，也可以切换到已归档的历史月份。");
+}
+
+async function handleMonthSelection() {
+  const monthKey = normalizeMonthKey(state.desiredMonthKey);
+  if (!monthKey || state.monthSwitchBusy) {
+    return;
+  }
+
+  state.monthSwitchBusy = true;
+  renderMonthTools({ message: `正在切换到 ${buildMonthLabel(monthKey)}...` });
+  try {
+    const ok = await loadDashboard({ monthKey });
+    if (!ok) {
+      renderMonthTools({ message: `切换到 ${buildMonthLabel(monthKey)} 失败，请稍后重试。`, stateName: "error" });
+      return;
+    }
+    state.monthPickerOpen = false;
+    renderMonthTools({ message: `已切换到 ${buildMonthLabel(monthKey)}。`, stateName: "success" });
+  } catch (_error) {
+    renderMonthTools({ message: `切换到 ${buildMonthLabel(monthKey)} 失败，请稍后重试。`, stateName: "error" });
+  } finally {
+    state.monthSwitchBusy = false;
+    renderMonthTools({ message: monthStatus?.textContent ?? "", stateName: monthStatus?.dataset.state ?? "" });
+  }
+}
+
+async function handleReturnToCurrentMonth() {
+  if (!state.liveMonthKey || state.monthSwitchBusy || state.monthViewMode === "current") {
+    return;
+  }
+
+  state.monthSwitchBusy = true;
+  renderMonthTools({ message: `正在切回当前月：${buildMonthLabel(state.liveMonthKey)}...` });
+  try {
+    const ok = await loadDashboard();
+    if (!ok) {
+      renderMonthTools({ message: "切回当前月失败，请稍后重试。", stateName: "error" });
+      return;
+    }
+    state.monthPickerOpen = false;
+    renderMonthTools({ message: `已切回当前月：${buildMonthLabel(state.liveMonthKey)}。`, stateName: "success" });
+  } catch (_error) {
+    renderMonthTools({ message: "切回当前月失败，请稍后重试。", stateName: "error" });
+  } finally {
+    state.monthSwitchBusy = false;
+    renderMonthTools({ message: monthStatus?.textContent ?? "", stateName: monthStatus?.dataset.state ?? "" });
+  }
 }
 
 function setupUpdateTools() {
@@ -247,6 +570,7 @@ async function probeUpdateCapability() {
       throw new Error(`HTTP ${response.status}`);
     }
     const payload = await response.json();
+    state.lastUpdateSnapshot = payload;
     state.updateAvailable = Boolean(payload.available);
     updateUpdateTools({
       message: payload.message || "手动兜底更新服务已就绪。",
@@ -276,6 +600,12 @@ function updateUpdateTools(options = {}) {
 
   if (typeof message === "string") {
     setUpdateStatus(message, stateName);
+    return;
+  }
+
+  const snapshotStatus = buildUpdateStatusFromSnapshot();
+  if (snapshotStatus) {
+    setUpdateStatus(snapshotStatus.message, snapshotStatus.stateName);
     return;
   }
 
@@ -309,6 +639,66 @@ function setUpdateStatus(message, stateName = "") {
   }
 }
 
+function buildUpdateStatusFromSnapshot() {
+  const snapshot = state.lastUpdateSnapshot;
+  if (!snapshot || typeof snapshot !== "object") {
+    return null;
+  }
+
+  const status = String(snapshot.status ?? "").trim();
+  const message = String(snapshot.message ?? "").trim();
+  const updatedAt = formatDateTime(snapshot.updatedAt);
+  const result = snapshot.result && typeof snapshot.result === "object" ? snapshot.result : null;
+  const businessDate = String(result?.businessDate ?? "").trim();
+  const publishStatus = String(result?.publishStatus ?? "").trim();
+  const skippedRefresh = Boolean(result?.skippedRefresh);
+
+  if (status === "success") {
+    const details = [];
+    if (businessDate) {
+      details.push(`业务日期：${businessDate}`);
+    }
+    if (updatedAt !== "-") {
+      details.push(`完成时间：${updatedAt}`);
+    }
+    if (publishStatus === "success") {
+      details.push(skippedRefresh ? "发布链路检查正常" : "已自动发布到 GitHub");
+    } else if (publishStatus === "disabled") {
+      details.push("仅完成本地更新，未自动发布");
+    } else if (publishStatus === "error") {
+      details.push("数据已更新，但自动发布失败");
+    }
+
+    return {
+      message: `${skippedRefresh ? "最近一次检查已确认数据是最新的" : "最近一次手动更新已成功"}${details.length ? `：${details.join("；")}` : "。"}`,
+      stateName: "success",
+    };
+  }
+
+  if (status === "error") {
+    const details = [];
+    if (businessDate) {
+      details.push(`业务日期：${businessDate}`);
+    }
+    if (updatedAt !== "-") {
+      details.push(`最近更新时间：${updatedAt}`);
+    }
+    return {
+      message: `${message || "最近一次手动更新失败。"}${details.length ? `（${details.join("；")}）` : ""}`,
+      stateName: "error",
+    };
+  }
+
+  if (message) {
+    return {
+      message,
+      stateName: "",
+    };
+  }
+
+  return null;
+}
+
 async function handleDataUpdate() {
   if (!state.updateAvailable || state.updateBusy) {
     return;
@@ -326,6 +716,7 @@ async function handleDataUpdate() {
     if (![202, 409].includes(response.status)) {
       throw new Error(payload.message || `HTTP ${response.status}`);
     }
+    state.lastUpdateSnapshot = payload;
     updateUpdateTools({
       message: payload.message || "更新任务已启动。",
       stateName: payload.status === "error" ? "error" : "",
@@ -354,6 +745,7 @@ async function pollUpdateStatus() {
       throw new Error(`HTTP ${response.status}`);
     }
     const payload = await response.json();
+    state.lastUpdateSnapshot = payload;
     state.updateAvailable = Boolean(payload.available);
     state.updateBusy = Boolean(payload.running);
     updateUpdateTools({
@@ -367,7 +759,13 @@ async function pollUpdateStatus() {
     }
 
     if (payload.status === "success") {
-      await loadDashboard();
+      if (state.monthViewMode === "archive" && state.selectedMonthKey) {
+        await loadDashboard({ monthKey: state.selectedMonthKey });
+      } else {
+        await loadDashboard();
+      }
+      await loadArchiveIndex();
+      renderMonthTools();
     }
   } catch (error) {
     state.updateBusy = false;
