@@ -627,3 +627,23 @@
 - 回滚方法：回退本次 `dashboard` 数据文件、`docs/data/monthly/2026-05/` 快照、`docs/data/monthly/index.json` 与 `tests/test_build_dashboard.py` 改动。
 - 关联提交（如有）：待补充
 - 备注：本次未推送远端；工作区中 `scripts/scheduled_update_runner.py`、`tests/test_scheduled_update_runner.py` 等无关改动保持原样未处理。
+
+## 2026-05-02 09:39
+- 需求 / 目标：进入 `AI_Digest` 项目目录，完成当前工作上下文切换。
+- 改动内容：确认当前工作目录为 `D:\WorkCode\AI_Digest`，未修改业务代码。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Get-Location`
+- 验证结果：已确认当前工作目录为 `D:\WorkCode\AI_Digest`
+- 回滚方法：删除本条变更记录
+- 关联提交（如有）：待补充
+- 备注：本次仅切换上下文，未启动服务、未运行测试、未修改代码
+
+## 2026-05-02 09:43
+- 需求 / 目标：修复网页提示“数据已是最新”但页面未切到 5 月、且月内修改目标工作簿后手动更新会被误判跳过的问题。
+- 改动内容：更新 `scripts/serve_dashboard.py`，让手动更新前的“是否已是最新”判断同时校验 `dashboard.summary.json` 中记录的 `workbookModifiedAt` 与 `arrivalWorkbookModifiedAt` 是否仍与当前源工作簿一致，避免仅凭 `reportDate` 相同就跳过重建；更新 `docs/assets/app.js`，在网页手动更新成功后统一重新加载当前月数据，而不是停留在之前选中的历史归档页；补充 `tests/test_serve_dashboard.py`，覆盖“源工作簿未变化时可跳过”和“同业务日内工作簿已变化时不得跳过”两类场景。
+- 涉及文件：`scripts/serve_dashboard.py`、`docs/assets/app.js`、`tests/test_serve_dashboard.py`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest tests.test_serve_dashboard -v`、`python -X utf8 -m py_compile scripts\serve_dashboard.py`
+- 验证结果：`tests.test_serve_dashboard` 共 `9/9` 通过；确认修复后，若当前月工作簿内容发生变更，手动更新不会再仅因 `reportDate` 相同而跳过，且更新成功后页面会回到当前月视图。
+- 回滚方法：回退上述 `serve_dashboard.py`、`app.js`、`test_serve_dashboard.py` 与本条日志记录。
+- 关联提交（如有）：待补充
+- 备注：本次未处理工作区中 `scripts/scheduled_update_runner.py`、`tests/test_scheduled_update_runner.py` 等无关脏改动。

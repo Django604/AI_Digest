@@ -21,6 +21,11 @@ class ServeDashboardTests(unittest.TestCase):
         self.addCleanup(lambda: shutil.rmtree(test_dir, ignore_errors=True))
         return test_dir / ".daily_update.lock"
 
+    def create_source_file(self, directory: Path, name: str, content: str) -> Path:
+        path = directory / name
+        path.write_text(content, encoding="utf-8")
+        return path
+
     def wait_for(self, predicate, timeout: float = 3.0) -> bool:
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -87,13 +92,32 @@ class ServeDashboardTests(unittest.TestCase):
 
     def test_update_task_manager_skips_fetch_when_dashboard_is_current(self) -> None:
         lock_path = self.create_lock_path()
+        leads_path = self.create_source_file(lock_path.parent, "NEV+ICE_xsai.xlsm", "leads")
+        arrival_path = self.create_source_file(lock_path.parent, "NEV+ICE_ldai.xlsx", "arrival")
         summary_path = lock_path.parent / "dashboard.summary.json"
-        summary_path.write_text(json.dumps({"reportDate": "2026-04-29"}), encoding="utf-8")
+        summary_path.write_text(
+            json.dumps(
+                {
+                    "reportDate": "2026-04-29",
+                    "inputs": {
+                        "workbookModifiedAt": serve_dashboard.datetime.fromtimestamp(leads_path.stat().st_mtime).isoformat(timespec="seconds"),
+                        "arrivalWorkbookModifiedAt": serve_dashboard.datetime.fromtimestamp(arrival_path.stat().st_mtime).isoformat(timespec="seconds"),
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
 
         manager = serve_dashboard.UpdateTaskManager()
         with patch("scripts.serve_dashboard.build_lock_path", return_value=lock_path), patch(
             "scripts.serve_dashboard.DASHBOARD_SUMMARY_PATH",
             summary_path,
+        ), patch(
+            "scripts.serve_dashboard.LEADS_WORKBOOK_PATH",
+            leads_path,
+        ), patch(
+            "scripts.serve_dashboard.ARRIVAL_WORKBOOK_PATH",
+            arrival_path,
         ), patch(
             "scripts.serve_dashboard.parse_business_date",
             return_value=serve_dashboard.date(2026, 4, 29),
@@ -118,6 +142,52 @@ class ServeDashboardTests(unittest.TestCase):
         completed = manager.snapshot()
         self.assertTrue(completed["result"]["skippedRefresh"])
         self.assertEqual(completed["result"]["businessDate"], "2026-04-29")
+
+    def test_update_task_manager_does_not_skip_when_current_workbook_changed(self) -> None:
+        lock_path = self.create_lock_path()
+        leads_path = self.create_source_file(lock_path.parent, "NEV+ICE_xsai.xlsm", "leads-newer")
+        arrival_path = self.create_source_file(lock_path.parent, "NEV+ICE_ldai.xlsx", "arrival")
+        summary_path = lock_path.parent / "dashboard.summary.json"
+        stale_leads_mtime = "2026-05-02T00:30:33"
+        summary_path.write_text(
+            json.dumps(
+                {
+                    "reportDate": "2026-05-01",
+                    "inputs": {
+                        "workbookModifiedAt": stale_leads_mtime,
+                        "arrivalWorkbookModifiedAt": serve_dashboard.datetime.fromtimestamp(arrival_path.stat().st_mtime).isoformat(timespec="seconds"),
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        manager = serve_dashboard.UpdateTaskManager(auto_publish=False)
+        with patch("scripts.serve_dashboard.build_lock_path", return_value=lock_path), patch(
+            "scripts.serve_dashboard.DASHBOARD_SUMMARY_PATH",
+            summary_path,
+        ), patch(
+            "scripts.serve_dashboard.LEADS_WORKBOOK_PATH",
+            leads_path,
+        ), patch(
+            "scripts.serve_dashboard.ARRIVAL_WORKBOOK_PATH",
+            arrival_path,
+        ), patch(
+            "scripts.serve_dashboard.parse_business_date",
+            return_value=serve_dashboard.date(2026, 5, 1),
+        ), patch(
+            "scripts.serve_dashboard.run_update",
+            return_value={"businessDate": "2026-05-01", "dashboardChanged": True, "summaryChanged": True},
+        ) as run_update_mock:
+            started, snapshot = manager.start()
+            self.assertTrue(started)
+            self.assertEqual(snapshot["status"], "running")
+            self.assertTrue(self.wait_for(lambda: manager.snapshot()["status"] == "success"))
+
+        run_update_mock.assert_called_once()
+        completed = manager.snapshot()
+        self.assertFalse(completed["result"].get("skippedRefresh", False))
+        self.assertEqual(completed["result"]["businessDate"], "2026-05-01")
 
     def test_update_api_reports_status_and_can_trigger_update(self) -> None:
         started_event = threading.Event()

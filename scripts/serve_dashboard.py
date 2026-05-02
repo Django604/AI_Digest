@@ -22,11 +22,14 @@ except ImportError:  # pragma: no cover - script entrypoint fallback
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = PROJECT_ROOT / "docs"
+DATA_SOURCE_DIR = PROJECT_ROOT / "data" / "source"
 DASHBOARD_JSON_PATH = DOCS_DIR / "data" / "dashboard.json"
 DASHBOARD_SUMMARY_PATH = DOCS_DIR / "data" / "dashboard.summary.json"
 MONTHLY_ARCHIVE_DIR = DOCS_DIR / "data" / "monthly"
 MONTHLY_ARCHIVE_INDEX_PATH = MONTHLY_ARCHIVE_DIR / "index.json"
 MANUAL_UPDATE_MODE = "manual-web"
+LEADS_WORKBOOK_PATH = DATA_SOURCE_DIR / "NEV+ICE_xsai.xlsm"
+ARRIVAL_WORKBOOK_PATH = DATA_SOURCE_DIR / "NEV+ICE_ldai.xlsx"
 
 
 def build_idle_message(auto_publish: bool) -> str:
@@ -91,6 +94,9 @@ def build_current_dashboard_result(business_date: date) -> dict[str, object] | N
     if current_report_date != expected_report_date:
         return None
 
+    if not summary_inputs_match_current_sources(summary):
+        return None
+
     return {
         "businessDate": expected_report_date,
         "dashboardChanged": False,
@@ -98,6 +104,28 @@ def build_current_dashboard_result(business_date: date) -> dict[str, object] | N
         "skippedRefresh": True,
         "skipReason": "dashboard-already-current",
     }
+
+
+def summary_inputs_match_current_sources(summary: dict[str, object]) -> bool:
+    inputs = summary.get("inputs")
+    if not isinstance(inputs, dict):
+        return False
+
+    expected_mtimes = {
+        "workbookModifiedAt": LEADS_WORKBOOK_PATH,
+        "arrivalWorkbookModifiedAt": ARRIVAL_WORKBOOK_PATH,
+    }
+    for key, path in expected_mtimes.items():
+        recorded_mtime = str(inputs.get(key) or "").strip()
+        if not recorded_mtime:
+            return False
+        try:
+            current_mtime = datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec="seconds")
+        except OSError:
+            return False
+        if recorded_mtime != current_mtime:
+            return False
+    return True
 
 
 def normalize_month_key(value: str | None) -> str | None:

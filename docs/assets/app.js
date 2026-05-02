@@ -759,12 +759,8 @@ async function pollUpdateStatus() {
     }
 
     if (payload.status === "success") {
-      if (state.monthViewMode === "archive" && state.selectedMonthKey) {
-        await loadDashboard({ monthKey: state.selectedMonthKey });
-      } else {
-        await loadDashboard();
-      }
       await loadArchiveIndex();
+      await loadDashboard();
       renderMonthTools();
     }
   } catch (error) {
