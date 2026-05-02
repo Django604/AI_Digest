@@ -647,3 +647,13 @@
 - 回滚方法：回退上述 `serve_dashboard.py`、`app.js`、`test_serve_dashboard.py` 与本条日志记录。
 - 关联提交（如有）：待补充
 - 备注：本次未处理工作区中 `scripts/scheduled_update_runner.py`、`tests/test_scheduled_update_runner.py` 等无关脏改动。
+
+## 2026-05-02 10:11
+- 需求 / 目标：修复 GitHub Pages 工作流因 `test_build_dashboard.py` 在换月后错误依赖当前工作簿来验证上月来店归档而失败的问题。
+- 改动内容：更新 `tests/test_build_dashboard.py`，将来店相关的历史月份断言改为优先读取 `docs/data/monthly/YYYY-MM/dashboard.json` 的真实归档快照，而不是继续基于当前工作簿反推上月来店数据；若目标月份归档文件不存在，则显式 `skip`，避免把“缺归档文件”和“当前工作簿已切月”混成同一种失败。
+- 涉及文件：`tests/test_build_dashboard.py`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest discover -s tests -v`、`python -X utf8 -m py_compile scripts\build_dashboard.py scripts\serve_dashboard.py`
+- 验证结果：全量单测 `53/53` 通过，确认 `Deploy Dashboard To Pages` 工作流此前失败的根因已在本地复现并排除。
+- 回滚方法：回退 `tests/test_build_dashboard.py` 与本条日志记录。
+- 关联提交（如有）：待补充
+- 备注：本次仅修复 CI 测试逻辑，不改动业务数据生成结果。

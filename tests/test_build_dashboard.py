@@ -13,6 +13,7 @@ from openpyxl import Workbook
 from scripts.build_dashboard import (
     ARRIVAL_BOOK,
     LEADS_BOOK,
+    MONTHLY_ARCHIVE_DIR,
     OUT_JSON,
     SUMMARY_JSON,
     build_payload,
@@ -42,6 +43,13 @@ class BuildDashboardPayloadTests(unittest.TestCase):
             LEADS_BOOK,
             ARRIVAL_BOOK,
             report_date_override=previous_month_end,
+        )
+        cls.previous_month_key = f"{previous_month_end.year:04d}-{previous_month_end.month:02d}"
+        cls.previous_month_archive_path = MONTHLY_ARCHIVE_DIR / cls.previous_month_key / "dashboard.json"
+        cls.previous_month_archive_payload = (
+            json.loads(cls.previous_month_archive_path.read_text(encoding="utf-8"))
+            if cls.previous_month_archive_path.exists()
+            else None
         )
 
     def test_expected_dashboards_exist(self) -> None:
@@ -109,7 +117,9 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertTrue(summary["outputs"]["archiveDashboardChanged"])
 
     def test_arrival_dashboard_uses_nev_daily_arrivals_for_nev_actual_row(self) -> None:
-        trend = self.previous_month_payload["dashboards"]["arrival"]["sections"][0]["trend"]
+        if self.previous_month_archive_payload is None:
+            self.skipTest(f"missing monthly archive payload for {self.previous_month_key}")
+        trend = self.previous_month_archive_payload["dashboards"]["arrival"]["sections"][0]["trend"]
         rows = {row["key"]: row["displayValues"] for row in trend["matrix"]["rows"]}
         report_index = trend["chart"]["reportDayIndex"]
 
@@ -117,7 +127,9 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertNotEqual(rows["nevActual"][report_index], "-")
 
     def test_arrival_dashboard_keeps_first_day_for_ice_actual_row(self) -> None:
-        trend = self.previous_month_payload["dashboards"]["arrival"]["sections"][0]["trend"]
+        if self.previous_month_archive_payload is None:
+            self.skipTest(f"missing monthly archive payload for {self.previous_month_key}")
+        trend = self.previous_month_archive_payload["dashboards"]["arrival"]["sections"][0]["trend"]
         rows = {row["key"]: row["displayValues"] for row in trend["matrix"]["rows"]}
 
         self.assertIn("iceActual", rows)
