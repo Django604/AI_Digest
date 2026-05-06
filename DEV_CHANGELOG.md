@@ -1,5 +1,25 @@
 # DEV CHANGELOG
 
+## 2026-05-06 10:08
+- 需求 / 目标：修复来店趋势图中“累计同期来店”在后续日期尚无真实数据时仍继续横向延申的问题，只展示到最新可用同期日。
+- 改动内容：更新 `scripts/build_dashboard.py` 的 `build_arrival_series()`，为 `previousCumulative` 增加“最后有效同期日”截断逻辑；当整段同期数据为空时，改为输出全 `null`，不再伪造 0 累计线；补充 `tests/test_build_dashboard.py` 覆盖“部分同期缺失”和“完全无同期数据”两类场景；重建当前 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与 `docs/data/monthly/2026-05/` 归档产物。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-05/dashboard.json`、`docs/data/monthly/2026-05/dashboard.summary.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest tests.test_build_dashboard -v`、`python -X utf8 scripts\build_dashboard.py --workbook data\source\NEV+ICE_xsai.xlsm --arrival-workbook data\source\NEV+ICE_ldai.xlsx --out docs\data\dashboard.json --summary-out docs\data\dashboard.summary.json`
+- 验证结果：`tests.test_build_dashboard` 共 `16/16` 通过；已确认当前 `docs/data/dashboard.json` 中来店趋势图 `previousCumulative` 序列在 `43401` 后续改为 `null`，前端不会再画出后面的长横线。
+- 回滚方法：回退上述代码 / 数据文件中的本次修改，并删除本条日志记录。
+- 关联提交（如有）：待补充
+- 备注：本次重建同步刷新了当前月 `2026-05` 的静态数据与摘要时间戳。
+
+## 2026-05-06 09:55
+- 需求 / 目标：将来店趋势图中“5 月同期来店 / 4 月同期来店”的文案统一改为“累计同期来店”，并确保悬浮窗提示同步更新。
+- 改动内容：更新 `scripts/build_dashboard.py` 中来店趋势图 `previousCumulative` 系列标签；同步修正 `docs/data/dashboard.json`、`docs/data/monthly/2026-04/dashboard.json`、`docs/data/monthly/2026-05/dashboard.json` 里的现有静态数据文案，确保当前月与归档月页面立即生效。
+- 涉及文件：`scripts/build_dashboard.py`、`docs/data/dashboard.json`、`docs/data/monthly/2026-04/dashboard.json`、`docs/data/monthly/2026-05/dashboard.json`、`DEV_CHANGELOG.md`
+- 关键命令：`rg -n '"[45]月同期来店"|"累计同期来店"' scripts\build_dashboard.py docs\data\dashboard.json docs\data\monthly\2026-04\dashboard.json docs\data\monthly\2026-05\dashboard.json`
+- 验证结果：已确认旧的 `4月同期来店`、`5月同期来店` 标签被替换为 `累计同期来店`，tooltip 会随 `seriesDefinitions` 标签同步展示新文案。
+- 回滚方法：回退上述 4 个代码 / 数据文件中的本次文案修改，并删除本条日志记录。
+- 关联提交（如有）：待补充
+- 备注：本次仅调整前端展示文案，未重跑构建脚本或自动化测试。
+
 ## 2026-05-01 13:10
 - 需求 / 目标：为 `AI_Digest` 页面增加按年月切换能力，默认仍展示当前月，同时把月度数据归档下来，确保后续更新 5 月数据时仍可查看 4 月整月快照。
 - 改动内容：更新 `scripts/build_dashboard.py`，在生成当前 `dashboard.json` / `dashboard.summary.json` 的同时，额外写入 `docs/data/monthly/YYYY-MM/` 月度归档并维护 `docs/data/monthly/index.json`；更新 `scripts/serve_dashboard.py`，新增 `/api/dashboard-archive`，并让 `/api/dashboard-data`、`/api/dashboard-summary` 支持 `?month=YYYY-MM`；更新 `docs/index.html`、`docs/assets/app.js`、`docs/assets/styles.css`，在截图工具下方新增“切换年月”按钮、年份/月选择面板与“回到当前月”入口；同步补充 `README.md`、`SCRIPTS.md`、测试与归档产物。

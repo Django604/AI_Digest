@@ -914,13 +914,20 @@ def build_arrival_series(
 
     report_indexes = [index for index, value in enumerate(current_daily) if isinstance(value, (int, float))]
     report_index = report_indexes[-1] if report_indexes else max(report_date.day - 1, 0)
+    previous_report_indexes = [index for index, value in enumerate(previous_daily) if isinstance(value, (int, float))]
+    previous_report_index = previous_report_indexes[-1] if previous_report_indexes else None
     chart_actual = [value if index <= report_index and value is not None else 0 for index, value in enumerate(current_daily)]
     current_cumulative = build_running_totals(current_daily, stop_at=report_index)
-    previous_cumulative = build_running_totals(previous_daily)
+    previous_cumulative = (
+        build_running_totals(previous_daily, stop_at=previous_report_index)
+        if previous_report_index is not None
+        else [None] * len(previous_daily)
+    )
 
     return {
         "dates": dates,
         "reportIndex": report_index,
+        "previousReportIndex": previous_report_index,
         "currentDaily": current_daily,
         "previousDaily": previous_daily,
         "chartActual": chart_actual,
@@ -1046,7 +1053,7 @@ def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date
                 {"key": "actual", "label": "本期来店", "type": "bar", "color": "#d40000", "fill": "#d40000"},
                 {"key": "cumulativeTarget", "label": f"{month_prefix}累计目标", "type": "line", "color": "#9f9f9f", "dashed": True, "strokeWidth": "3"},
                 {"key": "cumulativeActual", "label": f"{month_prefix}累计来店", "type": "line", "color": "#d40000", "strokeWidth": "3.5", "markers": True, "markerFill": "#ffffff", "markerStroke": "#d40000", "markerRadius": 4.8},
-                {"key": "previousCumulative", "label": f"{month_prefix}同期来店", "type": "line", "color": "#bfd0ff", "strokeWidth": "3", "markers": False},
+                {"key": "previousCumulative", "label": "累计同期来店", "type": "line", "color": "#bfd0ff", "strokeWidth": "3", "markers": False},
             ],
             "note": "",
         },

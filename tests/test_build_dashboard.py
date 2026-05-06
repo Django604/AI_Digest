@@ -16,6 +16,7 @@ from scripts.build_dashboard import (
     MONTHLY_ARCHIVE_DIR,
     OUT_JSON,
     SUMMARY_JSON,
+    build_arrival_series,
     build_payload,
     build_run_summary,
     load_arrival_daily_sheet,
@@ -198,6 +199,38 @@ class BuildDashboardPayloadTests(unittest.TestCase):
 
 
 class BuildDashboardValidationTests(unittest.TestCase):
+    def test_arrival_previous_cumulative_stops_at_last_available_previous_day(self) -> None:
+        series = build_arrival_series(
+            date(2026, 5, 5),
+            {
+                date(2026, 5, 1): 10,
+                date(2026, 5, 2): 20,
+                date(2026, 5, 3): 30,
+                date(2026, 5, 4): 40,
+                date(2026, 5, 5): 50,
+            },
+            {
+                date(2025, 5, 1): 100,
+                date(2025, 5, 2): 200,
+                date(2025, 5, 3): 300,
+            },
+        )
+
+        self.assertEqual(series["previousReportIndex"], 2)
+        self.assertEqual(series["previousCumulative"][:6], [100, 300, 600, None, None, None])
+
+    def test_arrival_previous_cumulative_stays_empty_when_no_previous_data_exists(self) -> None:
+        series = build_arrival_series(
+            date(2026, 5, 1),
+            {
+                date(2026, 5, 1): 10,
+            },
+            {},
+        )
+
+        self.assertIsNone(series["previousReportIndex"])
+        self.assertTrue(all(value is None for value in series["previousCumulative"]))
+
     def test_load_arrival_daily_sheet_supports_sheets_without_header_row(self) -> None:
         workbook = Workbook()
         sheet = workbook.active
