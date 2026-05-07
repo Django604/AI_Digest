@@ -2,9 +2,9 @@
 
 import argparse
 import calendar
-import copy
 import json
 from collections import defaultdict
+from functools import lru_cache
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -53,10 +53,12 @@ SPECIAL_DAY_OFFS = {
 }
 
 
+@lru_cache(maxsize=None)
 def month_start(value: date) -> date:
     return value.replace(day=1)
 
 
+@lru_cache(maxsize=None)
 def month_end(value: date) -> date:
     return value.replace(day=calendar.monthrange(value.year, value.month)[1])
 
@@ -71,12 +73,14 @@ def previous_month(value: date) -> date:
     return date(value.year, value.month - 1, 1)
 
 
+@lru_cache(maxsize=None)
 def month_dates(value: date) -> list[date]:
     start = month_start(value)
     end = month_end(value)
     return [date(start.year, start.month, day) for day in range(1, end.day + 1)]
 
 
+@lru_cache(maxsize=None)
 def aligned_previous_date(current_date: date) -> date | None:
     prev = previous_month(current_date)
     last = calendar.monthrange(prev.year, prev.month)[1]
@@ -85,6 +89,7 @@ def aligned_previous_date(current_date: date) -> date | None:
     return date(prev.year, prev.month, current_date.day)
 
 
+@lru_cache(maxsize=None)
 def coerce_date(value: Any) -> date | None:
     if value in (None, ""):
         return None
@@ -108,6 +113,7 @@ def coerce_date(value: Any) -> date | None:
     return None
 
 
+@lru_cache(maxsize=None)
 def num(value: Any) -> int | float | None:
     if value in (None, "", "-", "/", "#N/A", "#REF!", "#VALUE!"):
         return None
@@ -174,16 +180,18 @@ def read_json_file(path: Path, *, encoding: str = "utf-8") -> dict[str, Any] | N
 
 
 def without_volatile_fields(payload: dict[str, Any], field_paths: tuple[tuple[str, ...], ...]) -> dict[str, Any]:
-    cloned = copy.deepcopy(payload)
+    cloned = {**payload}
     for path in field_paths:
-        cursor: Any = cloned
+        parent: Any = cloned
         for key in path[:-1]:
-            if not isinstance(cursor, dict):
-                cursor = None
+            if not isinstance(parent, dict) or key not in parent:
+                parent = None
                 break
-            cursor = cursor.get(key)
-        if isinstance(cursor, dict):
-            cursor.pop(path[-1], None)
+            copied = {**parent[key]}
+            parent[key] = copied
+            parent = copied
+        if isinstance(parent, dict):
+            parent.pop(path[-1], None)
     return cloned
 
 
@@ -321,10 +329,10 @@ def load_nev_targets(ws, start_date: date, end_date: date) -> dict[str, dict[dat
     headers = header_map(ws, 2)
     total_col = headers["合计"]
     result: dict[str, dict[date, int | float]] = defaultdict(dict)
-    for row in range(3, ws.max_row + 1):
-        current_date = coerce_date(ws.cell(row, 1).value)
-        model = ws.cell(row, 2).value
-        total = num(ws.cell(row, total_col).value)
+    for row in ws.iter_rows(min_row=3, values_only=True):
+        current_date = coerce_date(row[0])
+        model = row[1]
+        total = num(row[total_col - 1])
         if current_date and model and total is not None and start_date <= current_date <= end_date:
             result[str(model).strip()][current_date] = total
     return result
@@ -333,16 +341,16 @@ def load_nev_targets(ws, start_date: date, end_date: date) -> dict[str, dict[dat
 def load_nev_daily(ws, start_date: date, end_date: date) -> dict[str, dict[date, dict[str, int | float | None]]]:
     headers = header_map(ws, 2)
     result: dict[str, dict[date, dict[str, int | float | None]]] = defaultdict(dict)
-    for row in range(4, ws.max_row + 1):
-        current_date = coerce_date(ws.cell(row, 3).value)
-        model = ws.cell(row, 4).value
+    for row in ws.iter_rows(min_row=4, values_only=True):
+        current_date = coerce_date(row[2])
+        model = row[3]
         if current_date is None or not model or not (start_date <= current_date <= end_date):
             continue
         result[str(model).strip()][current_date] = {
-            "newLeads": num(ws.cell(row, headers["新增线索量"]).value),
-            "validLeads": num(ws.cell(row, headers["有效线索量"]).value),
-            "storeLeads": num(ws.cell(row, headers["门店线索总量"]).value),
-            "arrivals": num(ws.cell(row, headers["新增到店量"]).value),
+            "newLeads": num(row[headers["新增线索量"] - 1]),
+            "validLeads": num(row[headers["有效线索量"] - 1]),
+            "storeLeads": num(row[headers["门店线索总量"] - 1]),
+            "arrivals": num(row[headers["新增到店量"] - 1]),
         }
     return result
 
@@ -350,15 +358,15 @@ def load_nev_daily(ws, start_date: date, end_date: date) -> dict[str, dict[date,
 def load_ice_daily(ws, start_date: date, end_date: date) -> dict[date, dict[str, int | float | None]]:
     headers = header_map(ws, 1)
     result: dict[date, dict[str, int | float | None]] = {}
-    for row in range(3, ws.max_row + 1):
-        current_date = coerce_date(ws.cell(row, headers["按日"]).value)
+    for row in ws.iter_rows(min_row=3, values_only=True):
+        current_date = coerce_date(row[headers["按日"] - 1])
         if current_date is None or not (start_date <= current_date <= end_date):
             continue
-        leads = num(ws.cell(row, headers["线索总量"]).value)
-        valid_leads = num(ws.cell(row, headers["有效线索量"]).value)
-        arrivals = num(ws.cell(row, headers["到店量"]).value)
-        orders = num(ws.cell(row, headers["订单量"]).value)
-        deals = num(ws.cell(row, headers["成交量"]).value)
+        leads = num(row[headers["线索总量"] - 1])
+        valid_leads = num(row[headers["有效线索量"] - 1])
+        arrivals = num(row[headers["到店量"] - 1])
+        orders = num(row[headers["订单量"] - 1])
+        deals = num(row[headers["成交量"] - 1])
         result[current_date] = {
             "leads": leads,
             "validLeads": valid_leads,
@@ -866,9 +874,9 @@ def aligned_previous_year_date(current_date: date) -> date:
 
 def load_arrival_daily_sheet(ws) -> dict[date, int | float]:
     result: dict[date, int | float] = {}
-    for row in range(1, ws.max_row + 1):
-        current_date = coerce_date(ws.cell(row, 1).value)
-        current_value = num(ws.cell(row, 2).value)
+    for row in ws.iter_rows(min_row=1, values_only=True):
+        current_date = coerce_date(row[0])
+        current_value = num(row[1])
         if current_date is None or current_value is None:
             continue
         result[current_date] = current_value
@@ -1084,8 +1092,8 @@ def build_payload(
     arrival_path: Path,
     report_date_override: date | None = None,
 ) -> dict[str, Any]:
-    leads = load_workbook(leads_path, data_only=True, keep_vba=True)
-    arrival = load_workbook(arrival_path, data_only=True, keep_vba=True)
+    leads = load_workbook(leads_path, data_only=True)
+    arrival = load_workbook(arrival_path, data_only=True)
     try:
         validate_workbook_structure(leads, arrival)
         report_date = report_date_override or validate_report_date_cell(leads)

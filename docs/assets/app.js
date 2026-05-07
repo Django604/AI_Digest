@@ -1100,19 +1100,23 @@ function renderMeta(meta) {
     <strong>${escapeHtml(meta.reportDateLabel ?? "-")}</strong>
   `;
 
-  [
+  const metaFrag = document.createDocumentFragment();
+  const metaItems = [
     `数据范围：${meta.dataRangeStart ?? "-"} 至 ${meta.dataRangeEnd ?? "-"}`,
     `源数据更新时间：${formatDateTime(meta.workbookModifiedAt)}`,
-  ].forEach((text) => {
+  ];
+  metaItems.forEach((text) => {
     const item = document.createElement("span");
     item.className = "meta-text";
     item.textContent = text;
-    metaStrip.appendChild(item);
+    metaFrag.appendChild(item);
   });
+  metaStrip.appendChild(metaFrag);
 }
 
 function renderTabs(dashboards) {
   tabList.innerHTML = "";
+  const frag = document.createDocumentFragment();
   dashboards.forEach((dashboard) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -1125,8 +1129,9 @@ function renderTabs(dashboards) {
       renderDashboard(dashboard);
       scrollToActiveDashboardTop();
     });
-    tabList.appendChild(button);
+    frag.appendChild(button);
   });
+  tabList.appendChild(frag);
 }
 
 function scrollToActiveDashboardTop() {
@@ -1181,9 +1186,11 @@ function renderDashboard(dashboard) {
   }
 
   const sectionStack = fragment.querySelector(".section-stack");
+  const sectionFrag = document.createDocumentFragment();
   sections.forEach((section, index) => {
-    sectionStack.appendChild(renderSection(section, dashboard.id, index));
+    sectionFrag.appendChild(renderSection(section, dashboard.id, index));
   });
+  sectionStack.appendChild(sectionFrag);
 
   dashboardRoot.appendChild(fragment);
   renderSectionDirectory();
@@ -1218,6 +1225,7 @@ function renderBriefPage(dashboard) {
 
   const grid = document.createElement("div");
   grid.className = "brief-page-grid";
+  const cardFrag = document.createDocumentFragment();
   sections.forEach((section, index) => {
     const card = document.createElement("article");
     card.className = "brief-page-card";
@@ -1246,8 +1254,9 @@ function renderBriefPage(dashboard) {
       card.appendChild(paragraph);
     }
 
-    grid.appendChild(card);
+    cardFrag.appendChild(card);
   });
+  grid.appendChild(cardFrag);
 
   article.appendChild(grid);
   return article;
@@ -1293,6 +1302,7 @@ function renderSectionDirectory() {
   }
 
   branchSwitcher.hidden = false;
+  const navFrag = document.createDocumentFragment();
   anchors.forEach((item, index) => {
     const link = document.createElement("a");
     link.href = `#${item.id}`;
@@ -1308,8 +1318,9 @@ function renderSectionDirectory() {
       updateSectionDirectoryState(item.id);
       item.node.scrollIntoView({ behavior: "smooth", block: "start" });
     });
-    sectionNav.appendChild(link);
+    navFrag.appendChild(link);
   });
+  sectionNav.appendChild(navFrag);
 
   setupSectionObserver(anchors);
   updateSectionDirectoryState(state.activeAnchor ?? anchors[0].id);
@@ -1562,6 +1573,7 @@ function renderTrendSummary(trend) {
     summary.classList.add("arrival-trend-summary");
   }
 
+  const summaryFrag = document.createDocumentFragment();
   items.forEach((item) => {
     const article = document.createElement("article");
     article.className = "trend-summary-item";
@@ -1571,8 +1583,9 @@ function renderTrendSummary(trend) {
       <strong class="${valueClass}">${escapeHtml(item.displayValue ?? "-")}</strong>
       ${item.note ? `<p>${formatSummaryNote(item.note)}</p>` : ""}
     `;
-    summary.appendChild(article);
+    summaryFrag.appendChild(article);
   });
+  summary.appendChild(summaryFrag);
 
   return summary;
 }
@@ -1864,13 +1877,15 @@ function renderTrendChart(trend, options = {}) {
 
   const legend = document.createElement("div");
   legend.className = "legend legend-wide";
+  const legendFrag = document.createDocumentFragment();
   defs.forEach((item) => {
     const legendItem = document.createElement("span");
     legendItem.className = `legend-item ${hasNumericValues(chart.series?.[item.key]) ? "" : "muted"}`.trim();
     const swatchStyle = getLegendSwatchStyle(item);
     legendItem.innerHTML = `<span class="legend-swatch ${item.type === "line" ? `line${item.dashed ? " is-dashed" : ""}` : "bar"}" style="${swatchStyle}"></span><span>${escapeHtml(item.label)}</span>`;
-    legend.appendChild(legendItem);
+    legendFrag.appendChild(legendItem);
   });
+  legend.appendChild(legendFrag);
   wrapper.appendChild(legend);
 
   if (chart.note) {

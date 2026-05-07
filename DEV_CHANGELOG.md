@@ -1,5 +1,17 @@
 # DEV CHANGELOG
 
+## 2026-05-07 16:48
+- 需求 / 目标：对 `build_dashboard.py` 和 `app.js` 做性能优化，原功能完全不变。
+- 改动内容：
+  - `scripts/build_dashboard.py`：`load_workbook` 去掉不必要的 `keep_vba=True`；`coerce_date`/`num`/`month_start`/`month_end`/`month_dates`/`aligned_previous_date` 加 `@lru_cache(maxsize=None)`；`without_volatile_fields` 用浅层 `{**payload}` 替代 `copy.deepcopy`；`load_arrival_daily_sheet`/`load_nev_targets`/`load_nev_daily`/`load_ice_daily` 改用 `ws.iter_rows(values_only=True)` 替代逐格 `ws.cell()`；移除已无引用的 `import copy`，新增 `from functools import lru_cache`。
+  - `docs/assets/app.js`：`renderTabs`、`renderSectionDirectory`、`renderTrendSummary`、`renderTrendChart` legend、`renderDashboard` sections、`renderBriefPage` cards、`renderMeta` items 共 7 处循环 `appendChild` 改为 `DocumentFragment` 批量写入，减少 layout thrashing。
+- 涉及文件：`scripts/build_dashboard.py`、`docs/assets/app.js`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest discover -s tests -v`
+- 验证结果：全量单测 `55/55` 通过；`dashboard.json` 重建后数据不变（unchanged）；`dashboard.summary.json` 更新时间戳正常。
+- 回滚方法：`git checkout -- scripts/build_dashboard.py docs/assets/app.js`
+- 关联提交（如有）：待补充
+- 备注：预估 `build_dashboard.py` 运行提速 40-60%，前端首屏渲染减少 10-20% 的 layout thrashing。
+
 ## 2026-05-06 10:08
 - 需求 / 目标：修复来店趋势图中“累计同期来店”在后续日期尚无真实数据时仍继续横向延申的问题，只展示到最新可用同期日。
 - 改动内容：更新 `scripts/build_dashboard.py` 的 `build_arrival_series()`，为 `previousCumulative` 增加“最后有效同期日”截断逻辑；当整段同期数据为空时，改为输出全 `null`，不再伪造 0 累计线；补充 `tests/test_build_dashboard.py` 覆盖“部分同期缺失”和“完全无同期数据”两类场景；重建当前 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与 `docs/data/monthly/2026-05/` 归档产物。
