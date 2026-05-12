@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-12T09:08:16",
+  "generatedAt": "2026-05-12T15:32:19",
   "reportDate": "2026-05-11",
   "reportDateLabel": "2026-05-11",
   "inputs": {
@@ -16,7 +16,14 @@
     "dashboardChanged": true,
     "dashboardStatus": "updated",
     "summaryJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.summary.json",
-    "summaryJsonName": "dashboard.summary.json"
+    "summaryJsonName": "dashboard.summary.json",
+    "archiveMonth": "2026-05",
+    "archiveDashboardJson": "./data/monthly/2026-05/dashboard.json",
+    "archiveSummaryJson": "./data/monthly/2026-05/dashboard.summary.json",
+    "archiveIndexJson": "./data/monthly/index.json",
+    "archiveDashboardChanged": true,
+    "archiveSummaryChanged": true,
+    "archiveIndexChanged": true
   },
   "stats": {
     "dashboardCount": 5,

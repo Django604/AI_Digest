@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-05-12 15:34
+- 需求 / 目标：按最新业务口径更新 `十五代轩逸` 5 月每日目标，并同步刷新网页数据后推送到 GitHub。
+- 改动内容：更新 `scripts/build_dashboard.py` 中 `SYLPHY_TARGET_OVERRIDES[(2026, 5)]`，写入 5 月 `31` 天新的十五代轩逸目标值；随后重建 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-05/` 与 `docs/data/monthly/index.json`，让当前页与 5 月月归档保持一致。
+- 涉及文件：`scripts/build_dashboard.py`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-05/dashboard.json`、`docs/data/monthly/2026-05/dashboard.summary.json`、`docs/data/monthly/index.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 scripts\build_dashboard.py --workbook data\source\NEV+ICE_xsai.xlsm --arrival-workbook data\source\NEV+ICE_ldai.xlsx --out docs\data\dashboard.json --summary-out docs\data\dashboard.summary.json`、`python -X utf8 -m unittest tests.test_build_dashboard -v`
+- 验证结果：`tests.test_build_dashboard` 共 `16/16` 通过；当前 `docs/data/dashboard.json` 与 `docs/data/monthly/2026-05/dashboard.json` 中，十五代轩逸简报已更新为 `累计达成率 122.5%`、`当日达成率 109.3%`，目标序列已包含 `1427 / 1241 / 1239 / 1420` 等新值。
+- 回滚方法：回退本次 `build_dashboard.py` 目标覆盖表与重建后的 JSON 产物。
+- 关联提交（如有）：待补充
+- 备注：十五代轩逸目标当前仍属于代码内 override，不在 Excel 目标表里；后续若业务继续频繁改口径，建议抽到独立配置，别再把目标值写成代码里的地雷。
+
 ## 2026-05-12 09:50
 - 需求 / 目标：彻底加固 `AI_Digest` 的自动发布链路，避免 `git push` 在 PowerShell 套娃里再次抽风。
 - 改动内容：新增 `scripts/dashboard_publish.py` 作为统一发布核心，负责发布前检查、可选重建、`git add`、`git commit` 与 `git push`；将 `scripts/scheduled_update_runner.py` 与 `scripts/serve_dashboard.py` 的自动发布改为直接调用该 Python 入口，不再通过 `powershell -> powershell -> git` 的多层子进程链；`scripts/publish_dashboard.ps1` 退化为薄封装；补充 `scripts/dashboard_publish.py`、`tests/test_dashboard_publish.py` 与相关文档说明。
