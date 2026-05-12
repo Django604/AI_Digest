@@ -11,6 +11,7 @@ from unittest import mock
 from scripts.scheduled_update_runner import (
     FINISH_AUTO_CLOSE_SECONDS,
     INTERACTIVE_MODE,
+    PROJECT_ROOT,
     ProgressUpdate,
     SILENT_MODE,
     ScheduledUpdateLock,
@@ -23,6 +24,7 @@ from scripts.scheduled_update_runner import (
     infer_progress_update,
     parse_args,
     resolve_message_visibility,
+    run_publish_step,
     run_scheduled_update,
 )
 
@@ -96,6 +98,19 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
         self.assertEqual(
             actual,
             ProgressUpdate(progress=50, message="正在抓取 NEV 来店本期与同期。"),
+        )
+
+    def test_infer_progress_update_tracks_excel_save_stage(self) -> None:
+        saving = infer_progress_update("[Excel COM] saving target workbook", 90)
+        saved = infer_progress_update("[Excel COM] saved target workbook", saving.progress)
+
+        self.assertEqual(
+            saving,
+            ProgressUpdate(progress=93, message="正在保存 Excel 目标工作簿。"),
+        )
+        self.assertEqual(
+            saved,
+            ProgressUpdate(progress=95, message="Excel 目标工作簿保存完成。"),
         )
 
     def test_infer_progress_update_keeps_progress_monotonic_for_unknown_log(self) -> None:
@@ -251,6 +266,37 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
             self.assertTrue(payload["autoPublish"])
         finally:
             shutil.rmtree(runtime_root, ignore_errors=True)
+
+    def test_run_publish_step_uses_python_publish_pipeline(self) -> None:
+        fake_publish = {
+            "publishStatus": "success",
+            "publishRemote": "origin",
+            "publishBranch": "main",
+            "publishCommitMessage": "Auto publish dashboard data 2026-04-22 (silent)",
+        }
+
+        with mock.patch(
+            "scripts.scheduled_update_runner.publish_dashboard",
+            return_value=fake_publish,
+        ) as publish_mock:
+            actual = run_publish_step(
+                business_date="2026-04-22",
+                mode=SILENT_MODE,
+                remote="origin",
+                branch="main",
+                commit_message="",
+                log=lambda _message: None,
+            )
+
+        self.assertEqual(actual, fake_publish)
+        publish_mock.assert_called_once()
+        kwargs = publish_mock.call_args.kwargs
+        self.assertEqual(kwargs["repo_root"], PROJECT_ROOT)
+        self.assertEqual(kwargs["business_date"], "2026-04-22")
+        self.assertEqual(kwargs["mode"], SILENT_MODE)
+        self.assertEqual(kwargs["remote"], "origin")
+        self.assertEqual(kwargs["branch"], "main")
+        self.assertTrue(kwargs["skip_rebuild"])
 
     def test_lock_prevents_duplicate_silent_run(self) -> None:
         runtime_root = self.create_repo_temp_dir()

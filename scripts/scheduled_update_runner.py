@@ -4,7 +4,6 @@ import argparse
 import json
 import os
 import queue
-import subprocess
 import threading
 import traceback
 from dataclasses import dataclass
@@ -31,8 +30,10 @@ except ImportError:  # pragma: no cover - Windows Python normally ships with tki
 
 try:
     from .fetch_daily_data import format_business_date, parse_business_date, run_update
+    from .dashboard_publish import PublishError, publish_dashboard, resolve_publish_commit_message as _resolve_publish_commit_message
 except ImportError:  # pragma: no cover - script entrypoint fallback
     from fetch_daily_data import format_business_date, parse_business_date, run_update
+    from dashboard_publish import PublishError, publish_dashboard, resolve_publish_commit_message as _resolve_publish_commit_message
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -43,9 +44,6 @@ FINISH_AUTO_CLOSE_SECONDS = 180
 INTERACTIVE_MODE = "interactive"
 SILENT_MODE = "silent"
 LOCK_FILENAME = ".daily_update.lock"
-PUBLISH_SCRIPT = PROJECT_ROOT / "scripts" / "publish_dashboard.ps1"
-
-
 @dataclass(frozen=True)
 class ProgressUpdate:
     progress: int
@@ -63,6 +61,8 @@ PROGRESS_RULES: tuple[tuple[str, int, str], ...] = (
     ("开始抓取：ICE 来店本期 + 同期", 72, "正在抓取 ICE 来店本期与同期。"),
     ("抓取完成：ICE 来店本期 + 同期", 84, "ICE 来店本期与同期抓取完成。"),
     ("回填工作表：", 90, "正在回填工作簿。"),
+    ("[Excel COM] saving target workbook", 93, "正在保存 Excel 目标工作簿。"),
+    ("[Excel COM] saved target workbook", 95, "Excel 目标工作簿保存完成。"),
     ("dashboard.json updated", 96, "正在重建 dashboard.json。"),
     ("dashboard.json unchanged", 96, "dashboard.json 无需改写。"),
     ("dashboard.summary.json updated", 98, "正在更新 dashboard.summary.json。"),
@@ -516,9 +516,11 @@ def resolve_publish_commit_message(
     mode: str,
     explicit_message: str,
 ) -> str:
-    if explicit_message.strip():
-        return explicit_message.strip()
-    return f"Auto publish dashboard data {business_date} ({mode})"
+    return _resolve_publish_commit_message(
+        business_date=business_date,
+        mode=mode,
+        explicit_message=explicit_message,
+    )
 
 
 def run_publish_step(
@@ -530,53 +532,19 @@ def run_publish_step(
     commit_message: str,
     log: Callable[[str], None],
 ) -> dict[str, str]:
-    if not PUBLISH_SCRIPT.exists():
-        raise FileNotFoundError(f"Publish script was not found: {PUBLISH_SCRIPT}")
+    def publish_log(message: str) -> None:
+        log(f"[publish] {message}")
 
-    resolved_commit_message = resolve_publish_commit_message(
+    return publish_dashboard(
+        repo_root=PROJECT_ROOT,
+        remote=remote,
+        branch=branch,
+        commit_message=commit_message,
         business_date=business_date,
         mode=mode,
-        explicit_message=commit_message,
+        skip_rebuild=True,
+        log=publish_log,
     )
-    command = [
-        "powershell",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        str(PUBLISH_SCRIPT),
-        "-SkipRebuild",
-        "-Remote",
-        remote,
-        "-Branch",
-        branch,
-        "-CommitMessage",
-        resolved_commit_message,
-    ]
-    log(f"Starting auto publish: remote={remote} branch={branch}")
-    process = subprocess.Popen(
-        command,
-        cwd=str(PROJECT_ROOT),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    assert process.stdout is not None
-    for line in process.stdout:
-        text = line.rstrip()
-        if text:
-            log(f"[publish] {text}")
-    exit_code = process.wait()
-    if exit_code != 0:
-        raise RuntimeError(f"Auto publish failed with exit code {exit_code}")
-    log("Auto publish completed.")
-    return {
-        "publishStatus": "success",
-        "publishRemote": remote,
-        "publishBranch": branch,
-        "publishCommitMessage": resolved_commit_message,
-    }
 
 
 def run_scheduled_update(
@@ -666,6 +634,7 @@ def run_scheduled_update(
     def worker() -> None:
         progress_window.wait_for_start()
         logger(f"定时更新任务启动，业务日期：{format_business_date(business_date)}")
+        partial_result: dict[str, object] | None = None
         try:
             result = run_update(
                 business_date=business_date,
@@ -673,6 +642,7 @@ def run_scheduled_update(
                 headless=headless,
                 keep_runtime=keep_runtime,
             )
+            partial_result = result
             if auto_publish:
                 publish_result = run_publish_step(
                     business_date=str(result.get("businessDate") or format_business_date(business_date)),
@@ -690,6 +660,27 @@ def run_scheduled_update(
             error_text = str(exc)
             logger(f"定时更新任务失败：{error_text}")
             logger(traceback.format_exc().rstrip())
+            publish_error_payload: dict[str, object] = {}
+            if auto_publish and partial_result is not None:
+                publish_error_payload = {
+                    "publishStatus": "error",
+                    "publishRemote": publish_remote,
+                    "publishBranch": publish_branch,
+                    "publishCommitMessage": resolve_publish_commit_message(
+                        business_date=str(partial_result.get("businessDate") or format_business_date(business_date)),
+                        mode=mode,
+                        explicit_message=publish_commit_message,
+                    ),
+                }
+                if isinstance(exc, PublishError):
+                    publish_error_payload.update(
+                        {
+                            "publishPhase": exc.phase,
+                            "publishExitCode": exc.exit_code,
+                            "publishCommand": exc.command,
+                            "publishErrorOutput": exc.output,
+                        }
+                    )
             write_json(
                 run_dir / "result.json",
                 {
@@ -702,6 +693,7 @@ def run_scheduled_update(
                     "autoPublish": auto_publish,
                     "publishRemote": publish_remote,
                     "publishBranch": publish_branch,
+                    **publish_error_payload,
                     "logPath": str(log_path),
                 },
             )

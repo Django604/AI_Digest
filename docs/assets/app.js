@@ -663,6 +663,8 @@ function buildUpdateStatusFromSnapshot() {
     }
     if (publishStatus === "success") {
       details.push(skippedRefresh ? "发布链路检查正常" : "已自动发布到 GitHub");
+    } else if (publishStatus === "no_changes") {
+      details.push("未检测到新的可发布变更");
     } else if (publishStatus === "disabled") {
       details.push("仅完成本地更新，未自动发布");
     } else if (publishStatus === "error") {

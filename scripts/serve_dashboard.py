@@ -13,9 +13,11 @@ from typing import Callable
 from urllib.parse import parse_qs, unquote, urlparse
 
 try:
+    from .dashboard_publish import PublishError, resolve_publish_commit_message
     from .fetch_daily_data import format_business_date, parse_business_date, run_update
     from .scheduled_update_runner import ScheduledUpdateLock, build_lock_path, run_publish_step
 except ImportError:  # pragma: no cover - script entrypoint fallback
+    from dashboard_publish import PublishError, resolve_publish_commit_message
     from fetch_daily_data import format_business_date, parse_business_date, run_update
     from scheduled_update_runner import ScheduledUpdateLock, build_lock_path, run_publish_step
 
@@ -46,13 +48,15 @@ def build_running_message(auto_publish: bool) -> str:
 
 def build_success_message(result: dict[str, object], auto_publish: bool) -> str:
     business_date = str(result.get("businessDate") or "")
+    publish_status = str(result.get("publishStatus") or "disabled")
     if result.get("skippedRefresh"):
-        if auto_publish and str(result.get("publishStatus") or "") == "success":
+        if auto_publish and publish_status in {"success", "no_changes"}:
             return f"数据已是最新业务日期：{business_date}，已检查发布链路。"
         return f"数据已是最新业务日期：{business_date}。"
-    publish_status = str(result.get("publishStatus") or "disabled")
     if auto_publish and publish_status == "success":
         return f"手动兜底更新完成，业务日期：{business_date}，并已自动发布到 GitHub。"
+    if auto_publish and publish_status == "no_changes":
+        return f"手动兜底更新完成，业务日期：{business_date}，未检测到新的可发布变更。"
     return f"手动兜底更新完成，业务日期：{business_date}。"
 
 
@@ -263,13 +267,28 @@ class UpdateTaskManager:
                 error_message = f"手动兜底更新失败：{exc}"
                 result_payload = None
                 if partial_result is not None and self._auto_publish:
+                    business_date_text = str(partial_result.get("businessDate") or "")
                     error_message = f"数据已更新，但自动发布失败：{exc}"
                     result_payload = {
                         **partial_result,
                         "publishStatus": "error",
                         "publishRemote": self._publish_remote,
                         "publishBranch": self._publish_branch,
+                        "publishCommitMessage": resolve_publish_commit_message(
+                            business_date=business_date_text,
+                            mode=MANUAL_UPDATE_MODE,
+                            explicit_message=self._publish_commit_message,
+                        ),
                     }
+                    if isinstance(exc, PublishError):
+                        result_payload.update(
+                            {
+                                "publishPhase": exc.phase,
+                                "publishExitCode": exc.exit_code,
+                                "publishCommand": exc.command,
+                                "publishErrorOutput": exc.output,
+                            }
+                        )
                 self._state.update(
                     {
                         "running": False,

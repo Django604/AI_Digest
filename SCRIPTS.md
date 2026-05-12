@@ -141,8 +141,21 @@
   - 更新 `docs/data/dashboard.summary.json`
   - 自动提交并推送发布相关文件
 - 备注：
+  - 这个脚本现在只是薄封装，实际的 rebuild / stage / commit / push 逻辑在 `./scripts/dashboard_publish.py`
   - 默认只会提交这 4 个文件：两本 Excel 源文件、`docs/data/dashboard.json` 和 `docs/data/dashboard.summary.json`
   - 如果工作区里已经暂存了别的文件，脚本会主动拦住，避免把无关改动一起推上去
+
+## scripts/dashboard_publish.py
+
+- 路径：`./scripts/dashboard_publish.py`
+- 作用：统一承担发布前检查、重建、`git add`、`git commit` 与 `git push`
+- 使用方法：
+  - `python scripts/dashboard_publish.py --remote origin --branch main`
+  - 跳过重建：`python scripts/dashboard_publish.py --skip-rebuild`
+  - 允许已有暂存文件：`python scripts/dashboard_publish.py --allow-existing-staged`
+- 备注：
+  - 定时更新与网页手动兜底现在都直接调用这个 Python 入口
+  - `git push` 若被中断会自动重试一次，并在失败时保留完整的阶段与命令信息
 
 ## scripts/serve_dashboard.py
 

@@ -25,6 +25,7 @@
 - `scripts/scheduled_update_runner.py`：定时自动更新执行入口，支持登录态弹窗执行与未登录静默执行
 - `scripts/register_daily_update_task.ps1`：Windows 计划任务注册脚本，默认注册“登录态弹窗 + 未登录静默兜底”两条计划任务
 - `scripts/rebuild_dashboard.ps1`：Windows 下本地一键重建 `dashboard.json`
+- `scripts/dashboard_publish.py`：统一处理 `rebuild -> git add -> commit -> push` 的发布核心逻辑
 - `start_dashboard_server.bat`：Windows 下双击启动 `serve_dashboard.py` 的快捷入口
 - `docs/data/runtime-config.json`：前端远端更新服务配置
 - `scripts/publish_dashboard.ps1`：Windows 下本地一键重建并推送到 GitHub
@@ -79,7 +80,7 @@
 
 1. 本地用 Excel 更新源数据并保存
 2. 直接运行 `powershell -ExecutionPolicy Bypass -File scripts/publish_dashboard.ps1`
-3. 脚本会自动重建 `dashboard.json` 与 `dashboard.summary.json`，并只提交以下发布相关文件：
+3. 脚本会自动重建 `dashboard.json` 与 `dashboard.summary.json`，内部通过 `scripts/dashboard_publish.py` 统一完成提交与推送，并只提交以下发布相关文件：
    - `data/source/NEV+ICE_xsai.xlsm`
    - `data/source/NEV+ICE_ldai.xlsx`
    - `docs/data/dashboard.json`

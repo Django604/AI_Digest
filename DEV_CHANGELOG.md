@@ -1,5 +1,25 @@
 # DEV CHANGELOG
 
+## 2026-05-12 09:50
+- 需求 / 目标：彻底加固 `AI_Digest` 的自动发布链路，避免 `git push` 在 PowerShell 套娃里再次抽风。
+- 改动内容：新增 `scripts/dashboard_publish.py` 作为统一发布核心，负责发布前检查、可选重建、`git add`、`git commit` 与 `git push`；将 `scripts/scheduled_update_runner.py` 与 `scripts/serve_dashboard.py` 的自动发布改为直接调用该 Python 入口，不再通过 `powershell -> powershell -> git` 的多层子进程链；`scripts/publish_dashboard.ps1` 退化为薄封装；补充 `scripts/dashboard_publish.py`、`tests/test_dashboard_publish.py` 与相关文档说明。
+- 涉及文件：`scripts/dashboard_publish.py`、`scripts/scheduled_update_runner.py`、`scripts/serve_dashboard.py`、`scripts/publish_dashboard.ps1`、`docs/assets/app.js`、`SCRIPTS.md`、`README.md`、`tests/test_dashboard_publish.py`、`tests/test_scheduled_update_runner.py`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest tests.test_dashboard_publish tests.test_scheduled_update_runner tests.test_serve_dashboard -v`、`python -X utf8 -m py_compile scripts\dashboard_publish.py scripts\scheduled_update_runner.py scripts\serve_dashboard.py`、`[scriptblock]::Create((Get-Content scripts\publish_dashboard.ps1 -Raw -Encoding utf8))`
+- 验证结果：新增发布模块测试与现有调度 / 网页测试共 `28/28` 通过；Python 语法检查通过；`publish_dashboard.ps1` 解析通过。
+- 回滚方法：回退本次新增的发布模块、调度 / 网页调用改动、测试与文档更新。
+- 关联提交（如有）：待补充
+- 备注：新的发布核心会自动重试一次被中断的 `git push`，并保留 `phase / exitCode / command` 这些诊断信息，后续排查不会再只剩一坨 `exit code`。
+
+## 2026-05-12 09:22
+- 需求 / 目标：排查 `2026-05-12` 当天 `AI_Digest` 页面未同步到 GitHub 的原因，并补齐缺失发布。
+- 改动内容：核对 `docs/data/dashboard.summary.json`、`.runtime/scheduled_update/20260512_090002_754095/` 运行结果与仓库状态，确认当天 `09:08` 已完成业务日 `2026-05-11` 的本地取数、回填、重建与自动提交，但自动发布在 `git push origin main` 阶段失败，错误为 `Auto publish failed with exit code 3221225786`；随后手动执行 `git push origin main`，将漏推的提交 `c3fe13d` 补发到远端。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`git status --short --branch`、`Get-Content .runtime\scheduled_update\20260512_090002_754095\result.json`、`git push origin main`
+- 验证结果：当前 `origin/main` 已更新到 `c3fe13d`，`docs/data/dashboard.summary.json` 显示 `generatedAt = 2026-05-12T09:08:16`、`reportDate = 2026-05-11`，远端现已补齐当天发布。
+- 回滚方法：如需撤回此次数据发布，基于提交 `c3fe13d` 创建新的反向提交，不直接改写远端历史。
+- 关联提交（如有）：`c3fe13d`
+- 备注：本次确认问题不在取数或重建阶段，而是在自动发布最后一步的 `git push` 进程异常退出；`2026-05-11` 同链路发布成功，说明当前更像单次任务环境异常，而不是数据链路整体失效。
+
 ## 2026-05-07 16:48
 - 需求 / 目标：对 `build_dashboard.py` 和 `app.js` 做性能优化，原功能完全不变。
 - 改动内容：
