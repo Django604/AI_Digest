@@ -58,6 +58,30 @@ SPECIAL_DAY_OFFS = {
     date(2026, 4, 6),
 }
 
+OFFICIAL_HOLIDAY_RULES: dict[int, dict[str, set[date]]] = {
+    2026: {
+        "holidays": {
+            date(2026, 1, 1), date(2026, 1, 2), date(2026, 1, 3),
+            date(2026, 2, 15), date(2026, 2, 16), date(2026, 2, 17), date(2026, 2, 18),
+            date(2026, 2, 19), date(2026, 2, 20), date(2026, 2, 21), date(2026, 2, 22), date(2026, 2, 23),
+            date(2026, 4, 5), date(2026, 4, 6),
+            date(2026, 5, 1), date(2026, 5, 2), date(2026, 5, 3), date(2026, 5, 4), date(2026, 5, 5),
+            date(2026, 6, 19), date(2026, 6, 20), date(2026, 6, 21),
+            date(2026, 9, 25), date(2026, 9, 26), date(2026, 9, 27),
+            date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 3), date(2026, 10, 4), date(2026, 10, 5),
+            date(2026, 10, 6), date(2026, 10, 7),
+        },
+        "makeup_workdays": {
+            date(2026, 1, 4),
+            date(2026, 2, 14),
+            date(2026, 2, 28),
+            date(2026, 5, 9),
+            date(2026, 9, 20),
+            date(2026, 10, 10),
+        },
+    },
+}
+
 
 @lru_cache(maxsize=None)
 def month_start(value: date) -> date:
@@ -301,10 +325,70 @@ def fmt_sheet_date(value: date | None) -> str:
     return "-" if value is None else f"{value.year}/{value.month}/{value.day}"
 
 
+@lru_cache(maxsize=None)
+def get_day_calendar_meta(value: date | None) -> dict[str, bool | str]:
+    if value is None:
+        return {
+            "dayType": "none",
+            "isHoliday": False,
+            "isWeekend": False,
+            "isMakeupWorkday": False,
+            "isRegularWorkday": False,
+            "highlight": False,
+        }
+
+    year_rules = OFFICIAL_HOLIDAY_RULES.get(value.year, {})
+    holidays = year_rules.get("holidays", set())
+    makeup_workdays = year_rules.get("makeup_workdays", set())
+    is_holiday = value in holidays or value in SPECIAL_DAY_OFFS
+    is_makeup_workday = value in makeup_workdays
+    is_weekend = value.weekday() >= 5 and not is_holiday and not is_makeup_workday
+    is_regular_workday = not is_holiday and not is_weekend and not is_makeup_workday
+
+    if is_holiday:
+        day_type = "holiday"
+    elif is_makeup_workday:
+        day_type = "makeupWorkday"
+    elif is_weekend:
+        day_type = "weekend"
+    else:
+        day_type = "regularWorkday"
+
+    return {
+        "dayType": day_type,
+        "isHoliday": is_holiday,
+        "isWeekend": is_weekend,
+        "isMakeupWorkday": is_makeup_workday,
+        "isRegularWorkday": is_regular_workday,
+        "highlight": is_holiday or is_weekend or is_makeup_workday,
+    }
+
+
 def is_day_off(value: date | None) -> bool:
     if value is None:
         return False
-    return value.weekday() >= 5 or value in SPECIAL_DAY_OFFS
+    return bool(get_day_calendar_meta(value)["isHoliday"])
+
+
+def build_single_day_meta(prefix: str, value: date | None) -> dict[str, Any]:
+    meta = get_day_calendar_meta(value)
+    cap_prefix = prefix[0].upper() + prefix[1:]
+    return {
+        f"{prefix}Date": value.isoformat() if value else None,
+        f"{prefix}DayType": meta["dayType"],
+        f"highlight{cap_prefix}": meta["highlight"],
+        f"is{cap_prefix}Holiday": meta["isHoliday"],
+        f"is{cap_prefix}Weekend": meta["isWeekend"],
+        f"is{cap_prefix}MakeupWorkday": meta["isMakeupWorkday"],
+        f"is{cap_prefix}RegularWorkday": meta["isRegularWorkday"],
+    }
+
+
+def build_column_calendar_meta(current_date: date | None, previous_date: date | None) -> dict[str, Any]:
+    meta: dict[str, Any] = {}
+    meta.update(build_single_day_meta("current", current_date))
+    meta.update(build_single_day_meta("previous", previous_date))
+    return meta
 
 
 def nice_axis_max(values: list[int | float | None]) -> int:
@@ -424,18 +508,7 @@ def build_running_totals(values: list[int | float | None], *, stop_at: int | Non
 
 
 def build_column_meta(current_date: date, previous_date: date | None) -> dict[str, Any]:
-    current_day_off = is_day_off(current_date)
-    previous_day_off = is_day_off(previous_date)
-    return {
-        "currentDate": current_date.isoformat(),
-        "previousDate": previous_date.isoformat() if previous_date else None,
-        "highlightCurrent": current_day_off,
-        "highlightPrevious": previous_day_off,
-        "isCurrentHoliday": current_day_off,
-        "isPreviousHoliday": previous_day_off,
-        "isCurrentWeekend": current_date.weekday() >= 5,
-        "isPreviousWeekend": previous_date.weekday() >= 5 if previous_date else False,
-    }
+    return build_column_calendar_meta(current_date, previous_date)
 
 
 def build_monthly_series_context(
@@ -1032,19 +1105,7 @@ def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date
                 "iceActual",
                 "iceDelta",
             ],
-            "columnMeta": [
-                {
-                    "currentDate": current.isoformat() if current else None,
-                    "previousDate": previous.isoformat() if previous else None,
-                    "highlightCurrent": is_day_off(current),
-                    "highlightPrevious": is_day_off(previous),
-                    "isCurrentHoliday": is_day_off(current),
-                    "isPreviousHoliday": is_day_off(previous),
-                    "isCurrentWeekend": current.weekday() >= 5 if current else False,
-                    "isPreviousWeekend": previous.weekday() >= 5 if previous else False,
-                }
-                for current, previous in zip(current_dates, previous_dates)
-            ],
+            "columnMeta": [build_column_calendar_meta(current, previous) for current, previous in zip(current_dates, previous_dates)],
             "rows": matrix_rows,
         },
         "chart": {

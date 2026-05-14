@@ -1625,6 +1625,19 @@ function renderTrendBoard(trend) {
   const previousHighlightRowKeys = new Set(["previousActual", "previousCumulative"]);
   const currentHighlightRowKeys = new Set(["target", "actual", "cumulativeTarget", "cumulativeActual", "nevActual", "iceActual"]);
 
+  const getCalendarBadge = (meta = {}) => {
+    if (meta.isCurrentHoliday) {
+      return { text: "节", className: "trend-date-badge is-holiday" };
+    }
+    if (meta.isCurrentMakeupWorkday) {
+      return { text: "班", className: "trend-date-badge is-makeup" };
+    }
+    if (meta.isCurrentWeekend) {
+      return { text: "周", className: "trend-date-badge is-weekend" };
+    }
+    return null;
+  };
+
   const getTrendCellClassName = (rowKey, meta = {}) => {
     const classNames = [];
     const shouldHighlightPrevious = previousHighlightRowKeys.has(rowKey) && meta.highlightPrevious;
@@ -1637,6 +1650,9 @@ function renderTrendBoard(trend) {
     if (shouldHighlightPrevious) classNames.push("is-previous-highlight");
     if ((shouldHighlightCurrent && meta.isCurrentHoliday) || (shouldHighlightPrevious && meta.isPreviousHoliday)) {
       classNames.push("is-holiday-highlight");
+    }
+    if ((shouldHighlightCurrent && meta.isCurrentMakeupWorkday) || (shouldHighlightPrevious && meta.isPreviousMakeupWorkday)) {
+      classNames.push("is-makeup-highlight");
     }
     return classNames.join(" ");
   };
@@ -1675,7 +1691,18 @@ function renderTrendBoard(trend) {
   };
 
   const headerCells = (trend.matrix.labels ?? [])
-    .map((label) => `<th>${escapeHtml(label)}</th>`)
+    .map((label, index) => {
+      const meta = columnMeta[index] ?? {};
+      const badge = getCalendarBadge(meta);
+      const headerClassName = [
+        meta.isCurrentHoliday ? "is-holiday-col" : "",
+        meta.isCurrentWeekend ? "is-weekend-col" : "",
+        meta.isCurrentMakeupWorkday ? "is-makeup-col" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return `<th class="${headerClassName}"><div class="trend-date-head"><span class="trend-date-label">${escapeHtml(label)}</span>${badge ? `<span class="${badge.className}">${badge.text}</span>` : ""}</div></th>`;
+    })
     .join("");
 
   table.innerHTML = `

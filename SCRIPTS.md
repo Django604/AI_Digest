@@ -22,6 +22,7 @@
   - 如果只有 `generatedAt` 变化、其余内容没变，脚本不会重复改写 `docs/data/dashboard.json`，更适合定时任务或 CI 场景
   - 摘要文件会输出报表日期、输入文件修改时间、dashboard 数量、section 数量以及本次是否真的发生内容更新
   - `--report-date` 支持 `YYYY-MM-DD` 与 `YYYYMMDD`，用于本地取数后强制按指定业务日期重建页面数据，避免依赖 Excel 缓存公式日期
+  - 趋势表的 `columnMeta` 现在会同时输出 `holiday / weekend / makeupWorkday / regularWorkday` 语义，前端据此显示 `节 / 周 / 班` 标签并区分补班日
 
 ## scripts/fetch_daily_data.py
 
@@ -165,6 +166,8 @@
   - `python scripts/serve_dashboard.py --port 4173 [--open-browser]`
   - 作为 GitHub Pages 远端后端：`python scripts/serve_dashboard.py --host 0.0.0.0 --port 4173 --no-open-browser --cors-allow-origin https://<你的-pages-域名>`
   - 只想本地刷新、不自动推 GitHub 时：`python scripts/serve_dashboard.py --port 4173 --no-auto-publish`
+  - 自定义访问日志目录：`python scripts/serve_dashboard.py --access-log-dir .runtime\\custom_access_logs`
+  - 关闭访问日志：`python scripts/serve_dashboard.py --no-access-log`
 - 运行前提：
   - 本机可用 `Python`（仅使用标准库）
 - 输出结果：
@@ -173,6 +176,8 @@
   - 端口被占用或目录缺失时会在控制台给出错误提示；按 `Ctrl+C` 即可退出
   - API 端点包括 `/api/update-status`、`/api/update-data`、`/api/dashboard-data`、`/api/dashboard-summary`
   - `--cors-allow-origin` 可重复传入多个域名；默认允许 `*`
+  - 默认会把页面访问与关键 API 访问写到 `.runtime/access_logs/visits-YYYYMMDD.jsonl`，记录 `clientIp`、`remoteAddr`、`forwardedFor`、时间、路径、状态码、`User-Agent` 与 `Referer`
+  - 访问日志只保留在服务端，不会展示在前端页面；静态资源和 `/api/update-status` 这类高频噪声请求默认不写入
   - 网页手动更新会复用和 `scheduled_update_runner.py` 相同的共享锁；已有交互任务、静默任务或其他网页更新在跑时，再次点击只会返回当前状态，不会并发回写 Excel
   - 默认会在手动更新成功后自动调用 `scripts/publish_dashboard.ps1 -SkipRebuild` 发布到 GitHub；如只想本地刷新可显式加 `--no-auto-publish`
 

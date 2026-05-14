@@ -1023,6 +1023,59 @@ button,
   font-size: 0.88rem;
 }
 
+.trend-date-head {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+
+.trend-date-label {
+  display: inline-block;
+}
+
+.trend-date-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.trend-date-badge.is-holiday {
+  background: rgba(196, 206, 216, 0.92);
+  color: #394858;
+}
+
+.trend-date-badge.is-weekend {
+  background: rgba(115, 137, 163, 0.18);
+  color: #52667c;
+}
+
+.trend-date-badge.is-makeup {
+  background: rgba(232, 186, 78, 0.22);
+  color: #8f5a00;
+  border: 1px solid rgba(192, 130, 20, 0.18);
+}
+
+.trend-matrix thead th.is-holiday-col {
+  background: linear-gradient(180deg, #edf1f5, #dfe5eb);
+}
+
+.trend-matrix thead th.is-weekend-col {
+  background: linear-gradient(180deg, #f2f5f8, #e7edf3);
+}
+
+.trend-matrix thead th.is-makeup-col {
+  background: linear-gradient(180deg, rgba(255, 248, 232, 0.98), rgba(248, 234, 196, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(222, 182, 86, 0.24);
+}
+
 .trend-matrix .is-calendar-highlight {
   background: rgba(216, 222, 230, 0.46);
 }
@@ -1041,6 +1094,11 @@ button,
   background-color: rgba(216, 222, 230, 0.68);
 }
 
+.trend-matrix .is-makeup-highlight {
+  background-color: rgba(245, 233, 198, 0.88);
+  box-shadow: inset 0 1px 0 rgba(214, 176, 88, 0.18);
+}
+
 .arrival-matrix td.is-current-highlight {
   background: rgba(194, 15, 47, 0.1) !important;
 }
@@ -1053,8 +1111,16 @@ button,
   background: rgba(214, 220, 228, 0.88) !important;
 }
 
+.arrival-matrix td.is-current-highlight.is-makeup-highlight {
+  background: rgba(247, 235, 201, 0.94) !important;
+}
+
 .arrival-matrix td.is-previous-highlight.is-holiday-highlight {
   background: rgba(165, 180, 198, 0.3) !important;
+}
+
+.arrival-matrix td.is-previous-highlight.is-makeup-highlight {
+  background: rgba(235, 221, 180, 0.5) !important;
 }
 
 .mixed-chart {

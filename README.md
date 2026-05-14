@@ -41,6 +41,7 @@
    这会同时生成 `docs/data/dashboard.json` 和 `docs/data/dashboard.summary.json`
 4. 双击 `start_dashboard_server.bat`，或手动运行 `python scripts/serve_dashboard.py --port 4173`
 5. 打开 `http://127.0.0.1:4173`，即使误写成 `/docs` 或 `/AI_Digest` 等路径也会被回退到 `index.html`
+   服务端会默认把页面/API 访问记录写到 `.runtime/access_logs/visits-YYYYMMDD.jsonl`，其中包含 `clientIp`、时间、路径、状态码和 `User-Agent`，不会显示在前端页面
 6. 如果静默更新失败，需要手动兜底，可在本地服务页面左侧点击 `数据更新`；它会按当天 `N-1` 抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日`、`NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店`，分别更新 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`，重建页面数据，并在成功后自动执行 GitHub 发布
 7. 如需指定业务日期或保留运行痕迹排查问题，可直接执行 `python scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`
    其中 `NEV本期来店`、`NEV同期来店` 会通过内部包装器直接走 FineReport 后台 `chart.data` 导出链，`ICE本期来店`、`ICE同期来店` 会通过内部包装器强制走 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
@@ -96,6 +97,8 @@
 - 工作流已经改成读取当前实际使用的两本源文件：`NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`。
 - `docs/data/dashboard.summary.json` 提供了报表日期、输入文件修改时间、dashboard 数量和本次是否真的发生内容变更，方便后续定时任务或自动巡检直接读取。
 - 页面上的 `数据更新` 按钮现在是“静默失败后的手动兜底入口”：在本机 `serve_dashboard.py` 页面或配置了 `docs/data/runtime-config.json.serviceBaseUrl` 的 GitHub Pages 页面上，它都会执行完整的抓取、重建与自动发布链路；未配置时公开页面会退化为静态浏览模式。
+- 趋势明细表现在会根据年度节假日配置直接标出 `节 / 周 / 班`：`节` 为法定节假日，`周` 为普通周末，`班` 为调休补班日；补班不会再被误判成周末或放假。
+- `serve_dashboard.py` 现在会把页面访问与关键 API 访问静默记录到 `.runtime/access_logs/`；如果服务前面挂了反向代理或 CDN，可通过 `CF-Connecting-IP`、`X-Forwarded-For`、`X-Real-IP` 头识别真实来源 IP。
 - `start_dashboard_server.bat` 默认会自动打开浏览器，并把额外参数原样转发给 `serve_dashboard.py`；例如可用 `start_dashboard_server.bat --no-auto-publish` 做只更新本地不自动推 GitHub 的临时调试。
 - 即使远端更新服务临时不可达，页面现在也会自动回退到已发布的静态 `docs/data/dashboard.json`，避免整页直接加载失败。
 ## Auto Publish Notes

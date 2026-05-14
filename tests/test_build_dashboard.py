@@ -17,8 +17,10 @@ from scripts.build_dashboard import (
     OUT_JSON,
     SUMMARY_JSON,
     build_arrival_series,
+    build_column_meta,
     build_payload,
     build_run_summary,
+    get_day_calendar_meta,
     load_arrival_daily_sheet,
     validate_report_date_cell,
     validate_sheet_headers,
@@ -199,6 +201,22 @@ class BuildDashboardPayloadTests(unittest.TestCase):
 
 
 class BuildDashboardValidationTests(unittest.TestCase):
+    def test_day_calendar_meta_distinguishes_holiday_weekend_makeup_and_regular_workday(self) -> None:
+        self.assertEqual(get_day_calendar_meta(date(2026, 5, 4))["dayType"], "holiday")
+        self.assertEqual(get_day_calendar_meta(date(2026, 5, 5))["dayType"], "holiday")
+        self.assertEqual(get_day_calendar_meta(date(2026, 5, 9))["dayType"], "makeupWorkday")
+        self.assertEqual(get_day_calendar_meta(date(2026, 5, 10))["dayType"], "weekend")
+        self.assertEqual(get_day_calendar_meta(date(2026, 5, 11))["dayType"], "regularWorkday")
+
+    def test_build_column_meta_marks_makeup_workday_without_weekend_or_holiday_flags(self) -> None:
+        meta = build_column_meta(date(2026, 5, 9), date(2026, 4, 9))
+
+        self.assertTrue(meta["highlightCurrent"])
+        self.assertTrue(meta["isCurrentMakeupWorkday"])
+        self.assertFalse(meta["isCurrentHoliday"])
+        self.assertFalse(meta["isCurrentWeekend"])
+        self.assertEqual(meta["currentDayType"], "makeupWorkday")
+
     def test_arrival_previous_cumulative_stops_at_last_available_previous_day(self) -> None:
         series = build_arrival_series(
             date(2026, 5, 5),
