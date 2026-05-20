@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-14T16:40:53",
+  "generatedAt": "2026-05-20T09:13:43",
   "latestMonth": "2026-05",
   "months": [
     {
@@ -7,11 +7,11 @@
       "year": 2026,
       "month": 5,
       "label": "2026 年 5 月",
-      "reportDate": "2026-05-13",
-      "reportDateLabel": "2026-05-13",
+      "reportDate": "2026-05-19",
+      "reportDateLabel": "2026-05-19",
       "dashboardPath": "./data/monthly/2026-05/dashboard.json",
       "summaryPath": "./data/monthly/2026-05/dashboard.summary.json",
-      "generatedAt": "2026-05-14T16:40:53"
+      "generatedAt": "2026-05-20T09:13:43"
     },
     {
       "key": "2026-04",
