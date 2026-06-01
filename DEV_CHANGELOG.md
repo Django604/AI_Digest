@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-06-01 19:45
+- 需求 / 目标：修复切换到 `2026-06` 后仍展示 `2026-05-31` 数据的问题，并发布到 GitHub。
+- 改动内容：更新 `scripts/serve_dashboard.py`，月初归档开启新月份时生成 `docs/data/monthly/YYYY-MM/` 空白 dashboard/summary，并让新月份入口指向空白归档；更新 `docs/assets/app.js`，默认当前月加载优先使用月度索引入口；生成当前 `2026-06` 空白归档数据；更新 `tests/test_serve_dashboard.py` 与 `SCRIPTS.md`。
+- 涉及文件：`scripts/serve_dashboard.py`、`docs/assets/app.js`、`docs/data/monthly/index.json`、`docs/data/monthly/2026-06/dashboard.json`、`docs/data/monthly/2026-06/dashboard.summary.json`、`tests/test_serve_dashboard.py`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 -m py_compile ...`、`node --check docs\assets\app.js`、`archive_current_dashboard_month()`、`python -B -X utf8 -m unittest tests.test_serve_dashboard -v`
+- 验证结果：`2026-06` 入口已指向 `./data/monthly/2026-06/dashboard.json`；空白 dashboard 的标题/日期列为 6 月，实绩与图表序列为空值；未扫到 `05.31`、`5月` 或 5 月实绩数字残留；`tests.test_serve_dashboard` 13 项通过。
+- 回滚方法：回退上述文件并删除 `docs/data/monthly/2026-06/` 空白归档目录，恢复 `monthly/index.json` 的 6 月入口指向策略，并删除本条记录。
+- 关联提交（如有）：待补充
+- 备注：此前仅修正了月份导航状态，没有修正 6 月入口的数据源指向；本次补齐数据源层修复。
+
 ## 2026-06-01 19:25
 - 需求 / 目标：修复月度切换中 `6 月` 出现但切换后仍被显示为 `5 月` 的首日归档边界问题。
 - 改动内容：更新 `docs/assets/app.js`，启动时先加载月度索引再加载 dashboard；导航月份优先使用 `monthly/index.json` 的 `latestMonth` 或用户请求月份，不再单纯从 `dashboard.json` 的 `meta.reportDate` 反推，避免 `2026-06` live 面板因日报业务日期 `2026-05-31` 被误判为 `2026-05`。

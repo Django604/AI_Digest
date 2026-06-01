@@ -155,13 +155,13 @@
   - 跳过重建：`python scripts/dashboard_publish.py --skip-rebuild`
   - 允许已有暂存文件：`python scripts/dashboard_publish.py --allow-existing-staged`
 - 备注：
-  - 定时更新与网页手动兜底现在都直接调用这个 Python 入口
+  - 定时更新与附魔工作台手动兜底会调用这个 Python 入口
   - `git push` 带 300 秒超时，若被中断会自动重试一次，并在失败时保留完整的阶段与命令信息
 
 ## scripts/serve_dashboard.py
 
 - 路径：`./scripts/serve_dashboard.py`
-- 作用：启动一个指向 `docs/` 目录的 `ThreadingHTTPServer`，并在访问 `/docs`、`/AI_Digest` 等“干净 URL”时自动回退到 `index.html`；同时暴露 dashboard 数据、历史归档索引和当前月份归档保存 API；手动兜底更新入口已迁移到附魔工作台
+- 作用：启动一个指向 `docs/` 目录的 `ThreadingHTTPServer`，并在访问 `/docs`、`/AI_Digest` 等“干净 URL”时自动回退到 `index.html`；同时暴露 dashboard 数据和历史归档索引；手动兜底更新与月度归档发布入口已迁移到附魔工作台
 - 使用方法：
   - `python scripts/serve_dashboard.py --port 4173 [--open-browser]`
   - 作为 GitHub Pages 远端后端：`python scripts/serve_dashboard.py --host 0.0.0.0 --port 4173 --no-open-browser --cors-allow-origin https://<你的-pages-域名>`
@@ -174,12 +174,13 @@
   - 控制台展示访问地址，例如 `http://127.0.0.1:4173`
 - 备注：
   - 端口被占用或目录缺失时会在控制台给出错误提示；按 `Ctrl+C` 即可退出
-  - API 端点包括 `/api/update-status`、`/api/update-data`、`/api/dashboard-data`、`/api/dashboard-summary`、`/api/dashboard-archive`、`/api/archive-current-month`
+  - API 端点包括 `/api/update-status`、`/api/update-data`、`/api/dashboard-data`、`/api/dashboard-summary`、`/api/dashboard-archive`
   - `--cors-allow-origin` 可重复传入多个域名；默认允许 `*`
   - 默认会把页面访问与关键 API 访问写到 `.runtime/access_logs/visits-YYYYMMDD.jsonl`，记录 `clientIp`、`remoteAddr`、`forwardedFor`、时间、路径、状态码、`User-Agent` 与 `Referer`
   - 访问日志只保留在服务端，不会展示在前端页面；静态资源和 `/api/update-status` 这类高频噪声请求默认不写入
   - `/api/update-status` 与 `/api/update-data` 仅保留兼容响应，会提示手动兜底更新已迁移到附魔工作台
-  - `/api/archive-current-month` 会复用现有 `docs/data/monthly/YYYY-MM/` 归档结构，保存当前报表月份；若源数据更新时间是每月 1 日，会在 `docs/data/monthly/index.json` 中开启源数据所属的新月份入口
+  - “保存当前月为历史数据”写入动作已迁移到 `附魔工作台` 的 `/api/archive-current-month`，避免 GitHub Pages 静态站点发起无效 POST
+  - 月初归档开启新月份时，会在 `docs/data/monthly/YYYY-MM/` 生成空白 dashboard/summary，并让新月份入口指向该空白归档，避免新月份继续展示上月末 live 数据
 
 ## start_dashboard_server.bat
 
@@ -198,13 +199,13 @@
 ## docs/data/runtime-config.json
 
 - 路径：`./docs/data/runtime-config.json`
-- 作用：给静态前端提供远端更新服务地址，让 GitHub Pages 页面能把 `数据更新` 按钮请求转发到独立后端
+- 作用：给静态前端提供远端数据服务地址，让 GitHub Pages 页面可读取独立后端的最新 dashboard 数据
 - 使用方法：
   - `serviceBaseUrl`：填写远端后端基地址，例如 `https://digest-api.example.com`
   - `dashboardDataUrl`：可选；留空时前端默认使用 `${serviceBaseUrl}/api/dashboard-data`
 - 备注：
   - 该文件适合保存公开可见的服务地址，不应放置账号密码等敏感配置
-  - 如果两个字段都留空，公开页面会回退到静态 `docs/data/dashboard.json` 浏览模式；此时如需手动兜底，请直接打开本机 `serve_dashboard.py` 页面点击同一个 `数据更新` 按钮
+  - 如果两个字段都留空，公开页面会回退到静态 `docs/data/dashboard.json` 浏览模式；此时如需手动兜底或月度归档发布，请打开 `附魔工作台`
 
 ## tests/test_build_dashboard.py
 
@@ -230,14 +231,14 @@
 ## tests/test_serve_dashboard.py
 
 - 路径：`./tests/test_serve_dashboard.py`
-- 作用：校验本地更新任务管理器不会锁死，能识别共享锁冲突，并通过真实 HTTP 请求验证 `/api/update-status` 与 `/api/update-data` 的交互及手动自动发布链路
+- 作用：校验本地 dashboard 服务的静态数据、历史归档、访问日志和迁移提示 API 行为
 - 使用方法：
   - `python -m unittest discover -s tests -v`
 ## Auto Publish Update
 
 - `scripts/scheduled_update_runner.py` now supports `--auto-publish`, `--publish-remote`, `--publish-branch`, and `--publish-commit-message`.
 - `scripts/register_daily_update_task.ps1` now supports `-AutoPublish`, `-PublishRemote`, and `-PublishBranch`.
-- Auto publish calls `scripts/publish_dashboard.ps1 -SkipRebuild`, so the scheduled task reuses the existing guarded git add/commit/push flow instead of rebuilding `dashboard.json` twice.
+- Auto publish calls `scripts/dashboard_publish.py --skip-rebuild`, so the scheduled task reuses the existing guarded git add/commit/push flow instead of rebuilding `dashboard.json` twice.
 - If the silent fallback task runs as `SYSTEM`, make sure `SYSTEM` can use Git credentials on this machine, or the refresh step may succeed while publish still fails.
 ## scripts/run_silent_test_once.ps1
 
@@ -248,7 +249,7 @@
 ## 月度归档
 
 - `scripts/build_dashboard.py`：除当前 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 外，还会同步生成 `docs/data/monthly/YYYY-MM/dashboard.json`、`docs/data/monthly/YYYY-MM/dashboard.summary.json`，并维护 `docs/data/monthly/index.json`。
-- `scripts/serve_dashboard.py`：新增 `/api/dashboard-archive` 与 `/api/archive-current-month`；`/api/dashboard-data` 与 `/api/dashboard-summary` 支持 `?month=YYYY-MM`，供前端按年月加载历史归档或当前源数据月份入口。
+- `scripts/serve_dashboard.py`：提供 `/api/dashboard-archive`；`/api/dashboard-data` 与 `/api/dashboard-summary` 支持 `?month=YYYY-MM`，供前端按年月加载历史归档或当前源数据月份入口。写入型的月度归档发布已迁移到 `附魔工作台`；若源数据更新时间为每月首日，会为新月份写入空白归档并将索引入口指向该空白文件。
 
 ## scripts/probe_system_git_publish.ps1
 

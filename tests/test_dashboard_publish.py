@@ -68,6 +68,14 @@ class DashboardPublishTests(unittest.TestCase):
         self.assertEqual(run_command_mock.call_count, 2)
         self.assertTrue(any("Push was interrupted once; retrying after a short pause..." in line for line in logs))
 
+    def test_check_staged_files_allows_monthly_archive_files(self) -> None:
+        staged_output = "docs/data/monthly/index.json\ndocs/data/monthly/2026-05/dashboard.json\n"
+        with mock.patch(
+            "scripts.dashboard_publish._run_git",
+            return_value=dashboard_publish.CommandResult(0, staged_output),
+        ):
+            dashboard_publish._check_staged_files(dashboard_publish.PROJECT_ROOT)
+
 
 if __name__ == "__main__":
     unittest.main()

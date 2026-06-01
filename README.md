@@ -42,7 +42,7 @@
 4. 双击 `start_dashboard_server.bat`，或手动运行 `python scripts/serve_dashboard.py --port 4173`
 5. 打开 `http://127.0.0.1:4173`，即使误写成 `/docs` 或 `/AI_Digest` 等路径也会被回退到 `index.html`
    服务端会默认把页面/API 访问记录写到 `.runtime/access_logs/visits-YYYYMMDD.jsonl`，其中包含 `clientIp`、时间、路径、状态码和 `User-Agent`，不会显示在前端页面
-6. 手动兜底更新已迁移到 `附魔工作台`，本页面只保留静态数据浏览、截图导出和月份归档能力
+6. 手动兜底更新与“保存当前月为历史数据”已迁移到 `附魔工作台`，本页面只保留静态数据浏览、截图导出和月份切换能力
 7. 如需指定业务日期或保留运行痕迹排查问题，可直接执行 `python scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`
    其中 `NEV本期来店`、`NEV同期来店` 会通过内部包装器直接走 FineReport 后台 `chart.data` 导出链，`ICE本期来店`、`ICE同期来店` 会通过内部包装器强制走 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
 8. 如需让这台电脑每天自动更新，可执行 `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1`
@@ -56,7 +56,7 @@
    `python scripts/serve_dashboard.py --host 0.0.0.0 --port 4173 --no-open-browser --cors-allow-origin https://<你的-pages-域名>`
 2. 把 `docs/data/runtime-config.json` 里的 `serviceBaseUrl` 改成这个后端地址，例如 `https://digest-api.example.com`
 3. 如无特殊需要，`dashboardDataUrl` 留空即可，前端会自动改为从 `${serviceBaseUrl}/api/dashboard-data` 读取最新 dashboard 数据
-4. 把这份配置随站点一起发布到 GitHub Pages 后，页面可读取远端后端的当前数据、历史归档索引和月度归档保存接口
+4. 把这份配置随站点一起发布到 GitHub Pages 后，页面可读取远端后端的当前数据和历史归档索引；写入型操作统一改到 `附魔工作台`
 5. 如果你想保持仓库里的 `runtime-config.json` 为空，不改公开站点默认行为，也可以只在本机运行 `python scripts/serve_dashboard.py --port 4173`；需要手动兜底时，改用 `附魔工作台`
 
 注意：
@@ -86,6 +86,7 @@
    - `data/source/NEV+ICE_ldai.xlsx`
    - `docs/data/dashboard.json`
    - `docs/data/dashboard.summary.json`
+   - `docs/data/monthly/`
 4. `GitHub Actions` 自动重新生成并发布页面
 5. 别人打开 GitHub Pages 链接时，就能看到最新数据
 
@@ -105,8 +106,8 @@
 
 - To let scheduled updates publish to GitHub Pages automatically, register the tasks with `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -AutoPublish -PublishRemote origin -PublishBranch main`.
 - The scheduled runner now supports `--auto-publish`, `--publish-remote`, `--publish-branch`, and `--publish-commit-message`.
-- `scripts/serve_dashboard.py` now treats the existing `数据更新` button as a manual fallback path and auto publishes by default; use `--no-auto-publish` only if you want local refresh without git push.
-- Auto publish reuses `scripts/publish_dashboard.ps1 -SkipRebuild`, so it stages only the two workbook files plus `docs/data/dashboard.json` and `docs/data/dashboard.summary.json`.
+- `附魔工作台` now owns write actions such as manual fallback and month archive publish; `scripts/serve_dashboard.py` only serves read APIs for the static dashboard.
+- Auto publish reuses `scripts/dashboard_publish.py -SkipRebuild`, so it stages the two workbook files, current dashboard JSON files, and `docs/data/monthly/`.
 - No Codex approval is needed when the scheduled task runs later on this machine. The task uses the local account context configured in Windows Task Scheduler.
 - If the silent fallback task runs as `SYSTEM`, Git credentials must also be available to `SYSTEM`; otherwise data refresh may succeed but `git push` can still fail.
 
@@ -115,5 +116,5 @@
 - `scripts/build_dashboard.py` 现在会在刷新当前 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 的同时，同步写入 `docs/data/monthly/YYYY-MM/dashboard.json` 与 `docs/data/monthly/YYYY-MM/dashboard.summary.json`。
 - 所有可切换月份会汇总到 `docs/data/monthly/index.json`，页面侧边栏的“切换年月”按钮会读取这里的归档清单。
 - 页面默认仍展示当前这份 dashboard 数据；切到历史月份后，读取的是对应月份的归档快照，不会被后续新月份的数据覆盖。
-- `scripts/serve_dashboard.py` 现已新增 `/api/dashboard-archive` 与 `/api/archive-current-month`，并让 `/api/dashboard-data`、`/api/dashboard-summary` 支持 `?month=YYYY-MM` 查询参数。
-- 页面侧边栏“保存当前月为历史数据”会调用 `/api/archive-current-month`：普通日期只固化当前报表月份；若源数据更新时间是每月 1 日，会先保存上一报表月份，再在月份索引里开启源数据所属的新月份入口。
+- `scripts/serve_dashboard.py` 提供 `/api/dashboard-archive`，并让 `/api/dashboard-data`、`/api/dashboard-summary` 支持 `?month=YYYY-MM` 查询参数。
+- “保存当前月为历史数据”已迁移到 `附魔工作台` 首页的“月度归档发布”：点击后会固化当前报表月份，若源数据更新时间是每月 1 日，会开启源数据所属的新月份空白入口，并顺手提交、推送到 GitHub。

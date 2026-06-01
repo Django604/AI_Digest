@@ -369,7 +369,11 @@ class ServeDashboardTests(unittest.TestCase):
         index_payload = json.loads(index_path.read_text(encoding="utf-8"))
         self.assertEqual(index_payload["latestMonth"], "2026-06")
         self.assertEqual(index_payload["months"][0]["key"], "2026-06")
-        self.assertEqual(index_payload["months"][0]["dashboardPath"], "./data/dashboard.json")
+        self.assertEqual(index_payload["months"][0]["dashboardPath"], "./data/monthly/2026-06/dashboard.json")
+        self.assertTrue(index_payload["months"][0]["blankMonth"])
+        blank_payload = json.loads((monthly_dir / "2026-06" / "dashboard.json").read_text(encoding="utf-8"))
+        self.assertEqual(blank_payload["meta"]["reportDate"], "2026-06-01")
+        self.assertTrue(blank_payload["meta"]["blankMonth"])
 
     def test_options_request_includes_cors_headers(self) -> None:
         with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:

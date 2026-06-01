@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import calendar
+import copy
 import functools
 import json
 import sys
@@ -13,12 +15,12 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlparse
 
 try:
-    from .build_dashboard import month_key, write_monthly_archive
+    from .build_dashboard import build_column_calendar_meta, month_key, write_monthly_archive
     from .dashboard_publish import PublishError, resolve_publish_commit_message
     from .fetch_daily_data import format_business_date, parse_business_date, run_update
     from .scheduled_update_runner import ScheduledUpdateLock, build_lock_path, run_publish_step
 except ImportError:  # pragma: no cover - script entrypoint fallback
-    from build_dashboard import month_key, write_monthly_archive
+    from build_dashboard import build_column_calendar_meta, month_key, write_monthly_archive
     from dashboard_publish import PublishError, resolve_publish_commit_message
     from fetch_daily_data import format_business_date, parse_business_date, run_update
     from scheduled_update_runner import ScheduledUpdateLock, build_lock_path, run_publish_step
@@ -40,7 +42,6 @@ ACCESS_LOG_API_PATHS = {
     "/api/dashboard-data",
     "/api/dashboard-summary",
     "/api/dashboard-archive",
-    "/api/archive-current-month",
     "/api/update-data",
 }
 
@@ -193,6 +194,191 @@ def build_docs_data_url(path: Path) -> str:
     return "./" + relative_path.as_posix()
 
 
+def month_dates_for(value: date) -> list[date]:
+    _, last_day = calendar.monthrange(value.year, value.month)
+    return [date(value.year, value.month, day) for day in range(1, last_day + 1)]
+
+
+def previous_month_aligned(value: date) -> date | None:
+    previous_year = value.year if value.month > 1 else value.year - 1
+    previous_month_value = value.month - 1 if value.month > 1 else 12
+    _, previous_last_day = calendar.monthrange(previous_year, previous_month_value)
+    if value.day > previous_last_day:
+        return None
+    return date(previous_year, previous_month_value, value.day)
+
+
+def format_axis_date(value: date | None) -> str:
+    return "-" if value is None else f"{value.month}/{value.day}"
+
+
+def format_sheet_date(value: date | None) -> str:
+    return "-" if value is None else f"{value.year}/{value.month}/{value.day}"
+
+
+def build_blank_month_payload(payload: dict[str, Any], summary: dict[str, Any], month_date: date) -> dict[str, Any]:
+    blank_payload = copy.deepcopy(payload)
+    generated_at = str(summary.get("generatedAt") or datetime.now().isoformat(timespec="seconds"))
+    month_label = f"{month_date.year} 年 {month_date.month} 月"
+    month_start = month_date.replace(day=1)
+    month_end_day = calendar.monthrange(month_date.year, month_date.month)[1]
+    month_end = month_date.replace(day=month_end_day)
+
+    meta = blank_payload.setdefault("meta", {})
+    meta.update(
+        {
+            "generatedAt": generated_at,
+            "reportDate": month_start.isoformat(),
+            "reportDateLabel": f"{month_label}待更新",
+            "dataRangeStart": month_start.isoformat(),
+            "dataRangeEnd": month_end.isoformat(),
+            "blankMonth": True,
+            "blankMonthReason": "新月份数据尚未刷新。",
+        }
+    )
+
+    dashboards = blank_payload.get("dashboards")
+    if isinstance(dashboards, dict):
+        for dashboard in dashboards.values():
+            blank_dashboard_for_month(dashboard, month_start)
+
+    return blank_payload
+
+
+def build_blank_month_summary(summary: dict[str, Any], blank_payload: dict[str, Any], month_date: date) -> dict[str, Any]:
+    blank_summary = copy.deepcopy(summary)
+    generated_at = str(summary.get("generatedAt") or datetime.now().isoformat(timespec="seconds"))
+    month_start = month_date.replace(day=1)
+    dashboards = blank_payload.get("dashboards", {})
+    analysis = blank_payload.get("analysis", {})
+    issues = analysis.get("issues", []) if isinstance(analysis, dict) else []
+    blank_summary.update(
+        {
+            "generatedAt": generated_at,
+            "reportDate": month_start.isoformat(),
+            "reportDateLabel": f"{month_start.year} 年 {month_start.month} 月待更新",
+            "blankMonth": True,
+            "warnings": ["新月份数据尚未刷新，当前为占位空白面板。"],
+            "stats": {
+                "dashboardCount": len(dashboards) if isinstance(dashboards, dict) else 0,
+                "sectionCounts": {
+                    dashboard_id: len(dashboard.get("sections", []))
+                    for dashboard_id, dashboard in dashboards.items()
+                    if isinstance(dashboard, dict)
+                }
+                if isinstance(dashboards, dict)
+                else {},
+                "sheetCount": analysis.get("sheetCount", 0) if isinstance(analysis, dict) else 0,
+                "issueCount": len(issues) if isinstance(issues, list) else 0,
+            },
+        }
+    )
+    return blank_summary
+
+
+def blank_dashboard_for_month(dashboard: Any, month_start: date) -> None:
+    if not isinstance(dashboard, dict):
+        return
+
+    if dashboard.get("pageType") == "brief" or dashboard.get("id") == "brief":
+        dashboard["headline"] = ""
+        briefing = dashboard.get("briefing")
+        if isinstance(briefing, dict):
+            briefing.update(
+                {
+                    "headline": f"{month_start.month} 月数据待更新",
+                    "dateLabel": f"{month_start.month:02d}",
+                    "reportDate": month_start.isoformat(),
+                    "sections": [],
+                    "generatedText": "",
+                    "arrivalBrief": {"kind": "arrival", "title": "来店简报", "lines": [], "sourceSheets": []},
+                }
+            )
+        return
+
+    sections = dashboard.get("sections")
+    if not isinstance(sections, list):
+        return
+
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        trend = section.get("trend")
+        if isinstance(trend, dict):
+            blank_trend_for_month(trend, month_start)
+
+
+def replace_month_in_title(value: Any, month_start: date) -> Any:
+    if not isinstance(value, str):
+        return value
+    import re
+
+    return re.sub(r"\d{1,2}\s*月", f"{month_start.month}月", value)
+
+
+def replace_month_strings(value: Any, month_start: date) -> Any:
+    if isinstance(value, dict):
+        for key, item in list(value.items()):
+            value[key] = replace_month_strings(item, month_start)
+        return value
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            value[index] = replace_month_strings(item, month_start)
+        return value
+    return replace_month_in_title(value, month_start)
+
+
+def blank_trend_for_month(trend: dict[str, Any], month_start: date) -> None:
+    dates = month_dates_for(month_start)
+    previous_dates = [previous_month_aligned(item) for item in dates]
+    labels = [format_axis_date(item) for item in dates]
+    empty_values = ["-"] * len(dates)
+
+    trend["chartTitle"] = replace_month_in_title(trend.get("chartTitle"), month_start)
+    trend["tableTitle"] = replace_month_in_title(trend.get("tableTitle"), month_start)
+
+    summary_items = trend.get("summary", {}).get("items")
+    if isinstance(summary_items, list):
+        for item in summary_items:
+            if not isinstance(item, dict):
+                continue
+            item["value"] = None
+            item["displayValue"] = "-"
+            if "note" in item:
+                item["note"] = ""
+
+    matrix = trend.get("matrix")
+    if isinstance(matrix, dict):
+        matrix["labels"] = labels
+        matrix["columnMeta"] = [
+            build_column_calendar_meta(current, previous)
+            for current, previous in zip(dates, previous_dates)
+        ]
+        for row in matrix.get("rows", []):
+            if not isinstance(row, dict):
+                continue
+            row_key = str(row.get("key") or "")
+            if row_key == "currentDate":
+                row["displayValues"] = [format_sheet_date(item) for item in dates]
+            elif row_key == "previousDate":
+                row["displayValues"] = [format_sheet_date(item) for item in previous_dates]
+            else:
+                row["displayValues"] = list(empty_values)
+
+    chart = trend.get("chart")
+    if isinstance(chart, dict):
+        chart["labels"] = labels
+        chart["reportDayIndex"] = 0
+        chart["dailyAxisMax"] = 1000
+        chart["cumulativeAxisMax"] = 1000
+        for key, values in list((chart.get("series") or {}).items()):
+            if isinstance(values, list):
+                chart["series"][key] = [None] * len(dates)
+        chart["note"] = ""
+
+    replace_month_strings(trend, month_start)
+
+
 def write_json_payload(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -242,14 +428,33 @@ def resolve_dashboard_data_path(month_key_value: str | None, kind: str) -> Path:
 def ensure_source_month_entry(
     *,
     source_updated_at: datetime,
+    payload: dict[str, Any],
     summary: dict[str, Any],
     current_index: dict[str, Any],
 ) -> tuple[dict[str, Any], bool]:
     source_month = month_key(source_updated_at.date())
+    blank_dashboard_path = MONTHLY_ARCHIVE_DIR / source_month / "dashboard.json"
+    blank_summary_path = MONTHLY_ARCHIVE_DIR / source_month / "dashboard.summary.json"
+    blank_payload = build_blank_month_payload(payload, summary, source_updated_at.date())
+    blank_summary = build_blank_month_summary(summary, blank_payload, source_updated_at.date())
+    write_json_payload(blank_dashboard_path, blank_payload)
+    write_json_payload(blank_summary_path, blank_summary)
+
     month_entries = [item for item in current_index.get("months", []) if isinstance(item, dict)]
     existing_entry = next((item for item in month_entries if normalize_month_key(str(item.get("key") or "")) == source_month), None)
     if existing_entry:
         current_index["latestMonth"] = source_month
+        existing_entry.update(
+            {
+                "dashboardPath": build_docs_data_url(blank_dashboard_path),
+                "summaryPath": build_docs_data_url(blank_summary_path),
+                "reportDate": source_updated_at.date().isoformat(),
+                "reportDateLabel": f"{source_updated_at.year} 年 {source_updated_at.month} 月待更新",
+                "generatedAt": blank_summary.get("generatedAt"),
+                "liveSourceMonth": True,
+                "blankMonth": True,
+            }
+        )
         return current_index, False
 
     month_entries.append(
@@ -259,11 +464,12 @@ def ensure_source_month_entry(
             "month": source_updated_at.month,
             "label": f"{source_updated_at.year} 年 {source_updated_at.month} 月",
             "reportDate": source_updated_at.date().isoformat(),
-            "reportDateLabel": f"{source_updated_at.date().isoformat()} 源数据更新",
-            "dashboardPath": build_docs_data_url(DASHBOARD_JSON_PATH),
-            "summaryPath": build_docs_data_url(DASHBOARD_SUMMARY_PATH),
-            "generatedAt": summary.get("generatedAt"),
+            "reportDateLabel": f"{source_updated_at.year} 年 {source_updated_at.month} 月待更新",
+            "dashboardPath": build_docs_data_url(blank_dashboard_path),
+            "summaryPath": build_docs_data_url(blank_summary_path),
+            "generatedAt": blank_summary.get("generatedAt"),
             "liveSourceMonth": True,
+            "blankMonth": True,
         }
     )
     month_entries.sort(key=lambda item: str(item.get("key") or ""), reverse=True)
@@ -298,6 +504,7 @@ def archive_current_dashboard_month() -> dict[str, Any]:
             current_index = load_json_payload(MONTHLY_ARCHIVE_INDEX_PATH)
             updated_index, new_month_opened = ensure_source_month_entry(
                 source_updated_at=source_updated_at,
+                payload=payload,
                 summary=summary,
                 current_index=current_index,
             )
@@ -686,26 +893,6 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 status_code=409,
             )
             return
-        if parsed.path == "/api/archive-current-month":
-            try:
-                self._send_json(archive_current_dashboard_month())
-            except FileNotFoundError as exc:
-                self._send_json(
-                    {
-                        "status": "error",
-                        "message": f"保存历史数据失败，缺少文件：{exc.filename or exc}",
-                    },
-                    status_code=404,
-                )
-            except Exception as exc:
-                self._send_json(
-                    {
-                        "status": "error",
-                        "message": f"保存历史数据失败：{exc}",
-                    },
-                    status_code=500,
-                )
-            return
         self.send_error(404, "Not Found")
 
     def send_head(self):
@@ -811,7 +998,7 @@ def main(argv: list[str] | None = None) -> int:
             print("Clean URLs such as /docs or /AI_Digest fall back to index.html. Press Ctrl+C to exit.")
             print(
                 "Dashboard data APIs are available at /api/dashboard-data, /api/dashboard-summary "
-                "and /api/dashboard-archive. Manual fallback update moved to Enchant Workbench."
+                "and /api/dashboard-archive. Write actions moved to Enchant Workbench."
             )
             if args.access_log:
                 print(f"Access log is enabled. Visits will be appended to {httpd.access_log_root}.")

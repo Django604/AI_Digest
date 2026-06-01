@@ -21,6 +21,7 @@ PUBLISH_TARGETS = (
     "data/source/NEV+ICE_ldai.xlsx",
     "docs/data/dashboard.json",
     "docs/data/dashboard.summary.json",
+    "docs/data/monthly",
 )
 INTERRUPTED_EXIT_CODES = {3221225786, 130}
 PUSH_TIMEOUT_SECONDS = 300
@@ -204,7 +205,12 @@ def _check_staged_files(repo_root: Path) -> None:
         return
 
     allowed = {item.lower() for item in PUBLISH_TARGETS}
-    unexpected = [item for item in staged_files if item.lower() not in allowed]
+    allowed_prefixes = tuple(f"{item.lower().rstrip('/')}/" for item in PUBLISH_TARGETS)
+    unexpected = [
+        item
+        for item in staged_files
+        if item.lower() not in allowed and not item.lower().startswith(allowed_prefixes)
+    ]
     if unexpected:
         raise PublishError(
             "precheck",

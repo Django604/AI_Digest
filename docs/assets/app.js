@@ -195,6 +195,23 @@ function getArchiveEntry(monthKey) {
 function buildDashboardRequest(monthKey = "") {
   const normalizedMonthKey = normalizeMonthKey(monthKey);
   if (!normalizedMonthKey) {
+    const liveMonthKey = getLiveMonthKeyFromArchiveIndex();
+    const liveArchiveEntry = getArchiveEntry(liveMonthKey);
+    const liveDashboardPath =
+      typeof liveArchiveEntry?.dashboardPath === "string" && liveArchiveEntry.dashboardPath.trim()
+        ? liveArchiveEntry.dashboardPath.trim()
+        : "";
+    if (liveMonthKey && liveDashboardPath) {
+      return {
+        mode: "current",
+        monthKey: liveMonthKey,
+        primaryUrl: state.apiBaseUrl
+          ? `${buildApiUrl("/api/dashboard-data")}?month=${encodeURIComponent(liveMonthKey)}`
+          : liveDashboardPath,
+        fallbackUrl: state.apiBaseUrl ? liveDashboardPath : "",
+      };
+    }
+
     const primaryUrl = state.dashboardDataUrl;
     return {
       mode: "current",

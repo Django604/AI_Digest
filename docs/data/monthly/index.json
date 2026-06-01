@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-01T19:13:22",
+  "generatedAt": "2026-06-01T19:37:34",
   "latestMonth": "2026-06",
   "months": [
     {
@@ -8,11 +8,12 @@
       "month": 6,
       "label": "2026 年 6 月",
       "reportDate": "2026-06-01",
-      "reportDateLabel": "2026-06-01 源数据更新",
-      "dashboardPath": "./data/dashboard.json",
-      "summaryPath": "./data/dashboard.summary.json",
+      "reportDateLabel": "2026 年 6 月待更新",
+      "dashboardPath": "./data/monthly/2026-06/dashboard.json",
+      "summaryPath": "./data/monthly/2026-06/dashboard.summary.json",
       "generatedAt": "2026-06-01T09:07:26",
-      "liveSourceMonth": true
+      "liveSourceMonth": true,
+      "blankMonth": true
     },
     {
       "key": "2026-05",
