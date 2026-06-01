@@ -9,14 +9,16 @@ import webbrowser
 from datetime import date, datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlparse
 
 try:
+    from .build_dashboard import month_key, write_monthly_archive
     from .dashboard_publish import PublishError, resolve_publish_commit_message
     from .fetch_daily_data import format_business_date, parse_business_date, run_update
     from .scheduled_update_runner import ScheduledUpdateLock, build_lock_path, run_publish_step
 except ImportError:  # pragma: no cover - script entrypoint fallback
+    from build_dashboard import month_key, write_monthly_archive
     from dashboard_publish import PublishError, resolve_publish_commit_message
     from fetch_daily_data import format_business_date, parse_business_date, run_update
     from scheduled_update_runner import ScheduledUpdateLock, build_lock_path, run_publish_step
@@ -32,6 +34,15 @@ MONTHLY_ARCHIVE_INDEX_PATH = MONTHLY_ARCHIVE_DIR / "index.json"
 MANUAL_UPDATE_MODE = "manual-web"
 LEADS_WORKBOOK_PATH = DATA_SOURCE_DIR / "NEV+ICE_xsai.xlsm"
 ARRIVAL_WORKBOOK_PATH = DATA_SOURCE_DIR / "NEV+ICE_ldai.xlsx"
+ACCESS_LOG_ROOT = PROJECT_ROOT / ".runtime" / "access_logs"
+ACCESS_LOG_LOCK = threading.Lock()
+ACCESS_LOG_API_PATHS = {
+    "/api/dashboard-data",
+    "/api/dashboard-summary",
+    "/api/dashboard-archive",
+    "/api/archive-current-month",
+    "/api/update-data",
+}
 
 
 def build_idle_message(auto_publish: bool) -> str:
@@ -151,6 +162,208 @@ def resolve_archived_dashboard_path(month_key: str) -> Path:
 
 def resolve_archived_summary_path(month_key: str) -> Path:
     return MONTHLY_ARCHIVE_DIR / month_key / "dashboard.summary.json"
+
+
+def parse_iso_datetime(value: object) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def get_source_updated_at(payload: dict[str, Any], summary: dict[str, Any]) -> datetime | None:
+    meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+    inputs = summary.get("inputs") if isinstance(summary.get("inputs"), dict) else {}
+    for value in (
+        meta.get("workbookModifiedAt"),
+        inputs.get("workbookModifiedAt"),
+        inputs.get("arrivalWorkbookModifiedAt"),
+    ):
+        parsed = parse_iso_datetime(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def build_docs_data_url(path: Path) -> str:
+    relative_path = path.resolve().relative_to(DOCS_DIR.resolve())
+    return "./" + relative_path.as_posix()
+
+
+def write_json_payload(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def resolve_docs_path_from_url(value: object) -> Path | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.startswith("./"):
+        text = text[2:]
+    if text.startswith("/"):
+        text = text.lstrip("/")
+    candidate = (DOCS_DIR / text).resolve()
+    try:
+        candidate.relative_to(DOCS_DIR.resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
+def find_archive_entry(month_key_value: str) -> dict[str, Any] | None:
+    try:
+        archive_index = load_json_payload(MONTHLY_ARCHIVE_INDEX_PATH)
+    except FileNotFoundError:
+        return None
+    for item in archive_index.get("months", []):
+        if isinstance(item, dict) and normalize_month_key(str(item.get("key") or "")) == month_key_value:
+            return item
+    return None
+
+
+def resolve_dashboard_data_path(month_key_value: str | None, kind: str) -> Path:
+    if not month_key_value:
+        return DASHBOARD_SUMMARY_PATH if kind == "summary" else DASHBOARD_JSON_PATH
+
+    entry = find_archive_entry(month_key_value)
+    path_key = "summaryPath" if kind == "summary" else "dashboardPath"
+    if entry:
+        candidate = resolve_docs_path_from_url(entry.get(path_key))
+        if candidate is not None:
+            return candidate
+
+    return resolve_archived_summary_path(month_key_value) if kind == "summary" else resolve_archived_dashboard_path(month_key_value)
+
+
+def ensure_source_month_entry(
+    *,
+    source_updated_at: datetime,
+    summary: dict[str, Any],
+    current_index: dict[str, Any],
+) -> tuple[dict[str, Any], bool]:
+    source_month = month_key(source_updated_at.date())
+    month_entries = [item for item in current_index.get("months", []) if isinstance(item, dict)]
+    existing_entry = next((item for item in month_entries if normalize_month_key(str(item.get("key") or "")) == source_month), None)
+    if existing_entry:
+        current_index["latestMonth"] = source_month
+        return current_index, False
+
+    month_entries.append(
+        {
+            "key": source_month,
+            "year": source_updated_at.year,
+            "month": source_updated_at.month,
+            "label": f"{source_updated_at.year} 年 {source_updated_at.month} 月",
+            "reportDate": source_updated_at.date().isoformat(),
+            "reportDateLabel": f"{source_updated_at.date().isoformat()} 源数据更新",
+            "dashboardPath": build_docs_data_url(DASHBOARD_JSON_PATH),
+            "summaryPath": build_docs_data_url(DASHBOARD_SUMMARY_PATH),
+            "generatedAt": summary.get("generatedAt"),
+            "liveSourceMonth": True,
+        }
+    )
+    month_entries.sort(key=lambda item: str(item.get("key") or ""), reverse=True)
+    current_index.update(
+        {
+            "generatedAt": datetime.now().isoformat(timespec="seconds"),
+            "latestMonth": source_month,
+            "months": month_entries,
+        }
+    )
+    return current_index, True
+
+
+def archive_current_dashboard_month() -> dict[str, Any]:
+    payload = load_json_payload(DASHBOARD_JSON_PATH)
+    summary = load_json_payload(DASHBOARD_SUMMARY_PATH)
+    archive_info = write_monthly_archive(
+        payload,
+        summary,
+        archive_root=MONTHLY_ARCHIVE_DIR,
+        index_path=MONTHLY_ARCHIVE_INDEX_PATH,
+        docs_root=DOCS_DIR,
+    )
+    archived_month = str(archive_info.get("monthKey") or "")
+    source_updated_at = get_source_updated_at(payload, summary)
+    open_month = archived_month
+    new_month_opened = False
+
+    if source_updated_at is not None and source_updated_at.day == 1:
+        source_month = month_key(source_updated_at.date())
+        if source_month != archived_month:
+            current_index = load_json_payload(MONTHLY_ARCHIVE_INDEX_PATH)
+            updated_index, new_month_opened = ensure_source_month_entry(
+                source_updated_at=source_updated_at,
+                summary=summary,
+                current_index=current_index,
+            )
+            write_json_payload(MONTHLY_ARCHIVE_INDEX_PATH, updated_index)
+            open_month = source_month
+
+    return {
+        "status": "success",
+        "message": (
+            f"已保存 {archived_month} 为历史数据，并开启 {open_month} 面板。"
+            if new_month_opened
+            else f"已保存 {archived_month} 为历史数据。"
+        ),
+        "archivedMonthKey": archived_month,
+        "openMonthKey": open_month,
+        "newMonthOpened": new_month_opened,
+        "sourceUpdatedAt": source_updated_at.isoformat(timespec="seconds") if source_updated_at else "",
+        "archive": archive_info,
+    }
+
+
+def should_log_access(method: str, request_path: str) -> bool:
+    if method.upper() not in {"GET", "HEAD", "POST"}:
+        return False
+
+    path = urlparse(request_path).path or "/"
+    if path.startswith("/api/"):
+        return path in ACCESS_LOG_API_PATHS
+
+    suffix = Path(path).suffix.lower()
+    return suffix in {"", ".html"}
+
+
+def resolve_client_ip(headers, client_address: tuple[str, int] | tuple[str, ...]) -> tuple[str, str, str]:
+    remote_addr = str(client_address[0]) if client_address else ""
+    forwarded_for = str(headers.get("X-Forwarded-For") or "").strip()
+    forwarded_ip = ""
+    if forwarded_for:
+        forwarded_ip = forwarded_for.split(",", 1)[0].strip()
+    for candidate in (
+        str(headers.get("CF-Connecting-IP") or "").strip(),
+        forwarded_ip,
+        str(headers.get("X-Real-IP") or "").strip(),
+        remote_addr,
+    ):
+        if candidate:
+            return candidate, remote_addr, forwarded_for
+    return "", remote_addr, forwarded_for
+
+
+def build_access_log_path(root: Path, now: datetime) -> Path:
+    return root / f"visits-{now.strftime('%Y%m%d')}.jsonl"
+
+
+def append_access_log(root: Path, payload: dict[str, object]) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    timestamp_text = str(payload.get("timestamp") or "")
+    try:
+        now = datetime.fromisoformat(timestamp_text.replace("Z", "+00:00"))
+    except ValueError:
+        now = datetime.now()
+    log_path = build_access_log_path(root, now)
+    line = json.dumps(payload, ensure_ascii=False) + "\n"
+    with ACCESS_LOG_LOCK:
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(line)
 
 
 class UpdateTaskManager:
@@ -338,6 +551,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
     update_manager = UpdateTaskManager()
 
     def __init__(self, *args, directory: str | None = None, **kwargs):
+        self._response_status_code = 200
+        self._access_logged = False
+        self._access_request_path = ""
         super().__init__(*args, directory=str(DOCS_DIR if directory is None else directory), **kwargs)
 
     def _resolve_cors_origin(self) -> str | None:
@@ -372,20 +588,64 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             if cors_origin != "*":
                 self.send_header("Vary", "Origin")
         super().end_headers()
+        self.log_access()
+
+    def send_response(self, code: int, message: str | None = None):
+        self._response_status_code = code
+        super().send_response(code, message)
+
+    def log_access(self) -> None:
+        if self._access_logged:
+            return
+        if not getattr(self.server, "access_log_enabled", True):
+            return
+        request_path = self._access_request_path or self.path
+        if not should_log_access(self.command, request_path):
+            return
+
+        client_ip, remote_addr, forwarded_for = resolve_client_ip(self.headers, self.client_address)
+        payload = {
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "clientIp": client_ip,
+            "remoteAddr": remote_addr,
+            "forwardedFor": forwarded_for,
+            "method": self.command,
+            "path": request_path,
+            "statusCode": self._response_status_code,
+            "userAgent": str(self.headers.get("User-Agent") or ""),
+            "referer": str(self.headers.get("Referer") or ""),
+        }
+        try:
+            append_access_log(getattr(self.server, "access_log_root", ACCESS_LOG_ROOT), payload)
+            self._access_logged = True
+        except Exception as exc:  # pragma: no cover - defensive logging
+            print(f"[serve_dashboard] 访问日志写入失败：{exc}", file=sys.stderr)
 
     def do_OPTIONS(self):
+        self._access_request_path = self.path
         self.send_response(204)
         self.end_headers()
 
     def do_GET(self):
+        self._access_request_path = self.path
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
         if parsed.path == "/api/update-status":
-            self._send_json(self.update_manager.snapshot())
+            self._send_json(
+                {
+                    "available": False,
+                    "running": False,
+                    "status": "idle",
+                    "message": "手动兜底更新功能已迁移到附魔工作台，请改用附魔工作台中的工具。",
+                    "result": None,
+                    "error": "",
+                    "updatedAt": datetime.now().isoformat(timespec="seconds"),
+                }
+            )
             return
         if parsed.path == "/api/dashboard-data":
             requested_month = normalize_month_key(query.get("month", [""])[0])
-            target_path = resolve_archived_dashboard_path(requested_month) if requested_month else DASHBOARD_JSON_PATH
+            target_path = resolve_dashboard_data_path(requested_month, "dashboard")
             try:
                 self._send_json(load_json_payload(target_path))
             except FileNotFoundError:
@@ -394,7 +654,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/dashboard-summary":
             requested_month = normalize_month_key(query.get("month", [""])[0])
-            target_path = resolve_archived_summary_path(requested_month) if requested_month else DASHBOARD_SUMMARY_PATH
+            target_path = resolve_dashboard_data_path(requested_month, "summary")
             try:
                 self._send_json(load_json_payload(target_path))
             except FileNotFoundError:
@@ -410,10 +670,41 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        self._access_request_path = self.path
         parsed = urlparse(self.path)
         if parsed.path == "/api/update-data":
-            started, snapshot = self.update_manager.start()
-            self._send_json(snapshot, status_code=202 if started else 409)
+            self._send_json(
+                {
+                    "available": False,
+                    "running": False,
+                    "status": "idle",
+                    "message": "手动兜底更新功能已迁移到附魔工作台，请改用附魔工作台中的工具。",
+                    "result": None,
+                    "error": "",
+                    "updatedAt": datetime.now().isoformat(timespec="seconds"),
+                },
+                status_code=409,
+            )
+            return
+        if parsed.path == "/api/archive-current-month":
+            try:
+                self._send_json(archive_current_dashboard_month())
+            except FileNotFoundError as exc:
+                self._send_json(
+                    {
+                        "status": "error",
+                        "message": f"保存历史数据失败，缺少文件：{exc.filename or exc}",
+                    },
+                    status_code=404,
+                )
+            except Exception as exc:
+                self._send_json(
+                    {
+                        "status": "error",
+                        "message": f"保存历史数据失败：{exc}",
+                    },
+                    status_code=500,
+                )
             return
         self.send_error(404, "Not Found")
 
@@ -459,6 +750,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=[],
         help="Allowed CORS origin. Repeat this option to allow multiple origins. Default: *",
     )
+    access_log_group = parser.add_mutually_exclusive_group()
+    access_log_group.add_argument(
+        "--access-log",
+        dest="access_log",
+        action="store_true",
+        default=True,
+        help="Enable server-side access logging for page/API visits (default: on).",
+    )
+    access_log_group.add_argument(
+        "--no-access-log",
+        dest="access_log",
+        action="store_false",
+        help="Disable server-side access logging.",
+    )
+    parser.add_argument(
+        "--access-log-dir",
+        default=str(ACCESS_LOG_ROOT),
+        help="Directory used to store access log JSONL files (default: .runtime/access_logs).",
+    )
     browser_group = parser.add_mutually_exclusive_group()
     browser_group.add_argument(
         "--open-browser",
@@ -494,20 +804,26 @@ def main(argv: list[str] | None = None) -> int:
     try:
         with ThreadingHTTPServer((args.host, args.port), handler) as httpd:
             httpd.cors_allow_origins = tuple(args.cors_allow_origin or ["*"])
+            httpd.access_log_enabled = args.access_log
+            httpd.access_log_root = Path(args.access_log_dir)
             url = f"http://{args.host}:{args.port}"
             print(f"Serving {DOCS_DIR} at {url}")
             print("Clean URLs such as /docs or /AI_Digest fall back to index.html. Press Ctrl+C to exit.")
             print(
-                "Update API is available at /api/update-status, /api/update-data, "
-                "/api/dashboard-data, /api/dashboard-summary and /api/dashboard-archive."
+                "Dashboard data APIs are available at /api/dashboard-data, /api/dashboard-summary "
+                "and /api/dashboard-archive. Manual fallback update moved to Enchant Workbench."
             )
+            if args.access_log:
+                print(f"Access log is enabled. Visits will be appended to {httpd.access_log_root}.")
+            else:
+                print("Access log is disabled.")
             if args.auto_publish:
                 print(
-                    "Manual update button will auto publish to "
-                    f"{args.publish_remote}/{args.publish_branch} after a successful refresh."
+                    "定时更新发布配置仍保持为 "
+                    f"{args.publish_remote}/{args.publish_branch}."
                 )
             else:
-                print("Manual update button will refresh local data only; auto publish is disabled.")
+                print("当前本地服务会话下，定时更新发布仍保持禁用。")
             if args.open_browser:
                 webbrowser.open(url)
             httpd.serve_forever()

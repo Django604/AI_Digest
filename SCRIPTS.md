@@ -1,6 +1,6 @@
 # 脚本使用手册
 
-最后更新：2026-04-23 09:23
+最后更新：2026-06-01 10:30
 
 ## scripts/build_dashboard.py
 
@@ -156,12 +156,12 @@
   - 允许已有暂存文件：`python scripts/dashboard_publish.py --allow-existing-staged`
 - 备注：
   - 定时更新与网页手动兜底现在都直接调用这个 Python 入口
-  - `git push` 若被中断会自动重试一次，并在失败时保留完整的阶段与命令信息
+  - `git push` 带 300 秒超时，若被中断会自动重试一次，并在失败时保留完整的阶段与命令信息
 
 ## scripts/serve_dashboard.py
 
 - 路径：`./scripts/serve_dashboard.py`
-- 作用：启动一个指向 `docs/` 目录的 `ThreadingHTTPServer`，并在访问 `/docs`、`/AI_Digest` 等“干净 URL”时自动回退到 `index.html`；同时暴露可独立部署的更新 API，供页面上的 `数据更新` 按钮在静默任务失败后手动兜底触发完整更新与发布流程
+- 作用：启动一个指向 `docs/` 目录的 `ThreadingHTTPServer`，并在访问 `/docs`、`/AI_Digest` 等“干净 URL”时自动回退到 `index.html`；同时暴露 dashboard 数据、历史归档索引和当前月份归档保存 API；手动兜底更新入口已迁移到附魔工作台
 - 使用方法：
   - `python scripts/serve_dashboard.py --port 4173 [--open-browser]`
   - 作为 GitHub Pages 远端后端：`python scripts/serve_dashboard.py --host 0.0.0.0 --port 4173 --no-open-browser --cors-allow-origin https://<你的-pages-域名>`
@@ -174,12 +174,12 @@
   - 控制台展示访问地址，例如 `http://127.0.0.1:4173`
 - 备注：
   - 端口被占用或目录缺失时会在控制台给出错误提示；按 `Ctrl+C` 即可退出
-  - API 端点包括 `/api/update-status`、`/api/update-data`、`/api/dashboard-data`、`/api/dashboard-summary`
+  - API 端点包括 `/api/update-status`、`/api/update-data`、`/api/dashboard-data`、`/api/dashboard-summary`、`/api/dashboard-archive`、`/api/archive-current-month`
   - `--cors-allow-origin` 可重复传入多个域名；默认允许 `*`
   - 默认会把页面访问与关键 API 访问写到 `.runtime/access_logs/visits-YYYYMMDD.jsonl`，记录 `clientIp`、`remoteAddr`、`forwardedFor`、时间、路径、状态码、`User-Agent` 与 `Referer`
   - 访问日志只保留在服务端，不会展示在前端页面；静态资源和 `/api/update-status` 这类高频噪声请求默认不写入
-  - 网页手动更新会复用和 `scheduled_update_runner.py` 相同的共享锁；已有交互任务、静默任务或其他网页更新在跑时，再次点击只会返回当前状态，不会并发回写 Excel
-  - 默认会在手动更新成功后自动调用 `scripts/publish_dashboard.ps1 -SkipRebuild` 发布到 GitHub；如只想本地刷新可显式加 `--no-auto-publish`
+  - `/api/update-status` 与 `/api/update-data` 仅保留兼容响应，会提示手动兜底更新已迁移到附魔工作台
+  - `/api/archive-current-month` 会复用现有 `docs/data/monthly/YYYY-MM/` 归档结构，保存当前报表月份；若源数据更新时间是每月 1 日，会在 `docs/data/monthly/index.json` 中开启源数据所属的新月份入口
 
 ## start_dashboard_server.bat
 
@@ -248,7 +248,7 @@
 ## 月度归档
 
 - `scripts/build_dashboard.py`：除当前 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 外，还会同步生成 `docs/data/monthly/YYYY-MM/dashboard.json`、`docs/data/monthly/YYYY-MM/dashboard.summary.json`，并维护 `docs/data/monthly/index.json`。
-- `scripts/serve_dashboard.py`：新增 `/api/dashboard-archive`；`/api/dashboard-data` 与 `/api/dashboard-summary` 支持 `?month=YYYY-MM`，供前端按年月加载历史归档。
+- `scripts/serve_dashboard.py`：新增 `/api/dashboard-archive` 与 `/api/archive-current-month`；`/api/dashboard-data` 与 `/api/dashboard-summary` 支持 `?month=YYYY-MM`，供前端按年月加载历史归档或当前源数据月份入口。
 
 ## scripts/probe_system_git_publish.ps1
 

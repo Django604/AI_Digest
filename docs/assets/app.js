@@ -12,6 +12,7 @@ const monthYearSelect = document.querySelector("#month-year-select");
 const monthMonthSelect = document.querySelector("#month-month-select");
 const monthApplyButton = document.querySelector("#month-apply-button");
 const monthCurrentButton = document.querySelector("#month-current-button");
+const monthArchiveButton = document.querySelector("#month-archive-button");
 const monthStatus = document.querySelector("#month-status");
 const updateButton = document.querySelector("#update-button");
 const updateStatus = document.querySelector("#update-status");
@@ -59,6 +60,7 @@ const state = {
   selectedMonthKey: "",
   desiredMonthKey: "",
   monthSwitchBusy: false,
+  monthArchiveBusy: false,
   updateBusy: false,
   updateAvailable: false,
   updatePollTimer: null,
@@ -172,6 +174,15 @@ function buildArchiveIndexUrl() {
   return "./data/monthly/index.json";
 }
 
+function getArchiveEntry(monthKey) {
+  const normalizedMonthKey = normalizeMonthKey(monthKey);
+  if (!normalizedMonthKey) {
+    return null;
+  }
+  const archiveMonths = Array.isArray(state.archiveIndex?.months) ? state.archiveIndex.months : [];
+  return archiveMonths.find((item) => normalizeMonthKey(item?.key) === normalizedMonthKey) ?? null;
+}
+
 function buildDashboardRequest(monthKey = "") {
   const normalizedMonthKey = normalizeMonthKey(monthKey);
   if (!normalizedMonthKey) {
@@ -184,7 +195,12 @@ function buildDashboardRequest(monthKey = "") {
     };
   }
 
-  const staticUrl = `./data/monthly/${normalizedMonthKey}/dashboard.json`;
+  const archiveEntry = getArchiveEntry(normalizedMonthKey);
+  const archivedDashboardPath =
+    typeof archiveEntry?.dashboardPath === "string" && archiveEntry.dashboardPath.trim()
+      ? archiveEntry.dashboardPath.trim()
+      : `./data/monthly/${normalizedMonthKey}/dashboard.json`;
+  const staticUrl = archivedDashboardPath;
   return {
     mode: "archive",
     monthKey: normalizedMonthKey,
@@ -341,6 +357,10 @@ function setupMonthTools() {
   monthCurrentButton?.addEventListener("click", () => {
     void handleReturnToCurrentMonth();
   });
+
+  monthArchiveButton?.addEventListener("click", () => {
+    void handleArchiveCurrentMonth();
+  });
 }
 
 function getArchiveMonthOptions() {
@@ -398,7 +418,15 @@ function setMonthStatus(message, stateName = "") {
 }
 
 function renderMonthTools(options = {}) {
-  if (!monthPickerToggle || !monthPickerPanel || !monthYearSelect || !monthMonthSelect || !monthApplyButton || !monthCurrentButton) {
+  if (
+    !monthPickerToggle ||
+    !monthPickerPanel ||
+    !monthYearSelect ||
+    !monthMonthSelect ||
+    !monthApplyButton ||
+    !monthCurrentButton ||
+    !monthArchiveButton
+  ) {
     return;
   }
 
@@ -427,18 +455,20 @@ function renderMonthTools(options = {}) {
     .map((year) => `<option value="${year}">${year} 年</option>`)
     .join("");
   monthYearSelect.value = selectedYear ? String(selectedYear) : "";
-  monthYearSelect.disabled = !monthOptions.length || state.monthSwitchBusy;
+  monthYearSelect.disabled = !monthOptions.length || state.monthSwitchBusy || state.monthArchiveBusy;
 
   monthMonthSelect.innerHTML = monthsForYear
     .map((item) => `<option value="${String(item.month).padStart(2, "0")}">${item.month} 月</option>`)
     .join("");
   monthMonthSelect.value = selectedMonth ? String(selectedMonth.month).padStart(2, "0") : "";
-  monthMonthSelect.disabled = !monthOptions.length || state.monthSwitchBusy;
+  monthMonthSelect.disabled = !monthOptions.length || state.monthSwitchBusy || state.monthArchiveBusy;
 
   const selectedKey = normalizeMonthKey(state.desiredMonthKey);
-  monthApplyButton.disabled = !selectedKey || state.monthSwitchBusy;
+  monthApplyButton.disabled = !selectedKey || state.monthSwitchBusy || state.monthArchiveBusy;
   monthApplyButton.textContent = state.monthSwitchBusy ? "切换中..." : "查看所选月份";
-  monthCurrentButton.disabled = !state.liveMonthKey || state.monthSwitchBusy || state.monthViewMode === "current";
+  monthCurrentButton.disabled = !state.liveMonthKey || state.monthSwitchBusy || state.monthArchiveBusy || state.monthViewMode === "current";
+  monthArchiveButton.disabled = !state.payload || state.monthSwitchBusy || state.monthArchiveBusy;
+  monthArchiveButton.textContent = state.monthArchiveBusy ? "保存中..." : "保存当前月为历史数据";
 
   if (typeof message === "string") {
     setMonthStatus(message, stateName);
@@ -506,6 +536,49 @@ async function handleReturnToCurrentMonth() {
     renderMonthTools({ message: "切回当前月失败，请稍后重试。", stateName: "error" });
   } finally {
     state.monthSwitchBusy = false;
+    renderMonthTools({ message: monthStatus?.textContent ?? "", stateName: monthStatus?.dataset.state ?? "" });
+  }
+}
+
+async function handleArchiveCurrentMonth() {
+  if (!state.payload || state.monthArchiveBusy) {
+    return;
+  }
+
+  state.monthArchiveBusy = true;
+  renderMonthTools({ message: "正在保存当前月份快照..." });
+  try {
+    const response = await fetch(buildApiUrl("/api/archive-current-month"), {
+      method: "POST",
+      cache: "no-store",
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.status !== "success") {
+      throw new Error(payload.message || `HTTP ${response.status}`);
+    }
+
+    await loadArchiveIndex();
+    const openMonthKey = normalizeMonthKey(payload.openMonthKey);
+    const archivedMonthKey = normalizeMonthKey(payload.archivedMonthKey);
+    let message = payload.message || "当前月份已保存为历史数据。";
+    let stateName = "success";
+
+    if (openMonthKey && openMonthKey !== archivedMonthKey) {
+      state.desiredMonthKey = openMonthKey;
+      state.monthPickerOpen = true;
+      const switched = await loadDashboard({ monthKey: openMonthKey });
+      message = switched
+        ? `已保存 ${buildMonthLabel(archivedMonthKey)}，并开启 ${buildMonthLabel(openMonthKey)} 面板。`
+        : `已保存 ${buildMonthLabel(archivedMonthKey)}，但开启 ${buildMonthLabel(openMonthKey)} 面板失败。`;
+      stateName = switched ? "success" : "error";
+    }
+
+    renderMonthTools({ message, stateName });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    renderMonthTools({ message: `保存历史数据失败：${message}`, stateName: "error" });
+  } finally {
+    state.monthArchiveBusy = false;
     renderMonthTools({ message: monthStatus?.textContent ?? "", stateName: monthStatus?.dataset.state ?? "" });
   }
 }

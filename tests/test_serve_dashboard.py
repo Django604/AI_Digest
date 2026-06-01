@@ -15,6 +15,12 @@ from scripts import serve_dashboard
 
 
 class ServeDashboardTests(unittest.TestCase):
+    def create_access_log_root(self) -> Path:
+        test_dir = serve_dashboard.PROJECT_ROOT / "tests" / ".tmp" / f"serve-dashboard-access-log-{uuid.uuid4()}"
+        test_dir.mkdir(parents=True, exist_ok=True)
+        self.addCleanup(lambda: shutil.rmtree(test_dir, ignore_errors=True))
+        return test_dir
+
     def create_lock_path(self) -> Path:
         test_dir = serve_dashboard.PROJECT_ROOT / ".runtime" / "test_serve_dashboard" / str(uuid.uuid4())
         test_dir.mkdir(parents=True, exist_ok=True)
@@ -33,6 +39,34 @@ class ServeDashboardTests(unittest.TestCase):
                 return True
             time.sleep(0.05)
         return predicate()
+
+    def read_access_log_entries(self, root: Path) -> list[dict]:
+        log_files = sorted(root.glob("visits-*.jsonl"))
+        payloads: list[dict] = []
+        for log_file in log_files:
+            for line in log_file.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    payloads.append(json.loads(line))
+        return payloads
+
+    def test_resolve_client_ip_prefers_forwarded_headers(self) -> None:
+        class DummyHeaders(dict):
+            def get(self, key, default=None):
+                return super().get(key, default)
+
+        headers = DummyHeaders(
+            {
+                "CF-Connecting-IP": "203.0.113.8",
+                "X-Forwarded-For": "198.51.100.10, 10.0.0.1",
+                "X-Real-IP": "192.0.2.5",
+            }
+        )
+
+        client_ip, remote_addr, forwarded_for = serve_dashboard.resolve_client_ip(headers, ("127.0.0.1", 4173))
+
+        self.assertEqual(client_ip, "203.0.113.8")
+        self.assertEqual(remote_addr, "127.0.0.1")
+        self.assertEqual(forwarded_for, "198.51.100.10, 10.0.0.1")
 
     def test_update_task_manager_rejects_duplicate_start_without_deadlock(self) -> None:
         started_event = threading.Event()
@@ -189,84 +223,26 @@ class ServeDashboardTests(unittest.TestCase):
         self.assertFalse(completed["result"].get("skippedRefresh", False))
         self.assertEqual(completed["result"]["businessDate"], "2026-05-01")
 
-    def test_update_api_reports_status_and_can_trigger_update(self) -> None:
-        started_event = threading.Event()
-        release_event = threading.Event()
+    def test_update_api_reports_manual_fallback_moved(self) -> None:
+        with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
+            server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            server_thread.start()
+            base_url = f"http://127.0.0.1:{httpd.server_port}"
 
-        def fake_run_update(*, log):
-            log("fake api run")
-            started_event.set()
-            self.assertTrue(release_event.wait(timeout=2))
-            return {
-                "businessDate": "2026-04-20",
-                "dashboardChanged": True,
-                "summaryChanged": True,
-            }
+            try:
+                with urlopen(f"{base_url}/api/update-status", timeout=2) as response:
+                    self.assertEqual(response.status, 200)
+                    payload = json.loads(response.read().decode("utf-8"))
+                self.assertFalse(payload["available"])
+                self.assertIn("附魔工作台", payload["message"])
 
-        original_manager = serve_dashboard.DashboardHandler.update_manager
-
-        try:
-            lock_path = self.create_lock_path()
-            serve_dashboard.DashboardHandler.update_manager = serve_dashboard.UpdateTaskManager()
-            with patch("scripts.serve_dashboard.build_lock_path", return_value=lock_path), patch(
-                "scripts.serve_dashboard.build_current_dashboard_result",
-                return_value=None,
-            ), patch(
-                "scripts.serve_dashboard.run_update",
-                side_effect=fake_run_update,
-            ), patch(
-                "scripts.serve_dashboard.run_publish_step",
-                return_value={
-                    "publishStatus": "success",
-                    "publishRemote": "origin",
-                    "publishBranch": "main",
-                    "publishCommitMessage": "Manual publish test",
-                },
-            ) as publish_mock:
-                with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
-                    server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-                    server_thread.start()
-                    base_url = f"http://127.0.0.1:{httpd.server_port}"
-
-                    with urlopen(f"{base_url}/api/update-status", timeout=2) as response:
-                        self.assertEqual(response.status, 200)
-                        payload = json.loads(response.read().decode("utf-8"))
-                    self.assertEqual(payload["status"], "idle")
-                    self.assertFalse(payload["running"])
-
-                    request = Request(f"{base_url}/api/update-data", method="POST", data=b"")
-                    with urlopen(request, timeout=2) as response:
-                        self.assertEqual(response.status, 202)
-                        payload = json.loads(response.read().decode("utf-8"))
-                    self.assertEqual(payload["status"], "running")
-                    self.assertTrue(started_event.wait(timeout=1))
-
-                    with urlopen(f"{base_url}/api/update-status", timeout=2) as response:
-                        running_payload = json.loads(response.read().decode("utf-8"))
-                    self.assertTrue(running_payload["running"])
-
-                    release_event.set()
-                    self.assertTrue(
-                        self.wait_for(
-                            lambda: json.loads(urlopen(f"{base_url}/api/update-status", timeout=2).read().decode("utf-8"))[
-                                "status"
-                            ]
-                            == "success"
-                        )
-                    )
-
-                    with urlopen(f"{base_url}/api/update-status", timeout=2) as response:
-                        completed_payload = json.loads(response.read().decode("utf-8"))
-                    self.assertEqual(completed_payload["status"], "success")
-                    self.assertEqual(completed_payload["result"]["businessDate"], "2026-04-20")
-                    self.assertEqual(completed_payload["result"]["publishStatus"], "success")
-                    self.assertEqual(completed_payload["result"]["publishRemote"], "origin")
-                    self.assertTrue(publish_mock.called)
-
-                    httpd.shutdown()
-                    server_thread.join(timeout=2)
-        finally:
-            serve_dashboard.DashboardHandler.update_manager = original_manager
+                request = Request(f"{base_url}/api/update-data", method="POST", data=b"")
+                with self.assertRaises(Exception) as context:
+                    urlopen(request, timeout=2)
+                self.assertIn("HTTP Error 409", str(context.exception))
+            finally:
+                httpd.shutdown()
+                server_thread.join(timeout=2)
 
     def test_dashboard_data_endpoint_returns_payload(self) -> None:
         with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
@@ -342,6 +318,59 @@ class ServeDashboardTests(unittest.TestCase):
                     httpd.shutdown()
                     server_thread.join(timeout=2)
 
+    def test_archive_current_month_opens_source_month_on_first_day(self) -> None:
+        temp_dir = serve_dashboard.PROJECT_ROOT / "tests" / ".tmp" / f"serve-dashboard-save-archive-{uuid.uuid4()}"
+        docs_dir = temp_dir / "docs"
+        data_dir = docs_dir / "data"
+        monthly_dir = data_dir / "monthly"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        dashboard_path = data_dir / "dashboard.json"
+        summary_path = data_dir / "dashboard.summary.json"
+        index_path = monthly_dir / "index.json"
+        dashboard_path.write_text(
+            json.dumps(
+                {
+                    "meta": {
+                        "reportDate": "2026-05-31",
+                        "reportDateLabel": "2026-05-31",
+                        "workbookModifiedAt": "2026-06-01T09:07:16",
+                    },
+                    "dashboards": {"brief": {"id": "brief"}},
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        summary_path.write_text(
+            json.dumps(
+                {
+                    "generatedAt": "2026-06-01T09:08:00",
+                    "reportDate": "2026-05-31",
+                    "reportDateLabel": "2026-05-31",
+                    "inputs": {"workbookModifiedAt": "2026-06-01T09:07:16"},
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        self.addCleanup(lambda: shutil.rmtree(temp_dir, ignore_errors=True))
+
+        with patch("scripts.serve_dashboard.DOCS_DIR", docs_dir), patch(
+            "scripts.serve_dashboard.DASHBOARD_JSON_PATH", dashboard_path
+        ), patch("scripts.serve_dashboard.DASHBOARD_SUMMARY_PATH", summary_path), patch(
+            "scripts.serve_dashboard.MONTHLY_ARCHIVE_DIR", monthly_dir
+        ), patch("scripts.serve_dashboard.MONTHLY_ARCHIVE_INDEX_PATH", index_path):
+            result = serve_dashboard.archive_current_dashboard_month()
+
+        self.assertEqual(result["archivedMonthKey"], "2026-05")
+        self.assertEqual(result["openMonthKey"], "2026-06")
+        self.assertTrue(result["newMonthOpened"])
+        self.assertTrue((monthly_dir / "2026-05" / "dashboard.json").exists())
+        index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+        self.assertEqual(index_payload["latestMonth"], "2026-06")
+        self.assertEqual(index_payload["months"][0]["key"], "2026-06")
+        self.assertEqual(index_payload["months"][0]["dashboardPath"], "./data/dashboard.json")
+
     def test_options_request_includes_cors_headers(self) -> None:
         with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
             httpd.cors_allow_origins = ("https://django604.github.io",)
@@ -356,6 +385,52 @@ class ServeDashboardTests(unittest.TestCase):
                     self.assertEqual(response.status, 204)
                     self.assertEqual(response.headers.get("Access-Control-Allow-Origin"), "https://django604.github.io")
                     self.assertIn("POST", response.headers.get("Access-Control-Allow-Methods", ""))
+            finally:
+                httpd.shutdown()
+                server_thread.join(timeout=2)
+
+    def test_page_visit_is_logged_without_frontend_output(self) -> None:
+        access_log_root = self.create_access_log_root()
+        with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
+            httpd.cors_allow_origins = ("*",)
+            httpd.access_log_enabled = True
+            httpd.access_log_root = access_log_root
+            server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            server_thread.start()
+            base_url = f"http://127.0.0.1:{httpd.server_port}"
+
+            try:
+                request = Request(f"{base_url}/AI_Digest", headers={"User-Agent": "serve-dashboard-test"})
+                with urlopen(request, timeout=2) as response:
+                    self.assertEqual(response.status, 200)
+                self.assertTrue(self.wait_for(lambda: len(self.read_access_log_entries(access_log_root)) == 1))
+                entries = self.read_access_log_entries(access_log_root)
+                self.assertEqual(len(entries), 1)
+                self.assertEqual(entries[0]["path"], "/AI_Digest")
+                self.assertEqual(entries[0]["clientIp"], "127.0.0.1")
+                self.assertEqual(entries[0]["userAgent"], "serve-dashboard-test")
+                self.assertEqual(entries[0]["statusCode"], 200)
+            finally:
+                httpd.shutdown()
+                server_thread.join(timeout=2)
+
+    def test_static_asset_and_update_status_do_not_pollute_access_log(self) -> None:
+        access_log_root = self.create_access_log_root()
+        with ThreadingHTTPServer(("127.0.0.1", 0), serve_dashboard.DashboardHandler) as httpd:
+            httpd.cors_allow_origins = ("*",)
+            httpd.access_log_enabled = True
+            httpd.access_log_root = access_log_root
+            server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            server_thread.start()
+            base_url = f"http://127.0.0.1:{httpd.server_port}"
+
+            try:
+                with urlopen(f"{base_url}/assets/app.js", timeout=2) as response:
+                    self.assertEqual(response.status, 200)
+                with urlopen(f"{base_url}/api/update-status", timeout=2) as response:
+                    self.assertEqual(response.status, 200)
+                entries = self.read_access_log_entries(access_log_root)
+                self.assertEqual(entries, [])
             finally:
                 httpd.shutdown()
                 server_thread.join(timeout=2)

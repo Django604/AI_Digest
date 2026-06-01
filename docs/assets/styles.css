@@ -266,7 +266,8 @@ button,
 
 .month-picker-toggle,
 .month-apply-button,
-.month-current-button {
+.month-current-button,
+.month-archive-button {
   width: 100%;
   border-radius: 14px;
   padding: 11px 14px;
@@ -291,9 +292,17 @@ button,
   box-shadow: none;
 }
 
+.month-archive-button {
+  border: 1px solid rgba(194, 15, 47, 0.16);
+  background: linear-gradient(135deg, rgba(194, 15, 47, 0.96), rgba(153, 9, 36, 0.96));
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(194, 15, 47, 0.18);
+}
+
 .month-picker-toggle:hover:not(:disabled),
 .month-apply-button:hover:not(:disabled),
-.month-current-button:hover:not(:disabled) {
+.month-current-button:hover:not(:disabled),
+.month-archive-button:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
@@ -309,9 +318,15 @@ button,
   background: rgba(238, 242, 246, 1);
 }
 
+.month-archive-button:hover:not(:disabled) {
+  border-color: rgba(194, 15, 47, 0.28);
+  box-shadow: 0 14px 30px rgba(194, 15, 47, 0.22);
+}
+
 .month-picker-toggle:disabled,
 .month-apply-button:disabled,
-.month-current-button:disabled {
+.month-current-button:disabled,
+.month-archive-button:disabled {
   cursor: not-allowed;
   opacity: 0.64;
   box-shadow: none;

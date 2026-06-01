@@ -23,6 +23,7 @@ PUBLISH_TARGETS = (
     "docs/data/dashboard.summary.json",
 )
 INTERRUPTED_EXIT_CODES = {3221225786, 130}
+PUSH_TIMEOUT_SECONDS = 300
 
 
 @dataclass(frozen=True)
@@ -90,6 +91,40 @@ def _run_command(
             log(f"{prefix}{text}" if prefix else text)
     exit_code = process.wait()
     return CommandResult(exit_code=exit_code, output="".join(collected))
+
+
+def _run_command_with_timeout(
+    command: list[str],
+    *,
+    cwd: Path,
+    timeout_seconds: int,
+    log: Callable[[str], None] | None = None,
+    prefix: str = "",
+) -> CommandResult:
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=str(cwd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        output = exc.stdout or ""
+        if isinstance(output, bytes):
+            output = output.decode("utf-8", errors="replace")
+        timeout_message = f"Command timed out after {timeout_seconds} seconds: {_format_command(command)}"
+        if output:
+            timeout_message = f"{output.rstrip()}\n{timeout_message}"
+        _log_lines(log, prefix, timeout_message)
+        return CommandResult(exit_code=-1, output=timeout_message)
+
+    _log_lines(log, prefix, completed.stdout or "")
+    return CommandResult(exit_code=completed.returncode, output=completed.stdout or "")
 
 
 def _format_command(command: list[str]) -> str:
@@ -248,11 +283,21 @@ def publish_dashboard(
 
     log(f"Step 4/4: pushing to {remote}/{branch}...")
     push_command = ["git", "push", remote, f"HEAD:{branch}"]
-    push_result = _run_command(push_command, cwd=repo_root, log=log)
+    push_result = _run_command_with_timeout(
+        push_command,
+        cwd=repo_root,
+        log=log,
+        timeout_seconds=PUSH_TIMEOUT_SECONDS,
+    )
     if push_result.exit_code != 0 and _retryable_push(push_result):
         log("Push was interrupted once; retrying after a short pause...")
         time.sleep(2)
-        push_result = _run_command(push_command, cwd=repo_root, log=log)
+        push_result = _run_command_with_timeout(
+            push_command,
+            cwd=repo_root,
+            log=log,
+            timeout_seconds=PUSH_TIMEOUT_SECONDS,
+        )
 
     if push_result.exit_code != 0:
         _raise_command_error(

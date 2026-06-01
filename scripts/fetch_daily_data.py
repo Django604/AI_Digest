@@ -198,6 +198,7 @@ def run_fetch_task(
     username: str | None,
     password: str | None,
     chrome_path: str | None,
+    max_attempts: int = 2,
 ) -> Path:
     output_dir = build_task_output_dir(task, runtime_root)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -222,7 +223,7 @@ def run_fetch_task(
     if chrome_path:
         command.extend(["--chrome-path", chrome_path])
 
-    max_attempts = 2
+    max_attempts = max(1, int(max_attempts))
     for attempt_index in range(1, max_attempts + 1):
         suffix = "" if attempt_index == 1 else f"（重试 {attempt_index - 1}/{max_attempts - 1}）"
         log(f"开始抓取：{task.label}{suffix}")
@@ -363,6 +364,7 @@ def run_update(
     username: str | None = None,
     password: str | None = None,
     chrome_path: str | None = None,
+    max_attempts: int = 2,
     keep_runtime: bool = False,
 ) -> dict[str, object]:
     resolved_business_date = business_date or parse_business_date()
@@ -384,6 +386,7 @@ def run_update(
                 username=username,
                 password=password,
                 chrome_path=chrome_path,
+                max_attempts=max_attempts,
             )
             for mapping in SHEET_MAPPINGS:
                 if mapping.target_sheet in export_paths:
@@ -441,6 +444,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--username", default="", help="可选：覆盖默认登录账号")
     parser.add_argument("--password", default="", help="可选：覆盖默认登录密码")
     parser.add_argument("--chrome-path", default="", help="可选：指定 Chrome 路径")
+    parser.add_argument("--max-attempts", type=int, default=2, help="每个抓取任务失败后的最大尝试次数，默认 2")
     parser.add_argument("--headed", action="store_true", help="启用有头模式，便于调试")
     parser.add_argument("--keep-runtime", action="store_true", help="保留运行时导出与 trace 目录")
     return parser.parse_args()
@@ -455,6 +459,7 @@ def main() -> int:
         username=args.username or None,
         password=args.password or None,
         chrome_path=args.chrome_path or None,
+        max_attempts=args.max_attempts,
         keep_runtime=args.keep_runtime,
     )
     print(result, flush=True)

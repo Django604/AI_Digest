@@ -42,7 +42,7 @@
 4. 双击 `start_dashboard_server.bat`，或手动运行 `python scripts/serve_dashboard.py --port 4173`
 5. 打开 `http://127.0.0.1:4173`，即使误写成 `/docs` 或 `/AI_Digest` 等路径也会被回退到 `index.html`
    服务端会默认把页面/API 访问记录写到 `.runtime/access_logs/visits-YYYYMMDD.jsonl`，其中包含 `clientIp`、时间、路径、状态码和 `User-Agent`，不会显示在前端页面
-6. 如果静默更新失败，需要手动兜底，可在本地服务页面左侧点击 `数据更新`；它会按当天 `N-1` 抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日`、`NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店`，分别更新 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`，重建页面数据，并在成功后自动执行 GitHub 发布
+6. 手动兜底更新已迁移到 `附魔工作台`，本页面只保留静态数据浏览、截图导出和月份归档能力
 7. 如需指定业务日期或保留运行痕迹排查问题，可直接执行 `python scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`
    其中 `NEV本期来店`、`NEV同期来店` 会通过内部包装器直接走 FineReport 后台 `chart.data` 导出链，`ICE本期来店`、`ICE同期来店` 会通过内部包装器强制走 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
 8. 如需让这台电脑每天自动更新，可执行 `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1`
@@ -50,14 +50,14 @@
 9. 如果你在 `09:00` 左右已经登录 Windows，就会看到启动窗口；2 分钟内没有点击“开始更新”也没事，系统会自动继续执行，执行过程中窗口不会消失，而是显示完成进度条，最终在同一窗口展示更新结果后自动关闭
 10. 如果 `09:00` 时没有登录 Windows，也不需要提前打开网页、VS Code 或手动点任何按钮；`09:01` 的静默任务会直接在后台完成更新，并继续把日志与结果写入 `.runtime/scheduled_update/`
 
-## GitHub Pages 点击更新
+## GitHub Pages 数据服务
 
 1. 在一台能访问目标取数系统的机器上运行后端服务：
    `python scripts/serve_dashboard.py --host 0.0.0.0 --port 4173 --no-open-browser --cors-allow-origin https://<你的-pages-域名>`
 2. 把 `docs/data/runtime-config.json` 里的 `serviceBaseUrl` 改成这个后端地址，例如 `https://digest-api.example.com`
 3. 如无特殊需要，`dashboardDataUrl` 留空即可，前端会自动改为从 `${serviceBaseUrl}/api/dashboard-data` 读取最新 dashboard 数据
-4. 把这份配置随站点一起发布到 GitHub Pages 后，页面上的 `数据更新` 按钮就会真正调用远端后端执行手动兜底更新，并在成功后自动发布到 GitHub Pages
-5. 如果你想保持仓库里的 `runtime-config.json` 为空，不改公开站点默认行为，也可以只在本机运行 `python scripts/serve_dashboard.py --port 4173`；需要手动兜底时，直接打开本机页面点击同一个 `数据更新` 按钮即可
+4. 把这份配置随站点一起发布到 GitHub Pages 后，页面可读取远端后端的当前数据、历史归档索引和月度归档保存接口
+5. 如果你想保持仓库里的 `runtime-config.json` 为空，不改公开站点默认行为，也可以只在本机运行 `python scripts/serve_dashboard.py --port 4173`；需要手动兜底时，改用 `附魔工作台`
 
 注意：
 - `runtime-config.json` 里只放后端访问地址，不要放账号密码之类的敏感信息
@@ -96,7 +96,7 @@
 - 当前方案读取的是 Excel 保存后的缓存结果。你更新完源数据后，必须先让 Excel 完成重算并保存，否则页面会拿到旧结果。
 - 工作流已经改成读取当前实际使用的两本源文件：`NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`。
 - `docs/data/dashboard.summary.json` 提供了报表日期、输入文件修改时间、dashboard 数量和本次是否真的发生内容变更，方便后续定时任务或自动巡检直接读取。
-- 页面上的 `数据更新` 按钮现在是“静默失败后的手动兜底入口”：在本机 `serve_dashboard.py` 页面或配置了 `docs/data/runtime-config.json.serviceBaseUrl` 的 GitHub Pages 页面上，它都会执行完整的抓取、重建与自动发布链路；未配置时公开页面会退化为静态浏览模式。
+- 页面不再显示 `数据更新` 按钮；手动兜底入口已迁移到 `附魔工作台`，本页面不会再提示配置 `serviceBaseUrl` 后进行补跑。
 - 趋势明细表现在会根据年度节假日配置直接标出 `节 / 周 / 班`：`节` 为法定节假日，`周` 为普通周末，`班` 为调休补班日；补班不会再被误判成周末或放假。
 - `serve_dashboard.py` 现在会把页面访问与关键 API 访问静默记录到 `.runtime/access_logs/`；如果服务前面挂了反向代理或 CDN，可通过 `CF-Connecting-IP`、`X-Forwarded-For`、`X-Real-IP` 头识别真实来源 IP。
 - `start_dashboard_server.bat` 默认会自动打开浏览器，并把额外参数原样转发给 `serve_dashboard.py`；例如可用 `start_dashboard_server.bat --no-auto-publish` 做只更新本地不自动推 GitHub 的临时调试。
@@ -115,4 +115,5 @@
 - `scripts/build_dashboard.py` 现在会在刷新当前 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 的同时，同步写入 `docs/data/monthly/YYYY-MM/dashboard.json` 与 `docs/data/monthly/YYYY-MM/dashboard.summary.json`。
 - 所有可切换月份会汇总到 `docs/data/monthly/index.json`，页面侧边栏的“切换年月”按钮会读取这里的归档清单。
 - 页面默认仍展示当前这份 dashboard 数据；切到历史月份后，读取的是对应月份的归档快照，不会被后续新月份的数据覆盖。
-- `scripts/serve_dashboard.py` 现已新增 `/api/dashboard-archive`，并让 `/api/dashboard-data`、`/api/dashboard-summary` 支持 `?month=YYYY-MM` 查询参数。
+- `scripts/serve_dashboard.py` 现已新增 `/api/dashboard-archive` 与 `/api/archive-current-month`，并让 `/api/dashboard-data`、`/api/dashboard-summary` 支持 `?month=YYYY-MM` 查询参数。
+- 页面侧边栏“保存当前月为历史数据”会调用 `/api/archive-current-month`：普通日期只固化当前报表月份；若源数据更新时间是每月 1 日，会先保存上一报表月份，再在月份索引里开启源数据所属的新月份入口。

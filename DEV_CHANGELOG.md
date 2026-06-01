@@ -1,5 +1,25 @@
 # DEV CHANGELOG
 
+## 2026-06-01 10:30
+- 需求 / 目标：移除 AI_Digest 页面中已迁移到附魔工作台的手动兜底更新入口，并在“切换年月”区域增加保存当前月为历史数据的按钮；保存时复用既有 4 月月度归档结构，若源数据更新时间为每月首日则开启新月份入口；完成后推送到 GitHub。
+- 改动内容：更新 `docs/index.html` 移除 `数据更新` 区块并新增 `保存当前月为历史数据` 按钮；更新 `docs/assets/app.js` 接入 `/api/archive-current-month`，支持读取 `monthly/index.json` 中自定义 `dashboardPath`；更新 `docs/assets/styles.css` 补充归档按钮样式；更新 `scripts/serve_dashboard.py` 新增当前月归档 API、月份索引首日开新入口逻辑，并保留旧更新 API 的迁移提示；更新 `tests/test_serve_dashboard.py` 与 `tests/test_dashboard_publish.py`；同步更新 `README.md`、`SCRIPTS.md`。
+- 涉及文件：`docs/index.html`、`docs/assets/app.js`、`docs/assets/styles.css`、`scripts/serve_dashboard.py`、`tests/test_serve_dashboard.py`、`tests/test_dashboard_publish.py`、`docs/data/monthly/2026-05/dashboard.json`、`docs/data/monthly/2026-05/dashboard.summary.json`、`docs/data/monthly/index.json`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m py_compile scripts\serve_dashboard.py scripts\build_dashboard.py tests\test_serve_dashboard.py`、`python -X utf8 -m unittest tests.test_serve_dashboard -v`、`node --check .\docs\assets\app.js`、`python -X utf8 -m unittest discover -s tests -v`、`python -X utf8 - << archive_current_dashboard_month`
+- 验证结果：已实际保存 `2026-05` 月度历史数据，并在 `docs/data/monthly/index.json` 中开启 `2026-06` 最新入口；Python 语法检查通过，`node --check .\docs\assets\app.js` 通过；全量单测 `65/65` 通过。
+- 回滚方法：恢复 `docs/index.html` 的旧 `update-tools` 区块，移除前端归档按钮与 `/api/archive-current-month` 后端逻辑，回退 `docs/data/monthly/2026-05/` 与 `docs/data/monthly/index.json` 到变更前，并删除本条记录。
+- 关联提交（如有）：待补充
+- 备注：本次归档逻辑沿用已有 `write_monthly_archive()`，没有新增第二套历史数据格式；`2026-06` 入口为首日源数据月份入口，指向当前 dashboard 数据。
+
+## 2026-05-12 17:10
+- 需求 / 目标：为 `serve_dashboard.py` 增加纯服务端访问日志，静默记录访客 IP，不在前端页面展示。
+- 改动内容：更新 `scripts/serve_dashboard.py`，新增访问日志开关与目录参数，默认将页面访问和关键 API 访问写入 `.runtime/access_logs/visits-YYYYMMDD.jsonl`；日志内容包含 `clientIp`、`remoteAddr`、`forwardedFor`、请求路径、状态码、`User-Agent` 和 `Referer`，并支持从 `CF-Connecting-IP` / `X-Forwarded-For` / `X-Real-IP` 中识别代理后的真实来源；补充 `tests/test_serve_dashboard.py` 覆盖 IP 解析、页面访问落盘与静态资源 / `update-status` 噪声过滤；同步更新 `README.md`、`SCRIPTS.md`。
+- 涉及文件：`scripts/serve_dashboard.py`、`tests/test_serve_dashboard.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest tests.test_serve_dashboard -v`、`python -X utf8 -m py_compile scripts\serve_dashboard.py`
+- 验证结果：`tests.test_serve_dashboard` 共 `12/12` 通过；语法检查通过；本地最小复现实验已确认访问 `/AI_Digest` 时会生成 `visits-YYYYMMDD.jsonl` 并记录 `clientIp = 127.0.0.1`。
+- 回滚方法：回退本次 `serve_dashboard.py`、测试与文档更新，删除 `.runtime/access_logs/` 下新增日志文件。
+- 关联提交（如有）：待补充
+- 备注：访问日志只保留在服务端文件系统，不会通过网页接口回传给前端；默认不记录静态资源和 `/api/update-status` 这类高频噪声请求。
+
 ## 2026-05-12 15:34
 - 需求 / 目标：按最新业务口径更新 `十五代轩逸` 5 月每日目标，并同步刷新网页数据后推送到 GitHub。
 - 改动内容：更新 `scripts/build_dashboard.py` 中 `SYLPHY_TARGET_OVERRIDES[(2026, 5)]`，写入 5 月 `31` 天新的十五代轩逸目标值；随后重建 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-05/` 与 `docs/data/monthly/index.json`，让当前页与 5 月月归档保持一致。

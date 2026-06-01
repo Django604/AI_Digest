@@ -51,7 +51,7 @@ class DashboardPublishTests(unittest.TestCase):
                 dashboard_publish.CommandResult(0, "[main abc1234] Auto publish dashboard data 2026-05-11 (interactive)\n"),
             ],
         ), mock.patch(
-            "scripts.dashboard_publish._run_command",
+            "scripts.dashboard_publish._run_command_with_timeout",
             side_effect=[
                 dashboard_publish.CommandResult(3221225786, ""),
                 dashboard_publish.CommandResult(0, "To github.com:Django604/AI_Digest.git\n   old..new  HEAD -> main\n"),
