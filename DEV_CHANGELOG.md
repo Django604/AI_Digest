@@ -1,5 +1,25 @@
 # DEV CHANGELOG
 
+## 2026-06-01 19:25
+- 需求 / 目标：修复月度切换中 `6 月` 出现但切换后仍被显示为 `5 月` 的首日归档边界问题。
+- 改动内容：更新 `docs/assets/app.js`，启动时先加载月度索引再加载 dashboard；导航月份优先使用 `monthly/index.json` 的 `latestMonth` 或用户请求月份，不再单纯从 `dashboard.json` 的 `meta.reportDate` 反推，避免 `2026-06` live 面板因日报业务日期 `2026-05-31` 被误判为 `2026-05`。
+- 涉及文件：`docs/assets/app.js`、`DEV_CHANGELOG.md`
+- 关键命令：`node --check docs\assets\app.js`
+- 验证结果：前端脚本语法检查通过；当前 `docs/data/monthly/index.json` 已包含 `latestMonth=2026-06` 与 `liveSourceMonth=true` 的 6 月入口。
+- 回滚方法：回退 `docs/assets/app.js` 中本次月份索引加载顺序和月份状态判定调整，并删除本条记录。
+- 关联提交（如有）：待补充
+- 备注：无需等到 2026-06-02；这是前端导航月份与业务报表日期混用导致的问题。
+
+## 2026-06-01 12:40
+- 需求 / 目标：继续收口静态页月度归档迁移，确认 AI_Digest 静态页面不再保留写入型归档入口。
+- 改动内容：清理 `SCRIPTS.md` 中残留的旧 `/api/archive-current-month`、本机页面手动更新和旧发布脚本说明，统一改为附魔工作台负责手动兜底与月度归档发布。
+- 涉及文件：`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`node --check docs\assets\app.js`、`python -B -X utf8 -m py_compile scripts\serve_dashboard.py scripts\dashboard_publish.py tests\test_dashboard_publish.py`、`python -B -X utf8 -m unittest discover -s tests -v`、`rg -n "archive-current-month|month-archive-button|monthArchive|保存当前月为历史数据" docs`
+- 验证结果：前端脚本语法检查通过；Python 编译检查通过；全量单测 `66/66` 通过；静态 `docs/` 目录中无归档写入入口残留。
+- 回滚方法：回退本次 `SCRIPTS.md` 文档修订，并删除本条记录。
+- 关联提交（如有）：待补充
+- 备注：首次 `py_compile` 因 Windows 拒绝覆盖 `tests/__pycache__` 中的 `.pyc` 失败，改用 `python -B` 禁止写字节码后通过。
+
 ## 2026-06-01 10:30
 - 需求 / 目标：移除 AI_Digest 页面中已迁移到附魔工作台的手动兜底更新入口，并在“切换年月”区域增加保存当前月为历史数据的按钮；保存时复用既有 4 月月度归档结构，若源数据更新时间为每月首日则开启新月份入口；完成后推送到 GitHub。
 - 改动内容：更新 `docs/index.html` 移除 `数据更新` 区块并新增 `保存当前月为历史数据` 按钮；更新 `docs/assets/app.js` 接入 `/api/archive-current-month`，支持读取 `monthly/index.json` 中自定义 `dashboardPath`；更新 `docs/assets/styles.css` 补充归档按钮样式；更新 `scripts/serve_dashboard.py` 新增当前月归档 API、月份索引首日开新入口逻辑，并保留旧更新 API 的迁移提示；更新 `tests/test_serve_dashboard.py` 与 `tests/test_dashboard_publish.py`；同步更新 `README.md`、`SCRIPTS.md`。
@@ -739,3 +759,13 @@
 - 回滚方法：回退 `tests/test_build_dashboard.py` 与本条日志记录。
 - 关联提交（如有）：待补充
 - 备注：本次仅修复 CI 测试逻辑，不改动业务数据生成结果。
+
+## 2026-06-01 00:00
+- 需求 / 目标：移除静态页面上的“保存当前月为历史数据”按钮，并让月度归档发布由 `附魔工作台` 执行。
+- 改动内容：更新 `docs/index.html`、`docs/assets/app.js`、`docs/assets/styles.css`，清理静态页归档按钮、忙碌状态和 POST 调用；更新 `scripts/serve_dashboard.py`，不再暴露 `/api/archive-current-month` 写入路由，仅保留归档函数供工作台复用；更新 `scripts/dashboard_publish.py`，把 `docs/data/monthly/` 纳入自动发布范围；同步更新 README 与 SCRIPTS 文档。
+- 涉及文件：`docs/index.html`、`docs/assets/app.js`、`docs/assets/styles.css`、`scripts/serve_dashboard.py`、`scripts/dashboard_publish.py`、`tests/test_dashboard_publish.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m py_compile ...`、`node --check docs/assets/app.js`、`python -X utf8 -m unittest discover -s tests -v`、`rg -n "archive-current-month|month-archive-button|保存当前月为历史数据|monthArchive" docs`
+- 验证结果：Python 编译与前端脚本语法检查通过；全量单测 `66/66` 通过；静态 `docs/` 中不再出现归档写入按钮或 `/api/archive-current-month` 调用。
+- 回滚方法：恢复静态页归档按钮和 `/api/archive-current-month` 路由，并将 `docs/data/monthly/` 从发布范围移除。
+- 关联提交（如有）：待补充
+- 备注：GitHub Pages 静态站点无法处理写入型 POST，归档发布必须走本地工作台服务。
