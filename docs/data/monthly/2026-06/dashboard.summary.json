@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-06-01T09:07:26",
+  "generatedAt": "2026-06-02T14:14:23",
   "reportDate": "2026-06-01",
-  "reportDateLabel": "2026 年 6 月待更新",
+  "reportDateLabel": "2026-06-01",
   "inputs": {
     "workbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_xsai.xlsm",
     "workbookName": "NEV+ICE_xsai.xlsm",
-    "workbookModifiedAt": "2026-06-01T09:07:16",
+    "workbookModifiedAt": "2026-06-02T14:04:05",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
-    "arrivalWorkbookModifiedAt": "2026-06-01T09:07:19"
+    "arrivalWorkbookModifiedAt": "2026-06-02T09:10:52"
   },
   "outputs": {
     "dashboardJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.json",
@@ -31,7 +31,7 @@
     "issueCount": 2
   },
   "warnings": [
-    "新月份数据尚未刷新，当前为占位空白面板。"
-  ],
-  "blankMonth": true
+    "线索简报按底层数据重建，避免继续沿用历史模板文案。",
+    "全国来店简报与趋势改为基于 4 张来店底表聚合生成，不再依赖汇总页缓存结果。"
+  ]
 }

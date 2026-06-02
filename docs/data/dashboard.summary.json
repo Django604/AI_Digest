@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-06-02T09:10:53",
+  "generatedAt": "2026-06-02T14:14:23",
   "reportDate": "2026-06-01",
   "reportDateLabel": "2026-06-01",
   "inputs": {
     "workbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_xsai.xlsm",
     "workbookName": "NEV+ICE_xsai.xlsm",
-    "workbookModifiedAt": "2026-06-02T09:10:51",
+    "workbookModifiedAt": "2026-06-02T14:04:05",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
     "arrivalWorkbookModifiedAt": "2026-06-02T09:10:52"
@@ -16,7 +16,14 @@
     "dashboardChanged": true,
     "dashboardStatus": "updated",
     "summaryJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.summary.json",
-    "summaryJsonName": "dashboard.summary.json"
+    "summaryJsonName": "dashboard.summary.json",
+    "archiveMonth": "2026-06",
+    "archiveDashboardJson": "./data/monthly/2026-06/dashboard.json",
+    "archiveSummaryJson": "./data/monthly/2026-06/dashboard.summary.json",
+    "archiveIndexJson": "./data/monthly/index.json",
+    "archiveDashboardChanged": true,
+    "archiveSummaryChanged": true,
+    "archiveIndexChanged": true
   },
   "stats": {
     "dashboardCount": 5,

@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-06-02 14:18
+- 需求 / 目标：同步用户更新后的 6 月线索目标，并发布到 GitHub。
+- 改动内容：基于已更新的 `data/source/NEV+ICE_xsai.xlsm` 重建 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与 `docs/data/monthly/2026-06/` 月度归档；将 `docs/data/monthly/index.json` 中 6 月入口从空白占位恢复为真实 `2026-06-01` 数据入口。
+- 涉及文件：`data/source/NEV+ICE_xsai.xlsm`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-06/dashboard.json`、`docs/data/monthly/2026-06/dashboard.summary.json`、`docs/data/monthly/index.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py ...`、`python -B -X utf8 -m unittest discover -s tests -v`、`python -B -X utf8 -m py_compile ...`、`node --check docs\assets\app.js`、`python -B -X utf8 scripts\dashboard_publish.py --skip-rebuild --allow-existing-staged ...`
+- 验证结果：6 月归档 `blankMonth` 已移除，`latestMonth=2026-06` 且 6 月入口指向 `./data/monthly/2026-06/dashboard.json`；`docs/data/monthly/2026-06/dashboard.summary.json` 记录的源工作簿更新时间为 `2026-06-02T14:04:05`；NEV 总盘 6 月 1 日目标为 `10091`，N7 为 `1919`，N6 为 `4311`，天籁·鸿蒙座舱为 `3861`；全量单测 `66/66` 通过，Python 编译与前端脚本语法检查通过。
+- 回滚方法：回退上述数据产物与源工作簿到发布前状态，恢复 `docs/data/monthly/2026-06/` 为空白占位归档，并删除本条记录。
+- 关联提交（如有）：待补充
+- 备注：工作区中存在未跟踪的 `.codex/`、`mockups/`、演示脚本和临时测试目录，本次未纳入提交。
+
 ## 2026-06-01 19:45
 - 需求 / 目标：修复切换到 `2026-06` 后仍展示 `2026-05-31` 数据的问题，并发布到 GitHub。
 - 改动内容：更新 `scripts/serve_dashboard.py`，月初归档开启新月份时生成 `docs/data/monthly/YYYY-MM/` 空白 dashboard/summary，并让新月份入口指向空白归档；更新 `docs/assets/app.js`，默认当前月加载优先使用月度索引入口；生成当前 `2026-06` 空白归档数据；更新 `tests/test_serve_dashboard.py` 与 `SCRIPTS.md`。
