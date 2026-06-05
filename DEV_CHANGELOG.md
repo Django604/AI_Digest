@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-06-05 09:10
+- 需求 / 目标：在 6 月十五代轩逸分日目标发布后，同步本机静默更新产生的 2026-06-04 最新源数据与网页产物。
+- 改动内容：基于当前 `data/source/NEV+ICE_xsai.xlsm` 与 `data/source/NEV+ICE_ldai.xlsx` 重新构建 dashboard、summary 与 6 月归档，确保 6/4 页面继续使用新增的十五代轩逸 6 月目标 override。
+- 涉及文件：`data/source/NEV+ICE_xsai.xlsm`、`data/source/NEV+ICE_ldai.xlsx`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-06/dashboard.json`、`docs/data/monthly/2026-06/dashboard.summary.json`、`docs/data/monthly/index.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py ...`、`python -B -X utf8 -m py_compile scripts\build_dashboard.py`
+- 验证结果：6/4 当前 dashboard 与 6 月归档的十五代轩逸目标序列均匹配截图；截至 6/4 累计目标 `4,633`，当日目标 `1,159`，月目标合计 `36,472`。
+- 回滚方法：回退本条涉及的源工作簿、dashboard JSON、月度归档 JSON、index 与本条记录。
+- 关联提交（如有）：待补充
+- 备注：第一次提交推送后，本机静默更新写入了 6/4 源数据并生成了未带目标的本地 dashboard；本条用于把最新源数据重新套用目标 override 后发布。
+
 ## 2026-06-05 00:00
 - 需求 / 目标：同步 2026 年 6 月十五代轩逸分日目标到网页 dashboard，并发布到 GitHub。
 - 改动内容：更新 `scripts/build_dashboard.py` 中 `(2026, 6)` 十五代轩逸目标 override；基于现有源工作簿重建 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与 `docs/data/monthly/2026-06/` 归档数据。
