@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-06-05 09:20
+- 需求 / 目标：同步源工作簿中更新后的 2026 年 6 月 NX8 分日目标到网页 dashboard，并发布到 GitHub。
+- 改动内容：基于更新后的 `data/source/NEV+ICE_xsai.xlsm` 重建 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与 `docs/data/monthly/2026-06/` 归档数据；同步更新 `docs/data/monthly/index.json`。
+- 涉及文件：`data/source/NEV+ICE_xsai.xlsm`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-06/dashboard.json`、`docs/data/monthly/2026-06/dashboard.summary.json`、`docs/data/monthly/index.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py ...`、`python -B -X utf8 -m py_compile scripts\build_dashboard.py`、`python -B -X utf8 -m unittest discover -s tests -v`
+- 验证结果：NX8 6 月目标已进入当前 dashboard 与 6 月归档；6/4 当日目标 `6,168`，截至 6/4 累计目标 `24,665`，6 月目标合计 `267,500`。
+- 回滚方法：回退本条涉及的源工作簿、dashboard JSON、月度归档 JSON、index 与本条记录。
+- 关联提交（如有）：待补充
+- 备注：本次未修改代码，目标来自用户更新后的源工作簿。
+
 ## 2026-06-05 09:10
 - 需求 / 目标：在 6 月十五代轩逸分日目标发布后，同步本机静默更新产生的 2026-06-04 最新源数据与网页产物。
 - 改动内容：基于当前 `data/source/NEV+ICE_xsai.xlsm` 与 `data/source/NEV+ICE_ldai.xlsx` 重新构建 dashboard、summary 与 6 月归档，确保 6/4 页面继续使用新增的十五代轩逸 6 月目标 override。
