@@ -35,6 +35,7 @@ from scripts.build_dashboard import (  # noqa: E402
 DAILY_SOURCE_ROOT = WORKSPACE_ROOT / "日报取数平台"
 NEV_SCRIPT = DAILY_SOURCE_ROOT / "日报线索NEV源" / "getdata.py"
 ICE_SCRIPT = DAILY_SOURCE_ROOT / "日报线索ICE源" / "getdata.py"
+LEADS_NEV_WRAPPER_SCRIPT = PROJECT_ROOT / "scripts" / "run_leads_nev_exports.py"
 ARRIVAL_NEV_SCRIPT = DAILY_SOURCE_ROOT / "日报来店NEV源" / "getdata.py"
 ARRIVAL_ICE_SCRIPT = PROJECT_ROOT / "scripts" / "run_arrival_ice_exports.py"
 ARRIVAL_NEV_WRAPPER_SCRIPT = PROJECT_ROOT / "scripts" / "run_arrival_nev_exports.py"
@@ -65,7 +66,7 @@ ARRIVAL_WORKBOOK_KIND = "arrival"
 FETCH_TASKS = (
     FetchTask(
         label="NEV 全国按日",
-        script_path=NEV_SCRIPT,
+        script_path=LEADS_NEV_WRAPPER_SCRIPT,
         output_subdir="nev",
         report_keys=("national_daily",),
     ),

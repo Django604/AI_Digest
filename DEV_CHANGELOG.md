@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-06-10 00:00
+- 需求 / 目标：修复 `NEV+ICE_xsai` 全国按日 NEV 取数时 FineReport 平台新增默认 `营业店` 条件导致口径被筛窄的问题，并发布到 GitHub。
+- 改动内容：新增 `scripts/run_leads_nev_exports.py` 作为 NEV 线索取数包装器，运行时仅对 `national_daily` 注入 `营业状态: []` 与标签参数；更新 `scripts/fetch_daily_data.py` 将 `NEV 全国按日` 切到该包装器；补充单测与脚本说明。
+- 涉及文件：`scripts/run_leads_nev_exports.py`、`scripts/fetch_daily_data.py`、`tests/test_run_leads_nev_exports.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m py_compile scripts\fetch_daily_data.py scripts\run_leads_nev_exports.py`、`python -X utf8 -m unittest tests.test_run_leads_nev_exports tests.test_fetch_daily_data -v`、参数抽样脚本验证 `营业状态=[]`
+- 验证结果：相关单测 `8/8` 通过；抽样生成的 FineReport prepare 参数包含 `营业状态: []`、`营业状态-名称: 营业状态：`，业务日 `2026-06-09` 日期范围解析为 `2026-05-01 ~ 2026-06-09 23:59:59`。
+- 回滚方法：将 `NEV 全国按日` 任务恢复为直接调用 `../日报取数平台/日报线索NEV源/getdata.py`，删除新增包装器、测试、说明与本条记录。
+- 关联提交（如有）：待补充
+- 备注：本次修的是平台默认筛选值，不是原脚本主动传了 `营业店`。
+
 ## 2026-06-05 09:20
 - 需求 / 目标：同步源工作簿中更新后的 2026 年 6 月 NX8 分日目标到网页 dashboard，并发布到 GitHub。
 - 改动内容：基于更新后的 `data/source/NEV+ICE_xsai.xlsm` 重建 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与 `docs/data/monthly/2026-06/` 归档数据；同步更新 `docs/data/monthly/index.json`。
