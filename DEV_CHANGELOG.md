@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-06-10 10:15
+- 需求 / 目标：重新更新今天这批 AI_Digest 日报数据，按当前日期默认口径取业务日 `2026-06-09` 并发布到 GitHub。
+- 改动内容：执行完整取数流程，生成并回填 `全国按日-0609.xlsx`、`全国按日ICE-0609.xlsx`、`十五代轩逸按日-0609.xlsx`、`NEV本期-0609.xlsx`、`NEV同期-0609.xlsx`、`来店本期-0609.xlsx`、`来店同期-0609.xlsx`；更新两本源工作簿、live dashboard、6 月归档与月度索引。
+- 涉及文件：`data/source/NEV+ICE_xsai.xlsm`、`data/source/NEV+ICE_ldai.xlsx`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-06/dashboard.json`、`docs/data/monthly/2026-06/dashboard.summary.json`、`docs/data/monthly/index.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 scripts\fetch_daily_data.py --business-date 2026-06-09 --keep-runtime --max-attempts 2`、`python -X utf8 scripts\build_dashboard.py ...`、`python -X utf8 -m unittest tests.test_build_dashboard tests.test_fetch_daily_data tests.test_run_leads_nev_exports -v`
+- 验证结果：完整取数流程成功，7 张导出均生成并回填；live 与 `docs/data/monthly/2026-06/` 均更新为 `reportDate=2026-06-09`；NEV 全国按日真实 trace 确认 `营业状态=[]`；相关单测 `26/26` 通过。
+- 回滚方法：回退上述源工作簿、dashboard JSON、月度归档 JSON、index 与本条记录，或恢复到上一提交。
+- 关联提交（如有）：待补充
+- 备注：运行目录保留在 `.runtime/daily_update/20260609_20260610-100711` 便于追溯。
+
 ## 2026-06-10 00:00
 - 需求 / 目标：修复 `NEV+ICE_xsai` 全国按日 NEV 取数时 FineReport 平台新增默认 `营业店` 条件导致口径被筛窄的问题，并发布到 GitHub。
 - 改动内容：新增 `scripts/run_leads_nev_exports.py` 作为 NEV 线索取数包装器，运行时仅对 `national_daily` 注入 `营业状态: []` 与标签参数；更新 `scripts/fetch_daily_data.py` 将 `NEV 全国按日` 切到该包装器；补充单测与脚本说明。
