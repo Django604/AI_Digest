@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-07-01 10:49
+- 需求 / 目标：同步用户在源工作簿中更新后的 2026 年 6 月 N7 分日目标，总目标为 `75,000`，并发布到 GitHub。
+- 改动内容：基于已更新的 `data/source/NEV+ICE_xsai.xlsm` 重建 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与 `docs/data/monthly/2026-06/` 归档数据；同步更新 `docs/data/monthly/index.json`。
+- 涉及文件：`data/source/NEV+ICE_xsai.xlsm`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-06/dashboard.json`、`docs/data/monthly/2026-06/dashboard.summary.json`、`docs/data/monthly/index.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py --workbook data\source\NEV+ICE_xsai.xlsm --arrival-workbook data\source\NEV+ICE_ldai.xlsx --out docs\data\dashboard.json --summary-out docs\data\dashboard.summary.json`、`python -B -X utf8 -m unittest tests.test_build_dashboard -v`、`python -B -X utf8 -m py_compile scripts\build_dashboard.py scripts\dashboard_publish.py`
+- 验证结果：当前 dashboard 与 6 月归档中的 N7 6 月分日目标序列合计均为 `75,000`，累计目标末值为 `75,000`；截至 `2026-06-30`，N7 累计实绩 `67,032`，累计达成率 `89.4%`，当日目标 `2,557`；`tests.test_build_dashboard` 共 `18/18` 通过，脚本编译检查通过。
+- 回滚方法：回退上述源工作簿、dashboard JSON、月度归档 JSON、index 与本条记录，或恢复到上一提交。
+- 关联提交（如有）：待补充
+- 备注：本次未修改代码，目标来自用户更新后的源工作簿；分日目标同步为 `1496,1496,1498,1498,1498,3500,3500,1950,1950,1950,1950,1950,4050,4050,1950,4050,1950,1950,4050,4050,4050,1498,1498,1499,1499,1951,4052,4055,2005,2557`。
+
 ## 2026-06-10 10:15
 - 需求 / 目标：重新更新今天这批 AI_Digest 日报数据，按当前日期默认口径取业务日 `2026-06-09` 并发布到 GitHub。
 - 改动内容：执行完整取数流程，生成并回填 `全国按日-0609.xlsx`、`全国按日ICE-0609.xlsx`、`十五代轩逸按日-0609.xlsx`、`NEV本期-0609.xlsx`、`NEV同期-0609.xlsx`、`来店本期-0609.xlsx`、`来店同期-0609.xlsx`；更新两本源工作簿、live dashboard、6 月归档与月度索引。
