@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-07-02 10:35
+- 需求 / 目标：同步用户在源工作簿中更新后的 2026 年 7 月四车分日目标，并发布到 GitHub。
+- 改动内容：基于已更新的 `data/source/NEV+ICE_xsai.xlsm` 重建 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与 `docs/data/monthly/2026-07/` 归档数据；同步更新 `docs/data/monthly/index.json`，将 `latestMonth` 指向 `2026-07`。
+- 涉及文件：`data/source/NEV+ICE_xsai.xlsm`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-07/dashboard.json`、`docs/data/monthly/2026-07/dashboard.summary.json`、`docs/data/monthly/index.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py --workbook data\source\NEV+ICE_xsai.xlsm --arrival-workbook data\source\NEV+ICE_ldai.xlsx --out docs\data\dashboard.json --summary-out docs\data\dashboard.summary.json`、`python -B -X utf8 -m unittest tests.test_build_dashboard -v`、`python -B -X utf8 -m py_compile scripts\build_dashboard.py scripts\dashboard_publish.py`
+- 验证结果：`reportDate=2026-07-01`，7 月四车目标已写入当前 dashboard 与 7 月归档；NEV 总盘月目标 `430,367`，其中 NX8 `192,308`、N7 `69,048`、N6 `74,074`、天籁·鸿蒙座舱 `94,937`；`tests.test_build_dashboard` 共 `18/18` 通过，脚本编译检查通过。
+- 回滚方法：回退上述源工作簿、dashboard JSON、7 月归档 JSON、月度索引与本条记录，或恢复到上一提交。
+- 关联提交（如有）：待补充
+- 备注：本次未修改代码，目标来自用户更新后的源工作簿。
+
 ## 2026-07-01 10:49
 - 需求 / 目标：同步用户在源工作簿中更新后的 2026 年 6 月 N7 分日目标，总目标为 `75,000`，并发布到 GitHub。
 - 改动内容：基于已更新的 `data/source/NEV+ICE_xsai.xlsm` 重建 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与 `docs/data/monthly/2026-06/` 归档数据；同步更新 `docs/data/monthly/index.json`。
