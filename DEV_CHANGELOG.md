@@ -1,5 +1,35 @@
 # DEV CHANGELOG
 
+## 2026-07-04 11:59
+- 需求 / 目标：修复手动更新成功后主网页仍读取旧月度归档，导致页面没有展示新数据的问题，并完成验证。
+- 改动内容：更新 `scripts/fetch_daily_data.py`，让手动/定时更新在重建 live `dashboard.json` 后同步写入当前月份归档与 `docs/data/monthly/index.json`；补充 `tests/test_fetch_daily_data.py` 覆盖归档写入；基于当前 `2026-07-03` live 数据刷新 7 月归档。
+- 涉及文件：`scripts/fetch_daily_data.py`、`tests/test_fetch_daily_data.py`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-07/dashboard.json`、`docs/data/monthly/2026-07/dashboard.summary.json`、`docs/data/monthly/index.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py --workbook data\source\NEV+ICE_xsai.xlsm --arrival-workbook data\source\NEV+ICE_ldai.xlsx --out docs\data\dashboard.json --summary-out docs\data\dashboard.summary.json`、`python -B -X utf8 -m unittest tests.test_fetch_daily_data tests.test_build_dashboard -v`、`python -B -X utf8 -m py_compile scripts\fetch_daily_data.py scripts\build_dashboard.py scripts\dashboard_publish.py`、`node --check docs\assets\app.js`
+- 验证结果：live summary、`docs/data/monthly/2026-07/dashboard.summary.json` 与 `docs/data/monthly/index.json` 均更新为 `reportDate=2026-07-03`；相关单测 `24/24` 通过，Python 编译与前端语法检查通过。
+- 回滚方法：回退本次代码改动、测试改动、7 月归档数据、月度索引、dashboard summary 与本条记录。
+- 关联提交（如有）：待补充
+- 备注：本次修复的是“live 更新”和“页面默认月归档入口”之间的数据不同步。
+
+## 2026-07-04 11:56
+- 需求 / 目标：排查 GitHub Actions `Deploy Dashboard To Pages` 中 `build` 成功但 `deploy` 失败的原因。
+- 改动内容：未修改业务逻辑；核对本地 workflow 配置、GitHub run #176 页面状态与 deploy annotations。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Get-Content .github\workflows\deploy-pages.yml`、`git log -5 --oneline --decorate`、浏览 GitHub Actions run #176。
+- 验证结果：run #176 的 `build` job 成功，`deploy` job 失败；GitHub annotation 为 `Deployment failed, try again later.`，`Node.js 20 actions are deprecated` 为 warning，不是本次失败根因。
+- 回滚方法：删除本条诊断记录。
+- 关联提交（如有）：待补充
+- 备注：本次失败属于 GitHub Pages deploy 阶段服务端/临时部署失败，和 dashboard 构建产物无直接关系。
+
+## 2026-07-04 11:53
+- 需求 / 目标：排查“手动更新显示成功，但页面没有展示新数据”的原因。
+- 改动内容：未修改业务逻辑；核对最新手动更新运行结果、dashboard 摘要、月度归档索引、前端加载路径与最新 Git 提交。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`Get-Content .runtime\scheduled_update\20260704_114454_225508\result.json`、`Get-Content docs\data\dashboard.summary.json`、`Get-Content docs\data\monthly\2026-07\dashboard.summary.json`、`git show --name-status --oneline 9920cdd`
+- 验证结果：live `docs/data/dashboard.json` 已更新到 `reportDate=2026-07-03` 并由提交 `9920cdd` 推送；但 `docs/data/monthly/2026-07/dashboard.json` 与 `monthly/index.json` 仍停在 `reportDate=2026-07-01`，前端默认读取 `latestMonth=2026-07` 对应的月归档，导致页面看起来没有新数据。
+- 回滚方法：删除本条诊断记录。
+- 关联提交（如有）：待补充
+- 备注：最新一条静默任务结果为 `skipped / another-run-active`，真正完成并发布的是并行的 `manual-workbench` 流程。
+
 ## 2026-07-02 10:35
 - 需求 / 目标：同步用户在源工作簿中更新后的 2026 年 7 月四车分日目标，并发布到 GitHub。
 - 改动内容：基于已更新的 `data/source/NEV+ICE_xsai.xlsm` 重建 `docs/data/dashboard.json`、`docs/data/dashboard.summary.json` 与 `docs/data/monthly/2026-07/` 归档数据；同步更新 `docs/data/monthly/index.json`，将 `latestMonth` 指向 `2026-07`。

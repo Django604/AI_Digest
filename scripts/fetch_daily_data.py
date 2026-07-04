@@ -21,7 +21,10 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from scripts.build_dashboard import (  # noqa: E402
     ARRIVAL_BOOK,
+    DOCS_DIR,
     LEADS_BOOK,
+    MONTHLY_ARCHIVE_DIR,
+    MONTHLY_ARCHIVE_INDEX,
     OUT_JSON,
     SUMMARY_JSON,
     build_payload,
@@ -29,6 +32,7 @@ from scripts.build_dashboard import (  # noqa: E402
     coerce_date,
     safe_close_workbook,
     write_json_if_changed,
+    write_monthly_archive,
 )
 
 
@@ -320,6 +324,9 @@ def rebuild_dashboard(
     out_path: Path,
     summary_path: Path,
     log: Callable[[str], None],
+    archive_root: Path = MONTHLY_ARCHIVE_DIR,
+    archive_index_path: Path = MONTHLY_ARCHIVE_INDEX,
+    docs_root: Path = DOCS_DIR,
 ) -> dict[str, str | bool]:
     payload = build_payload(leads_path, arrival_path, report_date_override=business_date)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -332,7 +339,15 @@ def rebuild_dashboard(
     if not changed and existing_payload is not None:
         payload = existing_payload
 
-    summary_payload = build_run_summary(payload, leads_path, arrival_path, out_path, summary_path, changed)
+    archive_seed_summary = build_run_summary(payload, leads_path, arrival_path, out_path, summary_path, changed)
+    archive_info = write_monthly_archive(
+        payload,
+        archive_seed_summary,
+        archive_root=archive_root,
+        index_path=archive_index_path,
+        docs_root=docs_root,
+    )
+    summary_payload = build_run_summary(payload, leads_path, arrival_path, out_path, summary_path, changed, archive_info)
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary_changed, _ = write_json_if_changed(
         summary_path,
@@ -342,9 +357,13 @@ def rebuild_dashboard(
     )
     log(f"dashboard.json {'updated' if changed else 'unchanged'}: {out_path}")
     log(f"dashboard.summary.json {'updated' if summary_changed else 'unchanged'}: {summary_path}")
+    log(f"dashboard archive updated: {archive_info.get('monthKey')}")
     return {
         "dashboardChanged": changed,
         "summaryChanged": summary_changed,
+        "archiveDashboardChanged": bool(archive_info.get("dashboardChanged")),
+        "archiveSummaryChanged": bool(archive_info.get("summaryChanged")),
+        "archiveIndexChanged": bool(archive_info.get("indexChanged")),
     }
 
 

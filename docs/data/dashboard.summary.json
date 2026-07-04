@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-04T11:45:58",
+  "generatedAt": "2026-07-04T11:58:31",
   "reportDate": "2026-07-03",
   "reportDateLabel": "2026-07-03",
   "inputs": {
@@ -13,10 +13,17 @@
   "outputs": {
     "dashboardJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.json",
     "dashboardJsonName": "dashboard.json",
-    "dashboardChanged": true,
-    "dashboardStatus": "updated",
+    "dashboardChanged": false,
+    "dashboardStatus": "unchanged",
     "summaryJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.summary.json",
-    "summaryJsonName": "dashboard.summary.json"
+    "summaryJsonName": "dashboard.summary.json",
+    "archiveMonth": "2026-07",
+    "archiveDashboardJson": "./data/monthly/2026-07/dashboard.json",
+    "archiveSummaryJson": "./data/monthly/2026-07/dashboard.summary.json",
+    "archiveIndexJson": "./data/monthly/index.json",
+    "archiveDashboardChanged": true,
+    "archiveSummaryChanged": true,
+    "archiveIndexChanged": true
   },
   "stats": {
     "dashboardCount": 5,

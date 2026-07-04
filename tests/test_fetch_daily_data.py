@@ -145,14 +145,26 @@ class FetchDailyDataTests(unittest.TestCase):
             out_path=out_path,
             summary_path=summary_path,
             log=lambda _message: None,
+            archive_root=self.temp_root / "monthly",
+            archive_index_path=self.temp_root / "monthly" / "index.json",
+            docs_root=self.temp_root,
         )
 
         payload = json.loads(out_path.read_text(encoding="utf-8"))
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        archive_payload = json.loads((self.temp_root / "monthly" / "2026-04" / "dashboard.json").read_text(encoding="utf-8"))
+        archive_summary = json.loads((self.temp_root / "monthly" / "2026-04" / "dashboard.summary.json").read_text(encoding="utf-8"))
+        archive_index = json.loads((self.temp_root / "monthly" / "index.json").read_text(encoding="utf-8"))
         self.assertEqual(payload["meta"]["reportDate"], "2026-04-20")
         self.assertEqual(summary["reportDate"], "2026-04-20")
+        self.assertEqual(archive_payload["meta"]["reportDate"], "2026-04-20")
+        self.assertEqual(archive_summary["reportDate"], "2026-04-20")
+        self.assertEqual(archive_index["latestMonth"], "2026-04")
         self.assertIn("dashboardChanged", result)
         self.assertIn("summaryChanged", result)
+        self.assertIn("archiveDashboardChanged", result)
+        self.assertIn("archiveSummaryChanged", result)
+        self.assertIn("archiveIndexChanged", result)
 
 
 if __name__ == "__main__":
