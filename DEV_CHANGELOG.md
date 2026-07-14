@@ -909,3 +909,13 @@
 - 回滚方法：移除构建参数、时间保留与校验函数、workflow 参数和对应测试及文档记录。
 - 关联提交（如有）：待补充
 - 备注：本地重建默认行为不变，仍读取两本源工作簿当前文件系统修改时间；保留模式仅供 CI 使用。
+
+## 2026-07-14 推送源数据时间修复
+- 需求 / 目标：将源数据更新时间修复先推送到 GitHub `main` 分支。
+- 改动内容：提交并推送时间保留实现、测试、workflow、文档及设计文档；未纳入工作区中的无关未跟踪文件。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`git commit -m "Preserve source timestamps in Pages builds"`、`git push origin main`、`git ls-remote origin refs/heads/main`
+- 验证结果：实现提交 `eef60c8` 已推送，首次远端核对确认 `origin/main` 与本地 `HEAD` 一致。
+- 回滚方法：基于相关提交创建反向提交，不改写远端历史。
+- 关联提交（如有）：`6c0dfb0`、`eef60c8`
+- 备注：`.codex/`、`mockups/`、演示脚本、`start_dashboard_server.bat` 与 `tests/.tmp-copy-check/` 等未跟踪内容未推送。
