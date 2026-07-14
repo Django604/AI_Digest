@@ -919,3 +919,13 @@
 - 回滚方法：基于相关提交创建反向提交，不改写远端历史。
 - 关联提交（如有）：`6c0dfb0`、`eef60c8`
 - 备注：`.codex/`、`mockups/`、演示脚本、`start_dashboard_server.bat` 与 `tests/.tmp-copy-check/` 等未跟踪内容未推送。
+
+## 2026-07-14 14:18
+- 需求 / 目标：为 7 月 16 日上市的新探陆新增 NEV 月度对照表、线索趋势和每日简报独立板块，同时保持 NEV 总盘只统计原四款车型。
+- 改动内容：拆分 `NEV_CORE_MODELS` 与 `NEV_DETAIL_MODELS`；在 NEV 页面追加新探陆完整区块；全车系有效线索管控纳入新探陆；每日简报新增独立新探陆线索卡片；无目标时统一显示 `-`，并保留未来从 `目标竖版` 自动接入同名车型目标的能力；调整简报桌面两列布局并重建当前及 7 月归档数据。
+- 涉及文件：`scripts/build_dashboard.py`、`docs/assets/styles.css`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-07/dashboard.json`、`docs/data/monthly/2026-07/dashboard.summary.json`、`docs/data/monthly/index.json`、`tests/test_build_dashboard.py`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 scripts/build_dashboard.py ...`、`python -X utf8 -m unittest tests.test_build_dashboard -v`、`python -X utf8 -m unittest discover -s tests -v`、`playwright-cli -s=new-pathfinder open http://127.0.0.1:4173`
+- 验证结果：专项测试 `31/31`、全量测试 `81/81` 通过；正式产物中新探陆累计新增线索为 `2`、目标及达成率为 `-`，NEV 总盘与四车型累计之和均为 `122,967`；真实浏览器桌面端与 `390x844` 移动端布局通过，控制台仅存在既有 `favicon.ico 404`。
+- 回滚方法：回退本次构建器、样式、测试、数据产物与文档变更。
+- 关联提交（如有）：设计提交 `4d24793`，实现提交待补充。
+- 备注：新探陆统计当前月全部源数据，不按上市日截断；工作区无关未跟踪文件保持未处理。

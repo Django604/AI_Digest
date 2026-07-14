@@ -25,6 +25,7 @@
   - `--report-date` 支持 `YYYY-MM-DD` 与 `YYYYMMDD`，用于本地取数后强制按指定业务日期重建页面数据，避免依赖 Excel 缓存公式日期
   - `--preserve-input-modified-times` 仅供 GitHub Actions 重建使用：它会严格复用现有 dashboard 与 summary 中已提交的两本源工作簿修改时间，避免 checkout 后的 UTC 文件时间覆盖本地实际记录；本地更新不要启用该参数
   - 趋势表的 `columnMeta` 现在会同时输出 `holiday / weekend / makeupWorkday / regularWorkday` 语义，前端据此显示 `节 / 周 / 班` 标签并区分补班日
+  - `NEV 线索趋势` 会从 `全国按日NEV` 读取新探陆并生成独立月度对照与趋势区块；`NEV 总盘` 和每日简报四车合计仍只统计 `NX8 / N7 / N6 / 天籁·鸿蒙座舱`，`全车系有效线索管控` 则包含新探陆；`目标竖版` 暂无新探陆时目标与达成率显示 `-`，后续出现同名车型目标后自动接入
 
 ## scripts/fetch_daily_data.py
 

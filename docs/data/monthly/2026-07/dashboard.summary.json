@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-14T09:06:40",
+  "generatedAt": "2026-07-14T14:05:59",
   "reportDate": "2026-07-13",
   "reportDateLabel": "2026-07-13",
   "inputs": {
@@ -23,7 +23,7 @@
     "sectionCounts": {
       "brief": 0,
       "lead-control": 1,
-      "nev": 5,
+      "nev": 6,
       "ice": 2,
       "arrival": 1
     },

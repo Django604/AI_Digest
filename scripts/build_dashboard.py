@@ -23,13 +23,17 @@ SUMMARY_JSON = ROOT / "docs" / "data" / "dashboard.summary.json"
 MONTHLY_ARCHIVE_DIR = ROOT / "docs" / "data" / "monthly"
 MONTHLY_ARCHIVE_INDEX = MONTHLY_ARCHIVE_DIR / "index.json"
 
-NEV_MODELS = [
+NEV_CORE_MODELS = [
     ("nx8", "NX8", "NX8"),
     ("n7", "N7", "N7"),
     ("n6", "N6", "N6"),
     ("TEANA-harmony", "天籁·鸿蒙座舱", "天籁·鸿蒙座舱"),
 ]
-NEV_BRIEF_ORDER = ["NX8", "N7", "N6", "天籁·鸿蒙座舱"]
+NEV_DETAIL_MODELS = [
+    *NEV_CORE_MODELS,
+    ("new-pathfinder", "新探陆", "新探陆"),
+]
+NEV_BRIEF_ORDER = [model_name for _, _, model_name in NEV_CORE_MODELS]
 BRIEF_MARKERS = ["①", "②", "③", "④", "⑤", "⑥"]
 SYLPHY_TARGET_OVERRIDES = {
     (2026, 4): [
@@ -854,10 +858,15 @@ def build_monthly_chart_title(title: str, metric_label: str) -> str:
 def build_nev_section(section_id: str, title: str, report_date: date, current_actuals, previous_actuals, current_targets) -> dict[str, Any]:
     latest = current_actuals.get(report_date, {})
     total_new = sum((item.get("newLeads") or 0) for item in current_actuals.values())
-    total_target = sum(current_targets.get(item, 0) or 0 for item in month_dates(report_date) if item <= report_date)
+    has_target = bool(current_targets) and any(value is not None for value in current_targets.values())
+    total_target = (
+        sum(current_targets.get(item, 0) or 0 for item in month_dates(report_date) if item <= report_date)
+        if has_target
+        else None
+    )
     total_arrivals = sum((item.get("arrivals") or 0) for item in current_actuals.values())
     latest_new = latest.get("newLeads")
-    latest_target = current_targets.get(report_date)
+    latest_target = current_targets.get(report_date) if has_target else None
     return {
         "id": section_id,
         "title": title,
@@ -916,7 +925,40 @@ def build_sylphy_target_series(report_date: date) -> dict[date, int]:
     return {current_date: values[index] for index, current_date in enumerate(month_dates(report_date)) if index < len(values)}
 
 
-def build_line_brief(report_date: date, nev_daily, nev_targets, sylphy_daily, sylphy_targets) -> dict[str, Any]:
+def build_single_model_brief_line(
+    model_name: str,
+    report_date: date,
+    actuals: dict[date, dict[str, int | float | None]],
+    targets: dict[date, int | float],
+    *,
+    actual_key: str,
+) -> str:
+    cumulative_actual = sum((item.get(actual_key) or 0) for item in actuals.values())
+    daily_actual = actuals.get(report_date, {}).get(actual_key)
+    has_target = bool(targets) and any(value is not None for value in targets.values())
+    cumulative_target = (
+        sum(targets.get(current_date, 0) or 0 for current_date in month_dates(report_date) if current_date <= report_date)
+        if has_target
+        else None
+    )
+    daily_target = targets.get(report_date) if has_target else None
+    return (
+        f"{model_name}累计实绩 {fmt_count(cumulative_actual)}，"
+        f"累计达成率 {fmt_percent(ratio(cumulative_actual, cumulative_target))}；"
+        f"当日实绩 {fmt_count(daily_actual)}，"
+        f"当日达成率 {fmt_percent(ratio(daily_actual, daily_target))}"
+    )
+
+
+def build_line_brief(
+    report_date: date,
+    nev_daily,
+    nev_targets,
+    sylphy_daily,
+    sylphy_targets,
+    new_pathfinder_daily,
+    new_pathfinder_targets,
+) -> dict[str, Any]:
     total_cum_actual = total_day_actual = total_cum_target = total_day_target = 0
     nev_lines: list[str] = []
     for index, model_name in enumerate(NEV_BRIEF_ORDER):
@@ -933,16 +975,26 @@ def build_line_brief(report_date: date, nev_daily, nev_targets, sylphy_daily, sy
         marker = BRIEF_MARKERS[index]
         nev_lines.append(f"{marker}{model_name}累计实绩{fmt_count(cum_actual)}，累计达成率{fmt_percent(ratio(cum_actual, cum_target))}；当日实绩{fmt_count(day_actual)}，当日达成率{fmt_percent(ratio(day_actual, day_target))}")
     nev_summary = f"四车累计实绩{fmt_count(total_cum_actual)}，累计达成率{fmt_percent(ratio(total_cum_actual, total_cum_target))}；当日实绩{fmt_count(total_day_actual)}，当日达成率{fmt_percent(ratio(total_day_actual, total_day_target))}"
-    sylphy_cum_actual = sum((item.get('validLeads') or 0) for item in sylphy_daily.values())
-    sylphy_day_actual = sylphy_daily.get(report_date, {}).get("validLeads")
-    sylphy_cum_target = sum(sylphy_targets.get(d, 0) or 0 for d in month_dates(report_date) if d <= report_date)
-    sylphy_day_target = sylphy_targets.get(report_date)
-    sylphy_line = f"十五代轩逸累计实绩 {fmt_count(sylphy_cum_actual)}，累计达成率 {fmt_percent(ratio(sylphy_cum_actual, sylphy_cum_target))}；当日实绩 {fmt_count(sylphy_day_actual)}，当日达成率 {fmt_percent(ratio(sylphy_day_actual, sylphy_day_target))}"
+    sylphy_line = build_single_model_brief_line(
+        "十五代轩逸",
+        report_date,
+        sylphy_daily,
+        sylphy_targets,
+        actual_key="validLeads",
+    )
+    new_pathfinder_line = build_single_model_brief_line(
+        "新探陆",
+        report_date,
+        new_pathfinder_daily,
+        new_pathfinder_targets,
+        actual_key="newLeads",
+    )
     headline = f"请查收{report_date.strftime('%m.%d')}线索&来店日报"
     sections = [
         {"kind": "intro", "title": "开场", "lines": ["各位领导：", headline]},
         {"kind": "nev", "title": "NEV线索", "lines": [nev_summary, *nev_lines]},
         {"kind": "sylphy15", "title": "十五代轩逸线索", "lines": [sylphy_line]},
+        {"kind": "new-pathfinder", "title": "新探陆线索", "lines": [new_pathfinder_line]},
     ]
     return {
         "id": "daily-brief",
@@ -1243,17 +1295,27 @@ def build_payload(
         sylphy_current = {dt: value for dt, value in sylphy_daily_all.items() if current_start <= dt <= report_date}
         sylphy_previous = {dt: value for dt, value in sylphy_daily_all.items() if previous_start <= dt <= previous_end}
         sylphy_targets = build_sylphy_target_series(report_date)
-        nev_total_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_MODELS))
-        nev_total_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in NEV_MODELS))
+        nev_total_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
+        nev_total_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
+        nev_all_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_DETAIL_MODELS))
+        nev_all_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in NEV_DETAIL_MODELS))
         arrival_maps = build_arrival_daily_maps(arrival)
 
-        line_brief = build_line_brief(report_date, nev_current, nev_targets, sylphy_current, sylphy_targets)
+        line_brief = build_line_brief(
+            report_date,
+            nev_current,
+            nev_targets,
+            sylphy_current,
+            sylphy_targets,
+            nev_current.get("新探陆", {}),
+            nev_targets.get("新探陆", {}),
+        )
         arrival_brief = build_arrival_brief(report_date, arrival_maps)
         arrival_dashboard = build_arrival_dashboard(report_date, arrival_maps)
 
-        nev_total_targets = aggregate_targets(*(nev_targets.get(model_name, {}) for _, _, model_name in NEV_MODELS))
-        valid_leads_total_current = aggregate_daily_series(nev_total_current, ice_current)
-        valid_leads_total_previous = aggregate_daily_series(nev_total_previous, ice_previous)
+        nev_total_targets = aggregate_targets(*(nev_targets.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
+        valid_leads_total_current = aggregate_daily_series(nev_all_current, ice_current)
+        valid_leads_total_previous = aggregate_daily_series(nev_all_previous, ice_previous)
         data_dates = sorted({*nev_total_current.keys(), *ice_current.keys(), *sylphy_current.keys(), *valid_leads_total_current.keys()})
 
         dashboards = {
@@ -1283,7 +1345,7 @@ def build_payload(
                     build_nev_section("nev-total", "NEV 总盘", report_date, nev_total_current, nev_total_previous, nev_total_targets),
                     *[
                         build_nev_section(section_id, title, report_date, nev_current.get(model_name, {}), nev_previous.get(model_name, {}), nev_targets.get(model_name, {}))
-                        for section_id, title, model_name in NEV_MODELS
+                        for section_id, title, model_name in NEV_DETAIL_MODELS
                     ],
                 ],
             },

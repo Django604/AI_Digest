@@ -638,7 +638,7 @@ button,
 
 .brief-page-card.kind-nev {
   grid-column: 1;
-  grid-row: 1 / span 2;
+  grid-row: 1 / span 3;
 }
 
 .brief-page-card.kind-sylphy15 {
@@ -646,9 +646,14 @@ button,
   grid-row: 1;
 }
 
-.brief-page-card.kind-arrival {
+.brief-page-card.kind-new-pathfinder {
   grid-column: 2;
   grid-row: 2;
+}
+
+.brief-page-card.kind-arrival {
+  grid-column: 2;
+  grid-row: 3;
 }
 
 .data-section {
@@ -1458,6 +1463,7 @@ tbody tr:last-child td {
 
   .brief-page-card.kind-nev,
   .brief-page-card.kind-sylphy15,
+  .brief-page-card.kind-new-pathfinder,
   .brief-page-card.kind-arrival {
     grid-column: auto;
     grid-row: auto;

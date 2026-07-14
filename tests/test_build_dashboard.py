@@ -8,12 +8,14 @@ import shutil
 import unittest
 from unittest.mock import patch
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from scripts.build_dashboard import (
     ARRIVAL_BOOK,
     LEADS_BOOK,
     MONTHLY_ARCHIVE_DIR,
+    NEV_CORE_MODELS,
+    NEV_DETAIL_MODELS,
     OUT_JSON,
     SUMMARY_JSON,
     apply_preserved_input_modified_times,
@@ -21,10 +23,13 @@ from scripts.build_dashboard import (
     build_column_meta,
     build_payload,
     build_run_summary,
+    build_nev_section,
     file_mtime_iso,
     get_day_calendar_meta,
     load_preserved_input_modified_times,
     load_arrival_daily_sheet,
+    load_ice_daily,
+    load_nev_daily,
     validate_report_date_cell,
     validate_sheet_headers,
     validate_workbook_structure,
@@ -63,6 +68,137 @@ class BuildDashboardPayloadTests(unittest.TestCase):
             set(self.payload["dashboards"].keys()),
             {"brief", "lead-control", "nev", "ice", "arrival"},
         )
+
+    def test_nev_model_groups_keep_new_pathfinder_out_of_core_total(self) -> None:
+        core_model_names = [model_name for _, _, model_name in NEV_CORE_MODELS]
+        detail_model_names = [model_name for _, _, model_name in NEV_DETAIL_MODELS]
+
+        self.assertEqual(core_model_names, ["NX8", "N7", "N6", "天籁·鸿蒙座舱"])
+        self.assertEqual(detail_model_names, [*core_model_names, "新探陆"])
+
+    def test_new_pathfinder_section_follows_existing_nev_models(self) -> None:
+        sections = self.payload["dashboards"]["nev"]["sections"]
+
+        self.assertEqual([section["title"] for section in sections][-2:], ["天籁·鸿蒙座舱", "新探陆"])
+        self.assertEqual(sections[-1]["id"], "new-pathfinder")
+
+    def test_new_pathfinder_section_includes_all_current_month_source_data(self) -> None:
+        section = next(
+            item for item in self.payload["dashboards"]["nev"]["sections"]
+            if item["id"] == "new-pathfinder"
+        )
+        matrix = section["trend"]["matrix"]
+        rows = {row["key"]: row["displayValues"] for row in matrix["rows"]}
+        values_by_date = dict(zip(matrix["labels"], rows["actual"]))
+
+        self.assertEqual(values_by_date["7/10"], "2")
+        self.assertEqual(values_by_date["7/11"], "0")
+        self.assertEqual(values_by_date["7/13"], "0")
+
+    def test_new_pathfinder_without_targets_displays_placeholders(self) -> None:
+        section = next(
+            item for item in self.payload["dashboards"]["nev"]["sections"]
+            if item["id"] == "new-pathfinder"
+        )
+        cards = {card["label"]: card for card in section["summary"]["cards"]}
+        matrix_rows = {row["key"]: row for row in section["trend"]["matrix"]["rows"]}
+
+        self.assertEqual(cards["累计目标"]["displayValue"], "-")
+        self.assertEqual(cards["累计达成率"]["displayValue"], "-")
+        self.assertEqual(cards["当日目标"]["displayValue"], "-")
+        self.assertEqual(cards["当日达成率"]["displayValue"], "-")
+        self.assertTrue(all(value == "-" for value in matrix_rows["target"]["displayValues"]))
+        self.assertTrue(all(value is None for value in section["trend"]["chart"]["series"]["target"]))
+
+    def test_new_pathfinder_targets_are_used_when_available(self) -> None:
+        report_date = date(2026, 7, 16)
+        current_actuals = {
+            date(2026, 7, 15): {"newLeads": 4, "arrivals": 1},
+            report_date: {"newLeads": 6, "arrivals": 2},
+        }
+        current_targets = {
+            date(2026, 7, 15): 5,
+            report_date: 10,
+        }
+
+        section = build_nev_section(
+            "new-pathfinder",
+            "新探陆",
+            report_date,
+            current_actuals,
+            {},
+            current_targets,
+        )
+        cards = {card["label"]: card for card in section["summary"]["cards"]}
+
+        self.assertEqual(cards["累计目标"]["displayValue"], "15")
+        self.assertEqual(cards["累计达成率"]["displayValue"], "66.7%")
+        self.assertEqual(cards["当日目标"]["displayValue"], "10")
+        self.assertEqual(cards["当日达成率"]["displayValue"], "60.0%")
+
+    def test_nev_total_excludes_new_pathfinder_actuals(self) -> None:
+        sections = {
+            section["id"]: section
+            for section in self.payload["dashboards"]["nev"]["sections"]
+        }
+        core_cumulative = sum(
+            sections[section_id]["summary"]["cards"][0]["value"]
+            for section_id, _, _ in NEV_CORE_MODELS
+        )
+        new_pathfinder_cumulative = sections["new-pathfinder"]["summary"]["cards"][0]["value"]
+        nev_total_cumulative = sections["nev-total"]["summary"]["cards"][0]["value"]
+
+        self.assertEqual(nev_total_cumulative, core_cumulative)
+        self.assertGreater(new_pathfinder_cumulative, 0)
+        self.assertNotEqual(nev_total_cumulative, core_cumulative + new_pathfinder_cumulative)
+
+    def test_lead_control_includes_new_pathfinder_valid_leads(self) -> None:
+        current_date = date(2026, 7, 10)
+        workbook = load_workbook(LEADS_BOOK, data_only=True)
+        try:
+            nev_daily = load_nev_daily(
+                workbook["全国按日NEV"],
+                current_date.replace(day=1),
+                current_date,
+            )
+            ice_daily = load_ice_daily(
+                workbook["全国按日ICE"],
+                current_date.replace(day=1),
+                current_date,
+            )
+        finally:
+            workbook.close()
+
+        core_nev_valid = sum(
+            nev_daily.get(model_name, {}).get(current_date, {}).get("validLeads") or 0
+            for _, _, model_name in NEV_CORE_MODELS
+        )
+        new_pathfinder_valid = (
+            nev_daily.get("新探陆", {}).get(current_date, {}).get("validLeads") or 0
+        )
+        expected_all_vehicle_valid = (
+            core_nev_valid
+            + new_pathfinder_valid
+            + (ice_daily.get(current_date, {}).get("validLeads") or 0)
+        )
+        lead_control = self.payload["dashboards"]["lead-control"]["sections"][0]
+        actual_all_vehicle_valid = lead_control["trend"]["chart"]["series"]["actual"][current_date.day - 1]
+
+        self.assertEqual(new_pathfinder_valid, 1)
+        self.assertEqual(actual_all_vehicle_valid, expected_all_vehicle_valid)
+
+    def test_daily_brief_uses_separate_new_pathfinder_section(self) -> None:
+        sections = self.payload["dashboards"]["brief"]["briefing"]["sections"]
+        sections_by_kind = {section["kind"]: section for section in sections}
+
+        self.assertEqual(
+            [section["kind"] for section in sections],
+            ["intro", "nev", "sylphy15", "new-pathfinder", "arrival"],
+        )
+        self.assertEqual(sections_by_kind["new-pathfinder"]["title"], "新探陆线索")
+        self.assertIn("新探陆累计实绩 2", sections_by_kind["new-pathfinder"]["lines"][0])
+        self.assertIn("累计达成率 -", sections_by_kind["new-pathfinder"]["lines"][0])
+        self.assertFalse(any("新探陆" in line for line in sections_by_kind["nev"]["lines"]))
 
     def test_lead_control_row_order_is_stable(self) -> None:
         trend = self.payload["dashboards"]["lead-control"]["sections"][0]["trend"]
