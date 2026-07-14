@@ -10,6 +10,7 @@
   - `python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json`
   - 指定摘要输出：`python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json --summary-out docs/data/dashboard.summary.json`
   - 指定业务日期覆盖：`python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json --report-date 2026-04-20`
+  - CI 保留已提交的源文件时间：`python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json --preserve-input-modified-times`
 - 运行前提：
   - 本机可用 `Python`
   - 已执行 `pip install -r requirements.txt`
@@ -22,6 +23,7 @@
   - 如果只有 `generatedAt` 变化、其余内容没变，脚本不会重复改写 `docs/data/dashboard.json`，更适合定时任务或 CI 场景
   - 摘要文件会输出报表日期、输入文件修改时间、dashboard 数量、section 数量以及本次是否真的发生内容更新
   - `--report-date` 支持 `YYYY-MM-DD` 与 `YYYYMMDD`，用于本地取数后强制按指定业务日期重建页面数据，避免依赖 Excel 缓存公式日期
+  - `--preserve-input-modified-times` 仅供 GitHub Actions 重建使用：它会严格复用现有 dashboard 与 summary 中已提交的两本源工作簿修改时间，避免 checkout 后的 UTC 文件时间覆盖本地实际记录；本地更新不要启用该参数
   - 趋势表的 `columnMeta` 现在会同时输出 `holiday / weekend / makeupWorkday / regularWorkday` 语义，前端据此显示 `节 / 周 / 班` 标签并区分补班日
 
 ## scripts/fetch_daily_data.py

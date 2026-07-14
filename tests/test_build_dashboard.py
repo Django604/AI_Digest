@@ -16,11 +16,14 @@ from scripts.build_dashboard import (
     MONTHLY_ARCHIVE_DIR,
     OUT_JSON,
     SUMMARY_JSON,
+    apply_preserved_input_modified_times,
     build_arrival_series,
     build_column_meta,
     build_payload,
     build_run_summary,
+    file_mtime_iso,
     get_day_calendar_meta,
+    load_preserved_input_modified_times,
     load_arrival_daily_sheet,
     validate_report_date_cell,
     validate_sheet_headers,
@@ -96,6 +99,8 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertEqual(summary["outputs"]["dashboardStatus"], "unchanged")
         self.assertEqual(summary["stats"]["dashboardCount"], 5)
         self.assertEqual(summary["stats"]["sectionCounts"]["lead-control"], 1)
+        self.assertEqual(summary["inputs"]["workbookModifiedAt"], file_mtime_iso(LEADS_BOOK))
+        self.assertEqual(summary["inputs"]["arrivalWorkbookModifiedAt"], file_mtime_iso(ARRIVAL_BOOK))
 
     def test_build_run_summary_includes_archive_outputs_when_provided(self) -> None:
         summary = build_run_summary(
@@ -118,6 +123,108 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertEqual(summary["outputs"]["archiveMonth"], "2026-04")
         self.assertEqual(summary["outputs"]["archiveIndexJson"], "./data/monthly/index.json")
         self.assertTrue(summary["outputs"]["archiveDashboardChanged"])
+
+    def test_preserved_times_override_dashboard_and_summary_file_mtimes(self) -> None:
+        preserved_times = {
+            "workbookModifiedAt": "2026-07-14T09:06:37",
+            "arrivalWorkbookModifiedAt": "2026-07-14T09:06:38",
+        }
+        payload = {
+            **self.payload,
+            "meta": {**self.payload["meta"]},
+        }
+
+        apply_preserved_input_modified_times(payload, preserved_times)
+        summary = build_run_summary(
+            payload,
+            LEADS_BOOK,
+            ARRIVAL_BOOK,
+            OUT_JSON,
+            SUMMARY_JSON,
+            True,
+            input_modified_times=preserved_times,
+        )
+
+        self.assertEqual(payload["meta"]["workbookModifiedAt"], preserved_times["workbookModifiedAt"])
+        self.assertEqual(summary["inputs"]["workbookModifiedAt"], preserved_times["workbookModifiedAt"])
+        self.assertEqual(
+            summary["inputs"]["arrivalWorkbookModifiedAt"],
+            preserved_times["arrivalWorkbookModifiedAt"],
+        )
+
+    def test_load_preserved_times_reads_consistent_committed_outputs(self) -> None:
+        temp_dir = Path("tests/.tmp/preserved-input-times")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            dashboard_path = temp_dir / "dashboard.json"
+            summary_path = temp_dir / "dashboard.summary.json"
+            dashboard_path.write_text(
+                json.dumps({"meta": {"workbookModifiedAt": "2026-07-14T09:06:37"}}),
+                encoding="utf-8",
+            )
+            summary_path.write_text(
+                json.dumps(
+                    {
+                        "inputs": {
+                            "workbookModifiedAt": "2026-07-14T09:06:37",
+                            "arrivalWorkbookModifiedAt": "2026-07-14T09:06:38",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            preserved_times = load_preserved_input_modified_times(dashboard_path, summary_path)
+
+            self.assertEqual(preserved_times["workbookModifiedAt"], "2026-07-14T09:06:37")
+            self.assertEqual(preserved_times["arrivalWorkbookModifiedAt"], "2026-07-14T09:06:38")
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_load_preserved_times_rejects_inconsistent_leads_time(self) -> None:
+        temp_dir = Path("tests/.tmp/inconsistent-preserved-input-times")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            dashboard_path = temp_dir / "dashboard.json"
+            summary_path = temp_dir / "dashboard.summary.json"
+            dashboard_path.write_text(
+                json.dumps({"meta": {"workbookModifiedAt": "2026-07-14T09:06:37"}}),
+                encoding="utf-8",
+            )
+            summary_path.write_text(
+                json.dumps(
+                    {
+                        "inputs": {
+                            "workbookModifiedAt": "2026-07-14T01:07:00",
+                            "arrivalWorkbookModifiedAt": "2026-07-14T09:06:38",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "dashboard 与 summary 中的线索工作簿时间不一致"):
+                load_preserved_input_modified_times(dashboard_path, summary_path)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_load_preserved_times_rejects_missing_or_malformed_metadata(self) -> None:
+        temp_dir = Path("tests/.tmp/malformed-preserved-input-times")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            dashboard_path = temp_dir / "dashboard.json"
+            summary_path = temp_dir / "dashboard.summary.json"
+            dashboard_path.write_text(json.dumps({"meta": {}}), encoding="utf-8")
+            summary_path.write_text(json.dumps({"inputs": {}}), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "不是有效的 ISO 本地时间"):
+                load_preserved_input_modified_times(dashboard_path, summary_path)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_pages_workflow_preserves_committed_input_modified_times(self) -> None:
+        workflow = (Path(__file__).parents[1] / ".github/workflows/deploy-pages.yml").read_text(encoding="utf-8")
+        self.assertIn("--preserve-input-modified-times", workflow)
 
     def test_arrival_dashboard_uses_nev_daily_arrivals_for_nev_actual_row(self) -> None:
         if self.previous_month_archive_payload is None:

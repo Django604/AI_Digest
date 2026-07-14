@@ -41,7 +41,7 @@ jobs:
         run: python -m unittest discover -s tests -v
 
       - name: Build dashboard data
-        run: python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json
+        run: python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json --preserve-input-modified-times
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

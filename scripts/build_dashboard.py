@@ -250,6 +250,62 @@ def file_mtime_iso(path: Path) -> str:
     return datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec="seconds")
 
 
+def validate_preserved_local_datetime(value: Any, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip() or "T" not in value:
+        raise ValueError(f"保留源文件时间失败：{field_name} 不是有效的 ISO 本地时间。")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"保留源文件时间失败：{field_name} 不是有效的 ISO 本地时间。") from exc
+    if parsed.tzinfo is not None:
+        raise ValueError(f"保留源文件时间失败：{field_name} 必须是不带时区的本地时间。")
+    return value
+
+
+def load_preserved_input_modified_times(out_path: Path, summary_path: Path) -> dict[str, str]:
+    dashboard_payload = read_json_file(out_path)
+    summary_payload = read_json_file(summary_path)
+    if not isinstance(dashboard_payload, dict):
+        raise ValueError(f"保留源文件时间失败：无法读取已提交的 dashboard 文件 {out_path}。")
+    if not isinstance(summary_payload, dict):
+        raise ValueError(f"保留源文件时间失败：无法读取已提交的 summary 文件 {summary_path}。")
+
+    dashboard_meta = dashboard_payload.get("meta")
+    summary_inputs = summary_payload.get("inputs")
+    if not isinstance(dashboard_meta, dict) or not isinstance(summary_inputs, dict):
+        raise ValueError("保留源文件时间失败：已提交产物缺少 meta 或 inputs 对象。")
+
+    dashboard_leads_time = validate_preserved_local_datetime(
+        dashboard_meta.get("workbookModifiedAt"),
+        "dashboard.meta.workbookModifiedAt",
+    )
+    summary_leads_time = validate_preserved_local_datetime(
+        summary_inputs.get("workbookModifiedAt"),
+        "summary.inputs.workbookModifiedAt",
+    )
+    arrival_time = validate_preserved_local_datetime(
+        summary_inputs.get("arrivalWorkbookModifiedAt"),
+        "summary.inputs.arrivalWorkbookModifiedAt",
+    )
+    if dashboard_leads_time != summary_leads_time:
+        raise ValueError("保留源文件时间失败：dashboard 与 summary 中的线索工作簿时间不一致。")
+
+    return {
+        "workbookModifiedAt": dashboard_leads_time,
+        "arrivalWorkbookModifiedAt": arrival_time,
+    }
+
+
+def apply_preserved_input_modified_times(
+    payload: dict[str, Any],
+    input_modified_times: dict[str, str],
+) -> None:
+    meta = payload.get("meta")
+    if not isinstance(meta, dict):
+        raise ValueError("保留源文件时间失败：新生成的 dashboard 缺少 meta 对象。")
+    meta["workbookModifiedAt"] = input_modified_times["workbookModifiedAt"]
+
+
 def validate_workbook_sheets(workbook: Workbook, required_sheets: tuple[str, ...], workbook_label: str) -> None:
     missing = [sheet for sheet in required_sheets if sheet not in workbook.sheetnames]
     if missing:
@@ -1280,6 +1336,7 @@ def build_run_summary(
     summary_path: Path,
     dashboard_changed: bool,
     archive_info: dict[str, Any] | None = None,
+    input_modified_times: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     dashboards = payload.get("dashboards", {})
     analysis = payload.get("analysis", {})
@@ -1305,6 +1362,16 @@ def build_run_summary(
                 "archiveIndexChanged": archive_info.get("indexChanged"),
             }
         )
+    workbook_modified_at = (
+        input_modified_times["workbookModifiedAt"]
+        if input_modified_times is not None
+        else file_mtime_iso(leads_path)
+    )
+    arrival_workbook_modified_at = (
+        input_modified_times["arrivalWorkbookModifiedAt"]
+        if input_modified_times is not None
+        else file_mtime_iso(arrival_path)
+    )
     return {
         "generatedAt": datetime.now().isoformat(timespec="seconds"),
         "reportDate": meta.get("reportDate"),
@@ -1312,10 +1379,10 @@ def build_run_summary(
         "inputs": {
             "workbook": normalize_path_display(leads_path),
             "workbookName": leads_path.name,
-            "workbookModifiedAt": file_mtime_iso(leads_path),
+            "workbookModifiedAt": workbook_modified_at,
             "arrivalWorkbook": normalize_path_display(arrival_path),
             "arrivalWorkbookName": arrival_path.name,
-            "arrivalWorkbookModifiedAt": file_mtime_iso(arrival_path),
+            "arrivalWorkbookModifiedAt": arrival_workbook_modified_at,
         },
         "outputs": outputs,
         "stats": {
@@ -1417,6 +1484,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out", default=str(OUT_JSON), help="Output JSON path")
     parser.add_argument("--summary-out", default="", help="Optional output summary JSON path")
     parser.add_argument("--report-date", default="", help="Optional report date override in YYYY-MM-DD or YYYYMMDD")
+    parser.add_argument(
+        "--preserve-input-modified-times",
+        action="store_true",
+        help="Preserve source workbook modified times from existing committed dashboard outputs",
+    )
     return parser.parse_args()
 
 
@@ -1424,14 +1496,21 @@ def main() -> int:
     args = parse_args()
     leads_path = Path(args.workbook).resolve()
     arrival_path = Path(args.arrival_workbook).resolve()
+    out_path = Path(args.out).resolve()
+    summary_path = Path(args.summary_out).resolve() if args.summary_out else out_path.with_name(f"{out_path.stem}.summary{out_path.suffix}")
+    input_modified_times = (
+        load_preserved_input_modified_times(out_path, summary_path)
+        if args.preserve_input_modified_times
+        else None
+    )
     report_date_override = None
     if args.report_date:
         report_date_override = coerce_date(args.report_date)
         if report_date_override is None:
             raise ValueError(f"Invalid --report-date value: {args.report_date}")
     payload = build_payload(leads_path, arrival_path, report_date_override=report_date_override)
-    out_path = Path(args.out).resolve()
-    summary_path = Path(args.summary_out).resolve() if args.summary_out else out_path.with_name(f"{out_path.stem}.summary{out_path.suffix}")
+    if input_modified_times is not None:
+        apply_preserved_input_modified_times(payload, input_modified_times)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     changed, existing_payload = write_json_if_changed(
         out_path,
@@ -1444,7 +1523,15 @@ def main() -> int:
     status = "updated" if changed else "unchanged"
     print(f"dashboard.json {status}: {out_path}")
     summary_path.parent.mkdir(parents=True, exist_ok=True)
-    archive_seed_summary = build_run_summary(payload, leads_path, arrival_path, out_path, summary_path, changed)
+    archive_seed_summary = build_run_summary(
+        payload,
+        leads_path,
+        arrival_path,
+        out_path,
+        summary_path,
+        changed,
+        input_modified_times=input_modified_times,
+    )
     archive_info = write_monthly_archive(payload, archive_seed_summary)
     summary_payload = build_run_summary(
         payload,
@@ -1454,6 +1541,7 @@ def main() -> int:
         summary_path,
         changed,
         archive_info=archive_info,
+        input_modified_times=input_modified_times,
     )
     summary_changed, _ = write_json_if_changed(
         summary_path,

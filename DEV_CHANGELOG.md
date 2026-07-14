@@ -889,3 +889,23 @@
 - 回滚方法：恢复静态页归档按钮和 `/api/archive-current-month` 路由，并将 `docs/data/monthly/` 从发布范围移除。
 - 关联提交（如有）：待补充
 - 备注：GitHub Pages 静态站点无法处理写入型 POST，归档发布必须走本地工作台服务。
+
+## 2026-07-14 诊断源数据更新时间显示逻辑
+- 需求 / 目标：确认页面“源数据更新时间”字段的生成与展示逻辑，并解释截图中 `2026-07-14 01:07:00` 的来源。
+- 改动内容：未修改业务代码；确认前端直接展示 `dashboard.json.meta.workbookModifiedAt`，该字段由构建脚本读取线索工作簿文件系统修改时间生成，GitHub Actions 重新构建时会受 Ubuntu UTC 时区及 checkout 后文件时间影响。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`rg -n "源数据更新时间|workbookModifiedAt|formatDateTime" docs scripts`、`git show 6af78c0:docs/data/dashboard.json`、`git log -1 -- data/source/NEV+ICE_xsai.xlsm`
+- 验证结果：本地提交产物记录 `workbookModifiedAt = 2026-07-14T09:06:37`，提交时间为 `2026-07-14 09:06:44 +08:00`；前端仅将 `T` 替换为空格，不做时区转换；截图时间比北京时间约少 8 小时，符合 Pages workflow 在 UTC 构建环境重取文件 `mtime` 的结果。
+- 回滚方法：删除本条变更记录。
+- 关联提交（如有）：待补充
+- 备注：当前字段反映构建环境中的文件修改时间，不一定等同于业务源数据实际更新时间。
+
+## 2026-07-14 09:52
+- 需求 / 目标：让 GitHub Pages 展示本地提交产物中记录的实际源工作簿更新时间，避免 GitHub Actions 使用 UTC checkout 文件时间覆盖该值。
+- 改动内容：为 `scripts/build_dashboard.py` 增加 `--preserve-input-modified-times`，严格读取并校验现有 dashboard 与 summary 中的线索、来店工作簿修改时间，并统一注入 dashboard、summary 与归档构建链路；Pages workflow 启用该参数；补充脚本文档与测试。
+- 涉及文件：`scripts/build_dashboard.py`、`.github/workflows/deploy-pages.yml`、`tests/test_build_dashboard.py`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m py_compile scripts/build_dashboard.py tests/test_build_dashboard.py`、`python -X utf8 -m unittest tests.test_build_dashboard -v`、`python -X utf8 -m unittest discover -s tests -v`、`python -X utf8 scripts/build_dashboard.py ... --preserve-input-modified-times`
+- 验证结果：专项测试 `23/23`、全量测试 `73/73` 通过；按 Pages 命令实跑时 `dashboard.json unchanged`，已提交的 `workbookModifiedAt = 2026-07-14T09:06:37` 保持不变；验证产生的 summary 与月度索引改动已精确还原。
+- 回滚方法：移除构建参数、时间保留与校验函数、workflow 参数和对应测试及文档记录。
+- 关联提交（如有）：待补充
+- 备注：本地重建默认行为不变，仍读取两本源工作簿当前文件系统修改时间；保留模式仅供 CI 使用。
