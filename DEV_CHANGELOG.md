@@ -939,3 +939,13 @@
 - 回滚方法：基于相关提交创建反向提交，不改写远端历史。
 - 关联提交（如有）：`4d24793`、`5de09ea`
 - 备注：`.codex/`、`mockups/`、演示脚本、`start_dashboard_server.bat` 与 `tests/.tmp-copy-check/` 等未跟踪内容未推送。
+
+## 2026-07-15 10:05
+- 需求 / 目标：修复新探陆功能推送后 GitHub Pages build job 失败、deploy 被跳过的问题。
+- 改动内容：将 4 个依赖生产工作簿瞬时新探陆数值的测试改为固定合成数据对照；真实工作簿测试仅验证区块结构与空值行为，合成 payload 继续锁定新探陆实绩、独立简报、NEV 总盘排除和全车系有效线索包含口径；未修改业务代码。
+- 涉及文件：`tests/test_build_dashboard.py`、`docs/superpowers/specs/2026-07-15-stabilize-new-pathfinder-ci-design.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -X utf8 -m unittest tests.test_build_dashboard -v`、`python -X utf8 -m unittest discover -s tests -v`、`git worktree add --detach D:\\WorkCode\\AI_Digest-ci-repro-20260715 HEAD`、`python -X utf8 scripts/build_dashboard.py ... --preserve-input-modified-times`
+- 验证结果：本地复现原 4 个失败；修复后专项测试 `31/31`、主工作区全量测试 `81/81`、干净 Git worktree 全量测试 `81/81` 全部通过，干净 worktree 中 Pages 保留时间构建命令成功。
+- 回滚方法：回退合成数据测试、修复 spec 与本条日志记录。
+- 关联提交（如有）：修复设计 `7ddddf6`、测试修复 `ccdd558`。
+- 备注：失败根因是测试把开发当天的生产数据 `2 / 0 / 0` 和有效线索 `1` 写死；当前源表无新探陆数据时，空区块与 `-` 才是正确输出。
