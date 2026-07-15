@@ -42,7 +42,8 @@
 - 备注：
   - 推荐公开入口为 `https://cdn.jsdelivr.net/gh/Django604/AI_Digest@main/docs/index.svg`；jsDelivr 会把 `.html` 按纯文本返回，因此 CDN 入口使用可渲染的 SVG 兼容壳，GitHub Pages 仍使用原 `index.html`
   - GitHub Pages 备用入口为 `https://django604.github.io/AI_Digest/`
-  - 首页、前端 JS/CSS、当前 dashboard、月度索引及所有月度 dashboard/summary 属于关键文件；任一关键文件清理失败时脚本返回非零退出码并阻止 workflow 继续发布
+  - SVG 入口、前端 JS/CSS、当前 dashboard、月度索引及所有月度 dashboard/summary 属于关键文件；任一关键文件清理失败时脚本返回非零退出码并阻止 workflow 继续发布
+  - purge API 返回 `throttled=true` 表示该路径刚刚清理过，脚本会记录为 `[THROTTLED]` 并按成功处理，避免紧邻的自动/手动刷新互相误伤
   - 图片、字体等非关键资源也会清理并报告失败，但不会因单个非关键文件失败阻断 dashboard 发布
   - purge API 不需要账号、Token 或其他秘密信息
 

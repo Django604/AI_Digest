@@ -959,3 +959,13 @@
 - 回滚方法：回退 SVG 入口、purge 脚本、workflow 步骤、测试、文档与本条记录；GitHub Pages 的 `index.html` 可继续独立使用。
 - 关联提交（如有）：待补充
 - 备注：推荐公网入口为 `https://cdn.jsdelivr.net/gh/Django604/AI_Digest@main/docs/index.svg`；直接打开同路径 `index.html` 只会看到源码，不能作为对外入口。
+
+## 2026-07-15 11:48
+- 需求 / 目标：修复推送后手动 purge 与 GitHub Actions 自动 purge 紧邻执行时，jsDelivr `throttled=true` 被误判为关键文件刷新失败的问题。
+- 改动内容：将 purge 限流响应记录为 `[THROTTLED]` 并按“近期已刷新”成功处理；从 CDN 关键文件中移除只供 GitHub Pages 使用的 `index.html`，保留 `index.svg` 为关键公开入口；补充限流成功单测并同步文档。
+- 涉及文件：`scripts/purge_jsdelivr_cache.py`、`tests/test_purge_jsdelivr_cache.py`、`SCRIPTS.md`、`docs/superpowers/specs/2026-07-15-jsdelivr-public-mirror-design.md`、`DEV_CHANGELOG.md`
+- 关键命令：`curl https://purge.jsdelivr.net/.../docs/index.html`、`python -B -X utf8 -m unittest tests.test_purge_jsdelivr_cache -v`、`python -B -X utf8 scripts/purge_jsdelivr_cache.py`
+- 验证结果：真实响应确认 `status=finished`、`throttled=true` 且带 `throttlingReset`；修复后的测试与真实重复 purge 待下方发布验收确认。
+- 回滚方法：回退限流状态处理、关键文件清单、测试、文档与本条记录。
+- 关联提交（如有）：待补充
+- 备注：限流意味着“别重复敲门，刚清过”，不是“清理失败”；继续重试只会把同一个冷却窗口撞三遍。

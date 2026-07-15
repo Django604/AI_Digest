@@ -24,7 +24,6 @@ DEFAULT_TIMEOUT_SECONDS = 20.0
 
 CRITICAL_FILES = frozenset(
     {
-        "docs/index.html",
         "docs/index.svg",
         "docs/assets/app.js",
         "docs/assets/styles.css",
@@ -44,6 +43,7 @@ class PurgeResult:
     success: bool
     attempts: int
     error: str = ""
+    throttled: bool = False
 
 
 def enumerate_docs_files(docs_dir: Path) -> list[str]:
@@ -102,33 +102,33 @@ def _request_purge(url: str, timeout: float) -> str:
     return body
 
 
-def _validate_purge_payload(body: str) -> tuple[bool, str]:
+def _validate_purge_payload(body: str) -> tuple[bool, str, bool]:
     try:
         payload = json.loads(body)
     except json.JSONDecodeError as exc:
-        return False, f"invalid JSON response: {exc}"
+        return False, f"invalid JSON response: {exc}", False
 
     if payload.get("status") != "finished":
-        return False, f"unexpected purge status: {payload.get('status')!r}"
+        return False, f"unexpected purge status: {payload.get('status')!r}", False
 
     paths = payload.get("paths")
     if not isinstance(paths, dict) or not paths:
-        return False, "purge response does not contain path results"
+        return False, "purge response does not contain path results", False
 
     path_result = next(iter(paths.values()))
     if not isinstance(path_result, dict):
-        return False, "purge path result has an invalid format"
+        return False, "purge path result has an invalid format", False
     if path_result.get("throttled"):
-        return False, "purge request was throttled"
+        return True, "", True
 
     providers = path_result.get("providers")
     if not isinstance(providers, dict) or not providers:
-        return False, "purge response does not contain provider results"
+        return False, "purge response does not contain provider results", False
     failed_providers = sorted(name for name, succeeded in providers.items() if succeeded is not True)
     if failed_providers:
-        return False, f"providers failed: {', '.join(failed_providers)}"
+        return False, f"providers failed: {', '.join(failed_providers)}", False
 
-    return True, ""
+    return True, "", False
 
 
 def _http_error_is_transient(exc: HTTPError) -> bool:
@@ -158,9 +158,9 @@ def purge_file(
         retryable = True
         try:
             body = request_func(url, timeout)
-            success, error = _validate_purge_payload(body)
+            success, error, throttled = _validate_purge_payload(body)
             if success:
-                return PurgeResult(repo_path, url, True, attempt)
+                return PurgeResult(repo_path, url, True, attempt, throttled=throttled)
             last_error = error
         except HTTPError as exc:
             response_body = exc.read().decode("utf-8", errors="replace") if exc.fp else ""
@@ -211,20 +211,24 @@ def run_purge(
             sleep_func=sleep_func,
         )
         results.append(result)
-        if result.success:
+        if result.throttled:
+            log(f"[THROTTLED] {repo_path} (cache was purged recently)")
+        elif result.success:
             log(f"[OK] {repo_path} (attempts={result.attempts})")
         else:
             log(f"[FAIL] {repo_path} (attempts={result.attempts}) {result.error}")
             log(f"       {result.url}")
 
     failures = [result for result in results if not result.success]
+    throttled_results = [result for result in results if result.throttled]
     critical_failures = [result for result in failures if is_critical_file(result.repo_path)]
     log(
         "Summary: "
         f"total={len(results)} "
         f"succeeded={len(results) - len(failures)} "
         f"failed={len(failures)} "
-        f"critical_failed={len(critical_failures)}"
+        f"critical_failed={len(critical_failures)} "
+        f"throttled={len(throttled_results)}"
     )
 
     if critical_failures:

@@ -29,7 +29,7 @@ class PurgeJsDelivrCacheTests(unittest.TestCase):
             (docs_dir / "assets").mkdir(parents=True)
             (docs_dir / "data").mkdir()
             (docs_dir / "data" / "dashboard.json").write_text("{}", encoding="utf-8")
-            (docs_dir / "index.html").write_text("ok", encoding="utf-8")
+            (docs_dir / "index.svg").write_text("<svg/>", encoding="utf-8")
             (docs_dir / "assets" / "app.js").write_text("", encoding="utf-8")
 
             actual = purge_jsdelivr_cache.enumerate_docs_files(docs_dir)
@@ -39,7 +39,7 @@ class PurgeJsDelivrCacheTests(unittest.TestCase):
             [
                 "docs/assets/app.js",
                 "docs/data/dashboard.json",
-                "docs/index.html",
+                "docs/index.svg",
             ],
         )
 
@@ -73,6 +73,7 @@ class PurgeJsDelivrCacheTests(unittest.TestCase):
         sleep.assert_called_once_with(1.0)
 
     def test_monthly_dashboard_files_are_critical(self) -> None:
+        self.assertFalse(purge_jsdelivr_cache.is_critical_file("docs/index.html"))
         self.assertTrue(purge_jsdelivr_cache.is_critical_file("docs/index.svg"))
         self.assertTrue(
             purge_jsdelivr_cache.is_critical_file(
@@ -98,7 +99,7 @@ class PurgeJsDelivrCacheTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             docs_dir = Path(temp_dir) / "docs"
             docs_dir.mkdir()
-            (docs_dir / "index.html").write_text("ok", encoding="utf-8")
+            (docs_dir / "index.svg").write_text("<svg/>", encoding="utf-8")
             logs: list[str] = []
 
             exit_code = purge_jsdelivr_cache.run_purge(
@@ -112,6 +113,36 @@ class PurgeJsDelivrCacheTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertTrue(any("providers failed: CF" in line for line in logs))
         self.assertIn("critical_failed=1", logs[-2])
+
+    def test_run_purge_accepts_a_recently_purged_throttled_entry(self) -> None:
+        throttled_payload = json.dumps(
+            {
+                "status": "finished",
+                "paths": {
+                    "/gh/example": {
+                        "throttled": True,
+                        "throttlingReset": 120,
+                    }
+                },
+            }
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            docs_dir = Path(temp_dir) / "docs"
+            docs_dir.mkdir()
+            (docs_dir / "index.svg").write_text("<svg/>", encoding="utf-8")
+            logs: list[str] = []
+
+            exit_code = purge_jsdelivr_cache.run_purge(
+                docs_dir=docs_dir,
+                attempts=1,
+                log=logs.append,
+                request_func=lambda _url, _timeout: throttled_payload,
+                sleep_func=lambda _seconds: None,
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(any(line.startswith("[THROTTLED]") for line in logs))
+        self.assertIn("throttled=1", logs[-1])
 
     def test_run_purge_reports_a_success_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -130,7 +161,10 @@ class PurgeJsDelivrCacheTests(unittest.TestCase):
             )
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(logs[-1], "Summary: total=2 succeeded=2 failed=0 critical_failed=0")
+        self.assertEqual(
+            logs[-1],
+            "Summary: total=2 succeeded=2 failed=0 critical_failed=0 throttled=0",
+        )
 
 
 if __name__ == "__main__":
