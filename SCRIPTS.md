@@ -27,6 +27,25 @@
   - 趋势表的 `columnMeta` 现在会同时输出 `holiday / weekend / makeupWorkday / regularWorkday` 语义，前端据此显示 `节 / 周 / 班` 标签并区分补班日
   - `NEV 线索趋势` 会从 `全国按日NEV` 读取新探陆并生成独立月度对照与趋势区块；`NEV 总盘` 和每日简报四车合计仍只统计 `NX8 / N7 / N6 / 天籁·鸿蒙座舱`，`全车系有效线索管控` 则包含新探陆；`目标竖版` 暂无新探陆时目标与达成率显示 `-`，后续出现同名车型目标后自动接入
 
+## scripts/purge_jsdelivr_cache.py
+
+- 路径：`./scripts/purge_jsdelivr_cache.py`
+- 作用：递归枚举 `docs/` 下的公开文件，并清理 `Django604/AI_Digest@main` 对应的 jsDelivr CDN 缓存；GitHub Actions 会在测试与 dashboard 构建成功后自动执行
+- 使用方法：
+  - 清理默认公开入口缓存：`python scripts/purge_jsdelivr_cache.py`
+  - 指定仓库与分支：`python scripts/purge_jsdelivr_cache.py --repository Django604/AI_Digest --ref main`
+  - 调整重试次数与单次超时：`python scripts/purge_jsdelivr_cache.py --attempts 3 --timeout 20`
+  - 针对其他静态目录做验证：`python scripts/purge_jsdelivr_cache.py --docs-dir <目录>`
+- 输出结果：
+  - 逐文件输出 `[OK]` 或 `[FAIL]` 及实际 purge URL
+  - 最后输出总文件数、成功数、失败数和关键文件失败数
+- 备注：
+  - 推荐公开入口为 `https://cdn.jsdelivr.net/gh/Django604/AI_Digest@main/docs/index.svg`；jsDelivr 会把 `.html` 按纯文本返回，因此 CDN 入口使用可渲染的 SVG 兼容壳，GitHub Pages 仍使用原 `index.html`
+  - GitHub Pages 备用入口为 `https://django604.github.io/AI_Digest/`
+  - 首页、前端 JS/CSS、当前 dashboard、月度索引及所有月度 dashboard/summary 属于关键文件；任一关键文件清理失败时脚本返回非零退出码并阻止 workflow 继续发布
+  - 图片、字体等非关键资源也会清理并报告失败，但不会因单个非关键文件失败阻断 dashboard 发布
+  - purge API 不需要账号、Token 或其他秘密信息
+
 ## scripts/fetch_daily_data.py
 
 - 路径：`./scripts/fetch_daily_data.py`

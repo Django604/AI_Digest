@@ -949,3 +949,13 @@
 - 回滚方法：回退合成数据测试、修复 spec 与本条日志记录。
 - 关联提交（如有）：修复设计 `7ddddf6`、测试修复 `ccdd558`。
 - 备注：失败根因是测试把开发当天的生产数据 `2 / 0 / 0` 和有效线索 `1` 写死；当前源表无新探陆数据时，空区块与 `-` 才是正确输出。
+
+## 2026-07-15 11:40
+- 需求 / 目标：为公司内外用户提供可稳定访问的 AI_Digest 公网入口，绕过当前网络访问 GitHub Pages 时的 `ERR_CONNECTION_RESET`。
+- 改动内容：新增 `docs/index.svg` 作为 jsDelivr 可渲染入口，保留 `index.html` 给 GitHub Pages；新增 `scripts/purge_jsdelivr_cache.py`，递归清理 `docs/` CDN 缓存并对关键文件失败返回非零；workflow 在测试和 dashboard 构建成功后执行缓存清理；补充入口与缓存脚本测试，并更新 README、SCRIPTS 与设计 spec。
+- 涉及文件：`docs/index.svg`、`scripts/purge_jsdelivr_cache.py`、`tests/test_public_entry.py`、`tests/test_purge_jsdelivr_cache.py`、`.github/workflows/deploy-pages.yml`、`README.md`、`SCRIPTS.md`、`docs/superpowers/specs/2026-07-15-jsdelivr-public-mirror-design.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts/purge_jsdelivr_cache.py`、`python -B -X utf8 -m unittest discover -s tests -v`、`python -B -X utf8 scripts/build_dashboard.py ... --preserve-input-modified-times`、`playwright-cli ... http://127.0.0.1:4173/index.svg`
+- 验证结果：jsDelivr purge API 实测 `19/19` 成功；确认 `.html` CDN 响应为 `text/plain`，SVG 响应为 `image/svg+xml`；全量测试 `90/90` 通过，Actions 同款构建成功；真实浏览器验证当前 `2026-07-14` 数据、新探陆板块、6 月归档切换、返回当前月及 `390x844` 移动端布局均正常，移动端无横向溢出。
+- 回滚方法：回退 SVG 入口、purge 脚本、workflow 步骤、测试、文档与本条记录；GitHub Pages 的 `index.html` 可继续独立使用。
+- 关联提交（如有）：待补充
+- 备注：推荐公网入口为 `https://cdn.jsdelivr.net/gh/Django604/AI_Digest@main/docs/index.svg`；直接打开同路径 `index.html` 只会看到源码，不能作为对外入口。
