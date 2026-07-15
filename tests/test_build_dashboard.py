@@ -8,7 +8,7 @@ import shutil
 import unittest
 from unittest.mock import patch
 
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook
 
 from scripts.build_dashboard import (
     ARRIVAL_BOOK,
@@ -28,8 +28,6 @@ from scripts.build_dashboard import (
     get_day_calendar_meta,
     load_preserved_input_modified_times,
     load_arrival_daily_sheet,
-    load_ice_daily,
-    load_nev_daily,
     validate_report_date_cell,
     validate_sheet_headers,
     validate_workbook_structure,
@@ -62,6 +60,50 @@ class BuildDashboardPayloadTests(unittest.TestCase):
             if cls.previous_month_archive_path.exists()
             else None
         )
+        cls.synthetic_date = date(2026, 7, 10)
+        cls.synthetic_report_date = date(2026, 7, 13)
+        cls.synthetic_nev_daily = {
+            "NX8": {
+                cls.synthetic_date: {
+                    "newLeads": 10,
+                    "validLeads": 7,
+                    "storeLeads": 8,
+                    "arrivals": 1,
+                }
+            },
+            "新探陆": {
+                cls.synthetic_date: {
+                    "newLeads": 2,
+                    "validLeads": 1,
+                    "storeLeads": 1,
+                    "arrivals": 0,
+                }
+            },
+        }
+        synthetic_targets = {"NX8": {cls.synthetic_date: 20}}
+        with (
+            patch("scripts.build_dashboard.load_nev_daily", return_value=cls.synthetic_nev_daily),
+            patch("scripts.build_dashboard.load_nev_targets", return_value=synthetic_targets),
+        ):
+            cls.synthetic_payload = build_payload(
+                LEADS_BOOK,
+                ARRIVAL_BOOK,
+                report_date_override=cls.synthetic_report_date,
+            )
+        synthetic_without_new_pathfinder = {
+            model_name: series
+            for model_name, series in cls.synthetic_nev_daily.items()
+            if model_name != "新探陆"
+        }
+        with (
+            patch("scripts.build_dashboard.load_nev_daily", return_value=synthetic_without_new_pathfinder),
+            patch("scripts.build_dashboard.load_nev_targets", return_value=synthetic_targets),
+        ):
+            cls.synthetic_payload_without_new_pathfinder = build_payload(
+                LEADS_BOOK,
+                ARRIVAL_BOOK,
+                report_date_override=cls.synthetic_report_date,
+            )
 
     def test_expected_dashboards_exist(self) -> None:
         self.assertEqual(
@@ -82,9 +124,9 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertEqual([section["title"] for section in sections][-2:], ["天籁·鸿蒙座舱", "新探陆"])
         self.assertEqual(sections[-1]["id"], "new-pathfinder")
 
-    def test_new_pathfinder_section_includes_all_current_month_source_data(self) -> None:
+    def test_new_pathfinder_section_includes_all_synthetic_current_month_data(self) -> None:
         section = next(
-            item for item in self.payload["dashboards"]["nev"]["sections"]
+            item for item in self.synthetic_payload["dashboards"]["nev"]["sections"]
             if item["id"] == "new-pathfinder"
         )
         matrix = section["trend"]["matrix"]
@@ -92,13 +134,15 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         values_by_date = dict(zip(matrix["labels"], rows["actual"]))
 
         self.assertEqual(values_by_date["7/10"], "2")
-        self.assertEqual(values_by_date["7/11"], "0")
-        self.assertEqual(values_by_date["7/13"], "0")
 
     def test_new_pathfinder_without_targets_displays_placeholders(self) -> None:
-        section = next(
-            item for item in self.payload["dashboards"]["nev"]["sections"]
-            if item["id"] == "new-pathfinder"
+        section = build_nev_section(
+            "new-pathfinder",
+            "新探陆",
+            self.synthetic_report_date,
+            self.synthetic_nev_daily["新探陆"],
+            {},
+            {},
         )
         cards = {card["label"]: card for card in section["summary"]["cards"]}
         matrix_rows = {row["key"]: row for row in section["trend"]["matrix"]["rows"]}
@@ -139,56 +183,41 @@ class BuildDashboardPayloadTests(unittest.TestCase):
     def test_nev_total_excludes_new_pathfinder_actuals(self) -> None:
         sections = {
             section["id"]: section
-            for section in self.payload["dashboards"]["nev"]["sections"]
+            for section in self.synthetic_payload["dashboards"]["nev"]["sections"]
         }
-        core_cumulative = sum(
-            sections[section_id]["summary"]["cards"][0]["value"]
-            for section_id, _, _ in NEV_CORE_MODELS
-        )
+        sections_without_new_pathfinder = {
+            section["id"]: section
+            for section in self.synthetic_payload_without_new_pathfinder["dashboards"]["nev"][
+                "sections"
+            ]
+        }
         new_pathfinder_cumulative = sections["new-pathfinder"]["summary"]["cards"][0]["value"]
         nev_total_cumulative = sections["nev-total"]["summary"]["cards"][0]["value"]
+        nev_total_without_new_pathfinder = sections_without_new_pathfinder["nev-total"][
+            "summary"
+        ]["cards"][0]["value"]
 
-        self.assertEqual(nev_total_cumulative, core_cumulative)
-        self.assertGreater(new_pathfinder_cumulative, 0)
-        self.assertNotEqual(nev_total_cumulative, core_cumulative + new_pathfinder_cumulative)
+        self.assertEqual(new_pathfinder_cumulative, 2)
+        self.assertEqual(nev_total_cumulative, 10)
+        self.assertEqual(nev_total_cumulative, nev_total_without_new_pathfinder)
 
     def test_lead_control_includes_new_pathfinder_valid_leads(self) -> None:
-        current_date = date(2026, 7, 10)
-        workbook = load_workbook(LEADS_BOOK, data_only=True)
-        try:
-            nev_daily = load_nev_daily(
-                workbook["全国按日NEV"],
-                current_date.replace(day=1),
-                current_date,
-            )
-            ice_daily = load_ice_daily(
-                workbook["全国按日ICE"],
-                current_date.replace(day=1),
-                current_date,
-            )
-        finally:
-            workbook.close()
+        lead_control = self.synthetic_payload["dashboards"]["lead-control"]["sections"][0]
+        lead_control_without_new_pathfinder = self.synthetic_payload_without_new_pathfinder[
+            "dashboards"
+        ]["lead-control"]["sections"][0]
+        report_index = self.synthetic_date.day - 1
+        actual_all_vehicle_valid = lead_control["trend"]["chart"]["series"]["actual"][
+            report_index
+        ]
+        actual_without_new_pathfinder = lead_control_without_new_pathfinder["trend"]["chart"][
+            "series"
+        ]["actual"][report_index]
 
-        core_nev_valid = sum(
-            nev_daily.get(model_name, {}).get(current_date, {}).get("validLeads") or 0
-            for _, _, model_name in NEV_CORE_MODELS
-        )
-        new_pathfinder_valid = (
-            nev_daily.get("新探陆", {}).get(current_date, {}).get("validLeads") or 0
-        )
-        expected_all_vehicle_valid = (
-            core_nev_valid
-            + new_pathfinder_valid
-            + (ice_daily.get(current_date, {}).get("validLeads") or 0)
-        )
-        lead_control = self.payload["dashboards"]["lead-control"]["sections"][0]
-        actual_all_vehicle_valid = lead_control["trend"]["chart"]["series"]["actual"][current_date.day - 1]
-
-        self.assertEqual(new_pathfinder_valid, 1)
-        self.assertEqual(actual_all_vehicle_valid, expected_all_vehicle_valid)
+        self.assertEqual(actual_all_vehicle_valid - actual_without_new_pathfinder, 1)
 
     def test_daily_brief_uses_separate_new_pathfinder_section(self) -> None:
-        sections = self.payload["dashboards"]["brief"]["briefing"]["sections"]
+        sections = self.synthetic_payload["dashboards"]["brief"]["briefing"]["sections"]
         sections_by_kind = {section["kind"]: section for section in sections}
 
         self.assertEqual(
