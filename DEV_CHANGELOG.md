@@ -969,3 +969,13 @@
 - 回滚方法：回退限流状态处理、关键文件清单、测试、文档与本条记录。
 - 关联提交（如有）：待补充
 - 备注：限流意味着“别重复敲门，刚清过”，不是“清理失败”；继续重试只会把同一个冷却窗口撞三遍。
+
+## 2026-07-15 公网入口推送验收
+- 需求 / 目标：确认稳定公网入口已推送并可被公司内外网络真实访问。
+- 改动内容：推送 `36e0d86`（入口、workflow、测试与文档）及 `5102899`（purge 限流处理）；推送后再次执行缓存清理。
+- 涉及文件：`DEV_CHANGELOG.md`
+- 关键命令：`git push origin main`、`python -B -X utf8 scripts/purge_jsdelivr_cache.py`、公网 `curl` 关键资源检查、`playwright-cli open https://cdn.jsdelivr.net/gh/Django604/AI_Digest@main/docs/index.svg`
+- 验证结果：`origin/main=5102899`；推送后重复 purge 为 `20/20` 成功（其中 `18` 条按近期已刷新限流处理）；公网 SVG、JS、CSS、dashboard JSON、月度索引均返回 `HTTP 200`，SVG `Content-Type=image/svg+xml`；真实浏览器加载报表日期 `2026-07-14`、新探陆区块和 5 个导航页签正常，切换到 `2026-06` 显示 `2026-06-30` 且无加载错误。
+- 回滚方法：基于 `36e0d86`、`5102899` 创建反向提交，不改写远端历史；GitHub Pages 备用入口继续保留。
+- 关联提交（如有）：`36e0d86`、`5102899`
+- 备注：推荐同事使用 `https://cdn.jsdelivr.net/gh/Django604/AI_Digest@main/docs/index.svg`；不要使用同目录 `index.html` 作为 jsDelivr 入口，它会被 CDN 以纯文本返回。
