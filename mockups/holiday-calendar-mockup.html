@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>节假日识别效果图</title>
+    <style>
+      :root {
+        --bg: #eef2f6;
+        --bg-deep: #dfe5eb;
+        --surface: rgba(255, 255, 255, 0.94);
+        --surface-strong: rgba(255, 255, 255, 0.98);
+        --ink: #161c24;
+        --muted: #61707f;
+        --line: rgba(22, 28, 36, 0.08);
+        --shadow: 0 22px 56px rgba(24, 34, 48, 0.14);
+        --brand-red: #c20f2f;
+        --brand-red-soft: rgba(194, 15, 47, 0.09);
+        --brand-blue: #7389a3;
+        --brand-blue-soft: rgba(115, 137, 163, 0.16);
+        --brand-silver: #d8dee6;
+        --holiday-bg: rgba(216, 222, 230, 0.9);
+        --weekend-bg: rgba(115, 137, 163, 0.12);
+        --makeup-bg: rgba(232, 186, 78, 0.18);
+        --makeup-border: rgba(192, 130, 20, 0.22);
+        --makeup-text: #8f5a00;
+        --positive: #1f8f57;
+        --radius-xl: 28px;
+        --radius-lg: 20px;
+        --radius-md: 16px;
+        --radius-sm: 12px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI Variable Text", "HarmonyOS Sans SC", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(255, 255, 255, 0.98), transparent 34%),
+          radial-gradient(circle at top right, rgba(194, 15, 47, 0.1), transparent 24%),
+          radial-gradient(circle at 18% 82%, rgba(115, 137, 163, 0.08), transparent 28%),
+          linear-gradient(135deg, var(--bg) 0%, #eef2f6 46%, var(--bg-deep) 100%);
+      }
+
+      .page {
+        width: 1480px;
+        margin: 0 auto;
+        padding: 34px 28px 42px;
+      }
+
+      .hero,
+      .panel {
+        background: var(--surface);
+        border: 1px solid rgba(255, 255, 255, 0.84);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 24px;
+        padding: 28px 30px;
+        border-radius: var(--radius-xl);
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        color: var(--muted);
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 44px;
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+      }
+
+      .hero p {
+        margin: 14px 0 0;
+        color: var(--muted);
+        line-height: 1.7;
+        font-size: 15px;
+      }
+
+      .legend-card {
+        display: grid;
+        gap: 14px;
+        align-self: stretch;
+        padding: 18px 20px;
+        border-radius: var(--radius-lg);
+        background: linear-gradient(135deg, rgba(23, 31, 43, 0.96), rgba(58, 69, 82, 0.9));
+        color: #fff;
+      }
+
+      .legend-title {
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+
+      .legend-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 14px;
+      }
+
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        flex: 0 0 auto;
+      }
+
+      .dot-holiday {
+        background: #a9b5c2;
+      }
+
+      .dot-weekend {
+        background: #7f95b0;
+      }
+
+      .dot-makeup {
+        background: #d89d27;
+      }
+
+      .legend-note {
+        margin: 0;
+        color: rgba(255, 255, 255, 0.8);
+        line-height: 1.6;
+        font-size: 12px;
+      }
+
+      .panel {
+        margin-top: 22px;
+        padding: 22px;
+        border-radius: var(--radius-xl);
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 16px;
+      }
+
+      .panel-title {
+        margin: 0;
+        font-size: 23px;
+        letter-spacing: -0.03em;
+      }
+
+      .panel-subtitle {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .tag-strip {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .tag {
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--muted);
+        background: rgba(245, 247, 250, 0.96);
+        border: 1px solid rgba(22, 28, 36, 0.06);
+      }
+
+      .tag strong {
+        color: var(--ink);
+      }
+
+      .table-wrap {
+        overflow: hidden;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--line);
+        background: var(--surface-strong);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        table-layout: fixed;
+      }
+
+      thead th,
+      tbody th,
+      tbody td {
+        padding: 12px 10px;
+        text-align: center;
+        white-space: nowrap;
+        border-bottom: 1px solid rgba(22, 28, 36, 0.05);
+        border-right: 1px solid rgba(22, 28, 36, 0.04);
+      }
+
+      thead th {
+        position: relative;
+        background: linear-gradient(180deg, #f7f9fb, #edf1f5);
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      thead th:first-child,
+      tbody th {
+        background: linear-gradient(180deg, #fafbfd, #eef2f6);
+      }
+
+      tbody th {
+        width: 126px;
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      tbody td {
+        font-size: 15px;
+      }
+
+      tbody tr:nth-child(odd) td {
+        background: rgba(247, 249, 252, 0.8);
+      }
+
+      .accent {
+        color: var(--brand-red);
+        font-weight: 800;
+      }
+
+      .ratio-up {
+        color: var(--brand-red);
+        font-weight: 800;
+      }
+
+      .ratio-down {
+        color: var(--positive);
+        font-weight: 800;
+      }
+
+      .col-holiday {
+        background: var(--holiday-bg) !important;
+      }
+
+      .col-weekend {
+        background: var(--weekend-bg) !important;
+      }
+
+      .col-makeup {
+        background: var(--makeup-bg) !important;
+        box-shadow: inset 0 0 0 1px var(--makeup-border);
+      }
+
+      .date-head {
+        display: grid;
+        justify-items: center;
+        gap: 8px;
+      }
+
+      .date-text {
+        line-height: 1;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+
+      .pill-holiday {
+        background: #c4ced8;
+        color: #344252;
+      }
+
+      .pill-weekend {
+        background: rgba(115, 137, 163, 0.18);
+        color: #51657b;
+      }
+
+      .pill-makeup {
+        background: rgba(224, 171, 49, 0.2);
+        color: var(--makeup-text);
+        border: 1px solid rgba(192, 130, 20, 0.16);
+      }
+
+      .insight {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 16px;
+      }
+
+      .callout,
+      .mini-card {
+        border-radius: var(--radius-lg);
+        padding: 18px 20px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 244, 245, 0.92));
+        border: 1px solid rgba(22, 28, 36, 0.06);
+      }
+
+      .callout strong,
+      .mini-card strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 15px;
+      }
+
+      .callout p,
+      .mini-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.68;
+        font-size: 13px;
+      }
+
+      .mini-grid {
+        display: grid;
+        gap: 16px;
+      }
+
+      .footer-note {
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Holiday Calendar Mockup</p>
+          <h1>节假日、周末、补班<br />一眼分清的表格效果图</h1>
+          <p>
+            这张图按 <strong>2026 年官方放假安排</strong> 做示意，不接线上地址，不动现有页面逻辑。核心思路是把“日期状态”直接挂到表头，同时让对应列在关键行上轻微染色，别让用户靠鼠标悬浮碰运气。
+          </p>
+        </div>
+        <aside class="legend-card">
+          <div class="legend-title">状态图例</div>
+          <div class="legend-list">
+            <div class="legend-item"><span class="dot dot-holiday"></span><span>节假日：灰蓝色块 + “节” 标签</span></div>
+            <div class="legend-item"><span class="dot dot-weekend"></span><span>普通周末：浅蓝底 + “周” 标签</span></div>
+            <div class="legend-item"><span class="dot dot-makeup"></span><span>补班日：琥珀底 + “班” 标签</span></div>
+          </div>
+          <p class="legend-note">本版按中国政府网发布的 2026 年放假安排对齐：劳动节为 5 月 1 日至 5 日放假，5 月 9 日补班，5 月 11 日为正常工作日。</p>
+        </aside>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">全国来店日趋势 · 节假日识别版</h2>
+            <p class="panel-subtitle">保留现有表格骨架，只增加日期状态标签、列级高亮和说明性图例。</p>
+          </div>
+          <div class="tag-strip">
+            <div class="tag"><strong>表头可见</strong>：直接知道这天是什么性质</div>
+            <div class="tag"><strong>列内有感</strong>：关键行同步染色</div>
+            <div class="tag"><strong>补班不装死</strong>：周末但要上班会单独打标</div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table aria-label="节假日识别效果图">
+            <thead>
+              <tr>
+                <th>维度</th>
+                <th class="col-holiday"><div class="date-head"><span class="date-text">5/1</span><span class="pill pill-holiday">节</span></div></th>
+                <th class="col-holiday"><div class="date-head"><span class="date-text">5/2</span><span class="pill pill-holiday">节</span></div></th>
+                <th class="col-holiday"><div class="date-head"><span class="date-text">5/3</span><span class="pill pill-holiday">节</span></div></th>
+                <th class="col-holiday"><div class="date-head"><span class="date-text">5/4</span><span class="pill pill-holiday">节</span></div></th>
+                <th class="col-holiday"><div class="date-head"><span class="date-text">5/5</span><span class="pill pill-holiday">节</span></div></th>
+                <th><div class="date-head"><span class="date-text">5/6</span></div></th>
+                <th><div class="date-head"><span class="date-text">5/7</span></div></th>
+                <th><div class="date-head"><span class="date-text">5/8</span></div></th>
+                <th class="col-makeup"><div class="date-head"><span class="date-text">5/9</span><span class="pill pill-makeup">班</span></div></th>
+                <th class="col-weekend"><div class="date-head"><span class="date-text">5/10</span><span class="pill pill-weekend">周</span></div></th>
+                <th><div class="date-head"><span class="date-text">5/11</span></div></th>
+                <th><div class="date-head"><span class="date-text">5/12</span></div></th>
+                <th><div class="date-head"><span class="date-text">5/13</span></div></th>
+                <th><div class="date-head"><span class="date-text">5/14</span></div></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th>上期实绩</th>
+                <td class="col-holiday">18687</td>
+                <td class="col-holiday">19398</td>
+                <td class="col-holiday">20205</td>
+                <td class="col-holiday">21806</td>
+                <td class="col-holiday">23741</td>
+                <td>22813</td>
+                <td>23040</td>
+                <td>27471</td>
+                <td class="col-makeup">25835</td>
+                <td class="col-weekend">23336</td>
+                <td>27463</td>
+                <td>29988</td>
+                <td>26361</td>
+                <td>25408</td>
+              </tr>
+              <tr>
+                <th>上期累计实绩</th>
+                <td class="col-holiday">18687</td>
+                <td class="col-holiday">38085</td>
+                <td class="col-holiday">58290</td>
+                <td class="col-holiday">80096</td>
+                <td class="col-holiday">103837</td>
+                <td>126650</td>
+                <td>149690</td>
+                <td>177161</td>
+                <td class="col-makeup">202996</td>
+                <td class="col-weekend">226332</td>
+                <td>253795</td>
+                <td>283783</td>
+                <td>310144</td>
+                <td>335552</td>
+              </tr>
+              <tr>
+                <th>本期实绩</th>
+                <td class="accent col-holiday">41165</td>
+                <td class="accent col-holiday">39578</td>
+                <td class="accent col-holiday">37967</td>
+                <td class="accent col-holiday">34327</td>
+                <td class="accent col-holiday">32853</td>
+                <td class="accent">27149</td>
+                <td class="accent">26130</td>
+                <td class="accent">26347</td>
+                <td class="accent col-makeup">27870</td>
+                <td class="accent col-weekend">32586</td>
+                <td class="accent">28123</td>
+                <td class="accent">29507</td>
+                <td>-</td>
+                <td>-</td>
+              </tr>
+              <tr>
+                <th>本期累计实绩</th>
+                <td class="col-holiday">41165</td>
+                <td class="col-holiday">80743</td>
+                <td class="col-holiday">118710</td>
+                <td class="col-holiday">153037</td>
+                <td class="col-holiday">185890</td>
+                <td>213039</td>
+                <td>239169</td>
+                <td>265516</td>
+                <td class="col-makeup">293386</td>
+                <td class="col-weekend">325972</td>
+                <td>354095</td>
+                <td>383602</td>
+                <td>-</td>
+                <td>-</td>
+              </tr>
+              <tr>
+                <th>环比</th>
+                <td class="ratio-up col-holiday">120.3%</td>
+                <td class="ratio-up col-holiday">104.0%</td>
+                <td class="ratio-up col-holiday">87.9%</td>
+                <td class="ratio-up col-holiday">57.4%</td>
+                <td class="ratio-up col-holiday">38.4%</td>
+                <td class="ratio-up">19.0%</td>
+                <td class="ratio-up">13.4%</td>
+                <td class="ratio-down">-4.1%</td>
+                <td class="ratio-up col-makeup">7.9%</td>
+                <td class="ratio-up col-weekend">39.6%</td>
+                <td class="ratio-up">2.4%</td>
+                <td class="ratio-down">-1.6%</td>
+                <td>-</td>
+                <td>-</td>
+              </tr>
+              <tr>
+                <th>累计环比</th>
+                <td class="ratio-up col-holiday">120.3%</td>
+                <td class="ratio-up col-holiday">112.0%</td>
+                <td class="ratio-up col-holiday">103.7%</td>
+                <td class="ratio-up col-holiday">91.1%</td>
+                <td class="ratio-up col-holiday">79.0%</td>
+                <td class="ratio-up">68.2%</td>
+                <td class="ratio-up">59.8%</td>
+                <td class="ratio-up">49.9%</td>
+                <td class="ratio-up col-makeup">44.5%</td>
+                <td class="ratio-up col-weekend">44.0%</td>
+                <td class="ratio-up">39.5%</td>
+                <td class="ratio-up">35.2%</td>
+                <td>-</td>
+                <td>-</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="insight">
+          <div class="callout">
+            <strong>我建议的落地方式</strong>
+            <p>
+              默认只给日期表头打 `节 / 周 / 班` 标签，避免整张表花得像事故现场；同时只对 `上期实绩 / 本期实绩 / 环比` 这类关键行做列级高亮。这样信息密度够高，但还没到把人眼睛干报废的程度。
+            </p>
+          </div>
+          <div class="mini-grid">
+            <div class="mini-card">
+              <strong>推荐细节 1</strong>
+              <p>补班日用琥珀色，别和周末混一锅。周末是“休息感”，补班是“本来该歇但得上”，语义不一样。</p>
+            </div>
+            <div class="mini-card">
+              <strong>推荐细节 2</strong>
+              <p>未来日期继续保留 `-`，但日期头照样能显示状态。这样用户能提前看到节奏，不会以为系统漏数。</p>
+            </div>
+          </div>
+        </div>
+
+        <p class="footer-note">注：本图按 2026 年官方安排示意。后续真正接入时，节假日与补班判断应由年度日历配置驱动，而不是把日期写死在前端里硬扛。</p>
+      </section>
+    </div>
+  </body>
+  </html>
