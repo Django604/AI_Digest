@@ -1019,3 +1019,13 @@
 - 回滚方法：恢复当前月优先 monthly 的请求分支，移除发布后等待 / purge 调用和定点路径参数，恢复原公开入口大小写并回退测试、文档和本条记录。
 - 关联提交（如有）：`69a93bd`、待补充
 - 备注：旧大写 `Django604` 入口在首次 purge 回源时命中旧 branch mirror，并进入约 52 分钟节流窗口；后续统一使用 `https://cdn.jsdelivr.net/gh/django604/AI_Digest@main/docs/index.svg`。
+
+## 2026-07-17 10:56
+- 需求 / 目标：补充 `2026款探陆` 2026 年 7 月 1 日至 31 日逐日线索目标并发布网页。
+- 改动内容：新增 7 月 31 天目标兜底序列；`目标竖版` 没有 `2026款探陆` 时使用兜底，未来工作簿出现同名目标后优先读取工作簿；重建 live dashboard 与 7 月归档。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`SCRIPTS.md`、`docs/data/dashboard.json`、`docs/data/monthly/2026-07/dashboard.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts/build_dashboard.py ...`、`python -B -X utf8 -m unittest discover -s tests -v`、`python -B -X utf8 -m py_compile scripts/build_dashboard.py`。
+- 验证结果：全量测试 `103/103` 通过；31 天目标合计 `7,759`，截至 7 月 16 日累计目标 `3,967`、当日目标 `241`；累计实绩 `18`、达成率 `0.5%`，当日实绩 `13`、达成率 `5.4%`；live 与 7 月归档目标序列一致。
+- 回滚方法：移除 `NEW_PATHFINDER_TARGET_OVERRIDES`、目标解析兜底及对应测试，回退重建产物、文档和本条日志。
+- 关联提交（如有）：`fb2363a`
+- 备注：业务改动已提交并推送到 `origin/main`；工作区原有发布与缓存清理改动保持原样，未夹带进本次提交。
