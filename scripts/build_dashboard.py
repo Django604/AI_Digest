@@ -29,9 +29,10 @@ NEV_CORE_MODELS = [
     ("n6", "N6", "N6"),
     ("TEANA-harmony", "天籁·鸿蒙座舱", "天籁·鸿蒙座舱"),
 ]
+NEW_PATHFINDER_MODEL = "2026款探陆"
 NEV_DETAIL_MODELS = [
     *NEV_CORE_MODELS,
-    ("new-pathfinder", "新探陆", "新探陆"),
+    ("new-pathfinder", NEW_PATHFINDER_MODEL, NEW_PATHFINDER_MODEL),
 ]
 NEV_BRIEF_ORDER = [model_name for _, _, model_name in NEV_CORE_MODELS]
 BRIEF_MARKERS = ["①", "②", "③", "④", "⑤", "⑥"]
@@ -985,7 +986,7 @@ def build_line_brief(
         actual_key="validLeads",
     )
     new_pathfinder_line = build_single_model_brief_line(
-        "新探陆",
+        NEW_PATHFINDER_MODEL,
         report_date,
         new_pathfinder_daily,
         new_pathfinder_targets,
@@ -996,7 +997,7 @@ def build_line_brief(
         {"kind": "intro", "title": "开场", "lines": ["各位领导：", headline]},
         {"kind": "nev", "title": "NEV线索", "lines": [nev_summary, *nev_lines]},
         {"kind": "sylphy15", "title": "十五代轩逸线索", "lines": [sylphy_line]},
-        {"kind": "new-pathfinder", "title": "新探陆线索", "lines": [new_pathfinder_line]},
+        {"kind": "new-pathfinder", "title": f"{NEW_PATHFINDER_MODEL}线索", "lines": [new_pathfinder_line]},
     ]
     return {
         "id": "daily-brief",
@@ -1326,8 +1327,8 @@ def build_payload(
             nev_targets,
             sylphy_current,
             sylphy_targets,
-            nev_current.get("新探陆", {}),
-            nev_targets.get("新探陆", {}),
+            nev_current.get(NEW_PATHFINDER_MODEL, {}),
+            nev_targets.get(NEW_PATHFINDER_MODEL, {}),
             sylphy_report_date=sylphy_report_date,
         )
         arrival_brief = build_arrival_brief(report_date, arrival_maps)

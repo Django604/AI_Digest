@@ -72,7 +72,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
                     "arrivals": 1,
                 }
             },
-            "新探陆": {
+            "2026款探陆": {
                 cls.synthetic_date: {
                     "newLeads": 2,
                     "validLeads": 1,
@@ -94,7 +94,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         synthetic_without_new_pathfinder = {
             model_name: series
             for model_name, series in cls.synthetic_nev_daily.items()
-            if model_name != "新探陆"
+            if model_name != "2026款探陆"
         }
         with (
             patch("scripts.build_dashboard.load_nev_daily", return_value=synthetic_without_new_pathfinder),
@@ -117,7 +117,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         detail_model_names = [model_name for _, _, model_name in NEV_DETAIL_MODELS]
 
         self.assertEqual(core_model_names, ["NX8", "N7", "N6", "天籁·鸿蒙座舱"])
-        self.assertEqual(detail_model_names, [*core_model_names, "新探陆"])
+        self.assertEqual(detail_model_names, [*core_model_names, "2026款探陆"])
 
     def test_nev_total_chart_title_identifies_four_model_scope(self) -> None:
         section = next(
@@ -188,7 +188,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
     def test_new_pathfinder_section_follows_existing_nev_models(self) -> None:
         sections = self.payload["dashboards"]["nev"]["sections"]
 
-        self.assertEqual([section["title"] for section in sections][-2:], ["天籁·鸿蒙座舱", "新探陆"])
+        self.assertEqual([section["title"] for section in sections][-2:], ["天籁·鸿蒙座舱", "2026款探陆"])
         self.assertEqual(sections[-1]["id"], "new-pathfinder")
 
     def test_new_pathfinder_section_includes_all_synthetic_current_month_data(self) -> None:
@@ -205,9 +205,9 @@ class BuildDashboardPayloadTests(unittest.TestCase):
     def test_new_pathfinder_without_targets_displays_placeholders(self) -> None:
         section = build_nev_section(
             "new-pathfinder",
-            "新探陆",
+            "2026款探陆",
             self.synthetic_report_date,
-            self.synthetic_nev_daily["新探陆"],
+            self.synthetic_nev_daily["2026款探陆"],
             {},
             {},
         )
@@ -234,7 +234,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
 
         section = build_nev_section(
             "new-pathfinder",
-            "新探陆",
+            "2026款探陆",
             report_date,
             current_actuals,
             {},
@@ -291,10 +291,10 @@ class BuildDashboardPayloadTests(unittest.TestCase):
             [section["kind"] for section in sections],
             ["intro", "nev", "sylphy15", "new-pathfinder", "arrival"],
         )
-        self.assertEqual(sections_by_kind["new-pathfinder"]["title"], "新探陆线索")
-        self.assertIn("新探陆累计实绩 2", sections_by_kind["new-pathfinder"]["lines"][0])
+        self.assertEqual(sections_by_kind["new-pathfinder"]["title"], "2026款探陆线索")
+        self.assertIn("2026款探陆累计实绩 2", sections_by_kind["new-pathfinder"]["lines"][0])
         self.assertIn("累计达成率 -", sections_by_kind["new-pathfinder"]["lines"][0])
-        self.assertFalse(any("新探陆" in line for line in sections_by_kind["nev"]["lines"]))
+        self.assertFalse(any("2026款探陆" in line for line in sections_by_kind["nev"]["lines"]))
 
     def test_lead_control_row_order_is_stable(self) -> None:
         trend = self.payload["dashboards"]["lead-control"]["sections"][0]["trend"]
