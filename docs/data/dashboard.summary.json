@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-07-17T09:09:57",
-  "reportDate": "2026-07-15",
-  "reportDateLabel": "2026-07-15",
+  "generatedAt": "2026-07-17T09:57:14",
+  "reportDate": "2026-07-16",
+  "reportDateLabel": "2026-07-16",
   "inputs": {
     "workbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_xsai.xlsm",
     "workbookName": "NEV+ICE_xsai.xlsm",
-    "workbookModifiedAt": "2026-07-16T09:05:25",
+    "workbookModifiedAt": "2026-07-17T09:57:11",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
-    "arrivalWorkbookModifiedAt": "2026-07-16T09:05:27"
+    "arrivalWorkbookModifiedAt": "2026-07-17T09:57:12"
   },
   "outputs": {
     "dashboardJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.json",
@@ -22,8 +22,8 @@
     "archiveSummaryJson": "./data/monthly/2026-07/dashboard.summary.json",
     "archiveIndexJson": "./data/monthly/index.json",
     "archiveDashboardChanged": true,
-    "archiveSummaryChanged": false,
-    "archiveIndexChanged": false
+    "archiveSummaryChanged": true,
+    "archiveIndexChanged": true
   },
   "stats": {
     "dashboardCount": 5,
