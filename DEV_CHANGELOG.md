@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-07-15 00:00
+- 需求 / 目标：支持附魔工作台在不刷新数据的情况下单独执行 GitHub 推送，并可补推已提交但尚未上传的本地提交。
+- 改动内容：为 `publish_dashboard()` 与 `run_publish_step()` 增加默认关闭的 `push_if_no_changes` 参数；抽取统一 push / 中断重试逻辑；独立推送启用该参数后，无发布文件变更时仍执行 `git push`，原更新后自动发布行为保持不变；补充单测和脚本文档。
+- 涉及文件：`scripts/dashboard_publish.py`、`scripts/scheduled_update_runner.py`、`tests/test_dashboard_publish.py`、`tests/test_scheduled_update_runner.py`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 -m unittest tests.test_dashboard_publish tests.test_scheduled_update_runner -v`。
+- 验证结果：相关单测 `21/21` 通过；默认调用断言 `push_if_no_changes=False`，独立模式无变更时断言实际调用 `git push origin HEAD:main`。
+- 回滚方法：移除 `push_if_no_changes` 参数与无变更 push 分支，恢复内联 push 逻辑，并回退测试、文档和本条日志。
+- 关联提交（如有）：待补充
+- 备注：未执行真实 GitHub 推送验证，避免测试过程产生外部仓库变更。
+
 ## 2026-07-04 11:59
 - 需求 / 目标：修复手动更新成功后主网页仍读取旧月度归档，导致页面没有展示新数据的问题，并完成验证。
 - 改动内容：更新 `scripts/fetch_daily_data.py`，让手动/定时更新在重建 live `dashboard.json` 后同步写入当前月份归档与 `docs/data/monthly/index.json`；补充 `tests/test_fetch_daily_data.py` 覆盖归档写入；基于当前 `2026-07-03` live 数据刷新 7 月归档。
@@ -999,3 +1009,13 @@
 - 回滚方法：恢复车型显示名和源车型键为 `新探陆`，回退测试、文档、重建产物和本条日志。
 - 关联提交（如有）：`91b88bd`
 - 备注：业务改动已提交并推送到 `origin/main`；工作区原有的发布与缓存清理改动保持原样，未夹带进本次提交。
+
+## 2026-07-17 10:50
+- 需求 / 目标：将 jsDelivr 缓存刷新接入 AI_Digest 自动发布，并避免当前月页面继续被月度归档旧缓存卡住。
+- 改动内容：当前月首次加载与“回到当前月”统一读取 live `dashboard.json`，显式切换年月才读取 monthly 归档；发布管线在实际 `git push` 后等待 15 秒，再定点 purge 入口、前端资源、live 数据、月度索引和最新月份归档；独立 GitHub 推送在无新文件时也执行同一缓存流程；公开入口统一使用小写 `django604` 缓存键。
+- 涉及文件：`docs/assets/app.js`、`scripts/dashboard_publish.py`、`scripts/purge_jsdelivr_cache.py`、`scripts/scheduled_update_runner.py`、`tests/test_dashboard_publish.py`、`tests/test_purge_jsdelivr_cache.py`、`tests/test_public_entry.py`、`tests/test_scheduled_update_runner.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：Python / Node 语法检查、专项单测、全量单测、`git push origin HEAD:main`、定点 purge、`playwright-cli` 本地与 jsDelivr 公网请求链路验证。
+- 验证结果：全量测试 `101/101` 通过；定点 purge `8/8` 请求成功；本地首次加载命中 live、切换 6 月命中 monthly、返回当前月再次命中 live；小写公网入口显示业务日 `2026-07-16`、请求 `/data/dashboard.json`，控制台无错误，`390 px` 页面横向溢出为 `0`。
+- 回滚方法：恢复当前月优先 monthly 的请求分支，移除发布后等待 / purge 调用和定点路径参数，恢复原公开入口大小写并回退测试、文档和本条记录。
+- 关联提交（如有）：`69a93bd`、待补充
+- 备注：旧大写 `Django604` 入口在首次 purge 回源时命中旧 branch mirror，并进入约 52 分钟节流窗口；后续统一使用 `https://cdn.jsdelivr.net/gh/django604/AI_Digest@main/docs/index.svg`。

@@ -16,7 +16,7 @@ from urllib.request import Request, urlopen
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DOCS_DIR = PROJECT_ROOT / "docs"
-DEFAULT_REPOSITORY = "Django604/AI_Digest"
+DEFAULT_REPOSITORY = "django604/AI_Digest"
 DEFAULT_REF = "main"
 PURGE_API_ROOT = "https://purge.jsdelivr.net/gh"
 DEFAULT_ATTEMPTS = 3

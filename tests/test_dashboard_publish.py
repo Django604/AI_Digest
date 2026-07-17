@@ -56,7 +56,7 @@ class DashboardPublishTests(unittest.TestCase):
                 dashboard_publish.CommandResult(3221225786, ""),
                 dashboard_publish.CommandResult(0, "To github.com:Django604/AI_Digest.git\n   old..new  HEAD -> main\n"),
             ],
-        ) as run_command_mock, mock.patch("scripts.dashboard_publish.time.sleep"):
+        ) as run_command_mock, mock.patch("scripts.dashboard_publish.time.sleep") as sleep_mock:
             with mock.patch(
                 "scripts.dashboard_publish._purge_published_cache",
                 return_value=8,
@@ -72,6 +72,12 @@ class DashboardPublishTests(unittest.TestCase):
         self.assertEqual(actual["publishCachePurgeStatus"], "success")
         self.assertEqual(run_command_mock.call_count, 2)
         purge_mock.assert_called_once()
+        sleep_mock.assert_has_calls(
+            [
+                mock.call(2),
+                mock.call(dashboard_publish.JSDELIVR_SETTLE_SECONDS),
+            ]
+        )
         self.assertTrue(any("Push was interrupted once; retrying after a short pause..." in line for line in logs))
 
     def test_publish_dashboard_pushes_existing_commits_when_publish_scope_is_clean(self) -> None:
@@ -93,7 +99,7 @@ class DashboardPublishTests(unittest.TestCase):
         ) as push_mock, mock.patch(
             "scripts.dashboard_publish._purge_published_cache",
             return_value=8,
-        ) as purge_mock:
+        ) as purge_mock, mock.patch("scripts.dashboard_publish.time.sleep") as sleep_mock:
             actual = dashboard_publish.publish_dashboard(
                 skip_rebuild=True,
                 push_if_no_changes=True,
@@ -106,6 +112,7 @@ class DashboardPublishTests(unittest.TestCase):
         self.assertEqual(actual["publishCachePurgedFiles"], "8")
         push_mock.assert_called_once()
         purge_mock.assert_called_once()
+        sleep_mock.assert_called_once_with(dashboard_publish.JSDELIVR_SETTLE_SECONDS)
         self.assertEqual(push_mock.call_args.args[0], ["git", "push", "origin", "HEAD:main"])
         self.assertTrue(any("checking pending commits" in line for line in logs))
 
@@ -127,7 +134,7 @@ class DashboardPublishTests(unittest.TestCase):
 
         self.assertEqual(actual, 2)
         kwargs = purge_mock.call_args.kwargs
-        self.assertEqual(kwargs["repository"], "Django604/AI_Digest")
+        self.assertEqual(kwargs["repository"], "django604/AI_Digest")
         self.assertEqual(kwargs["ref"], "main")
         self.assertEqual(len(kwargs["repo_paths"]), 2)
 

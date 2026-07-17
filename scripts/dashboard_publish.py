@@ -30,6 +30,7 @@ PUBLISH_TARGETS = (
 )
 INTERRUPTED_EXIT_CODES = {3221225786, 130}
 PUSH_TIMEOUT_SECONDS = 300
+JSDELIVR_SETTLE_SECONDS = 15
 
 
 @dataclass(frozen=True)
@@ -264,7 +265,8 @@ def _resolve_github_repository(remote_url: str) -> str:
             continue
         repository = normalized.split(marker, 1)[1].strip("/")
         if len(repository.split("/")) == 2:
-            return repository
+            owner, name = repository.split("/", 1)
+            return f"{owner.lower()}/{name}"
     raise PublishError(
         "cache_purge",
         f"GitHub push succeeded, but the jsDelivr repository could not be inferred from remote URL: {remote_url}",
@@ -356,6 +358,8 @@ def publish_dashboard(
             log(f"No publishable changes detected; checking pending commits on {remote}/{branch}...")
             _push_to_remote(repo_root=repo_root, remote=remote, branch=branch, log=log)
             log("GitHub push check completed successfully.")
+            log(f"Waiting {JSDELIVR_SETTLE_SECONDS} seconds for the jsDelivr branch mirror...")
+            time.sleep(JSDELIVR_SETTLE_SECONDS)
             log("Refreshing jsDelivr dashboard cache...")
             purged_file_count = _purge_published_cache(
                 repo_root=repo_root,
@@ -385,6 +389,8 @@ def publish_dashboard(
     log(f"Step 4/5: pushing to {remote}/{branch}...")
     _push_to_remote(repo_root=repo_root, remote=remote, branch=branch, log=log)
 
+    log(f"Waiting {JSDELIVR_SETTLE_SECONDS} seconds for the jsDelivr branch mirror...")
+    time.sleep(JSDELIVR_SETTLE_SECONDS)
     log("Step 5/5: refreshing jsDelivr dashboard cache...")
     purged_file_count = _purge_published_cache(
         repo_root=repo_root,

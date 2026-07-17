@@ -4,10 +4,10 @@
 
 ## 公开访问入口
 
-- 推荐入口（公司内外网络）：https://cdn.jsdelivr.net/gh/Django604/AI_Digest@main/docs/index.svg
+- 推荐入口（公司内外网络）：https://cdn.jsdelivr.net/gh/django604/AI_Digest@main/docs/index.svg
 - 备用入口（GitHub Pages）：https://django604.github.io/AI_Digest/
 
-推荐把 jsDelivr 地址发给同事使用。它直接分发仓库 `main` 分支中的 `docs/` 静态文件，不需要安装客户端、修改 `hosts` 或连接公司内网；入口使用 `index.svg` 是因为 jsDelivr 会把普通 HTML 强制按纯文本返回，而 SVG 可以在浏览器中正常承载现有交互页面。GitHub Pages 地址继续保留，在当前网络可正常访问时可作为备用。
+推荐把上方小写仓库名的 jsDelivr 地址发给同事使用。它直接分发仓库 `main` 分支中的 `docs/` 静态文件，不需要安装客户端、修改 `hosts` 或连接公司内网；入口使用 `index.svg` 是因为 jsDelivr 会把普通 HTML 强制按纯文本返回，而 SVG 可以在浏览器中正常承载现有交互页面。GitHub Pages 地址继续保留，在当前网络可正常访问时可作为备用。jsDelivr 会把仓库名大小写视为不同缓存键，请统一使用文档中的小写 `django604` 入口。
 
 ## 为什么不用 Django
 
