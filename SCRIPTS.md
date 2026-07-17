@@ -30,7 +30,7 @@
 ## scripts/purge_jsdelivr_cache.py
 
 - 路径：`./scripts/purge_jsdelivr_cache.py`
-- 作用：递归枚举 `docs/` 下的公开文件，并清理 `django604/AI_Digest@main` 对应的 jsDelivr CDN 缓存；GitHub Actions 会在测试与 dashboard 构建成功后自动执行，`dashboard_publish.py` 在本地推送成功后会等待 branch mirror 同步，再调用同一模块定点清理 live 数据和最新月份归档
+- 作用：遗留的 jsDelivr CDN 缓存诊断工具；正式发布链与 GitHub Pages workflow 均不再调用
 - 使用方法：
   - 清理默认公开入口缓存：`python scripts/purge_jsdelivr_cache.py`
   - 指定仓库与分支：`python scripts/purge_jsdelivr_cache.py --repository django604/AI_Digest --ref main`
@@ -41,11 +41,11 @@
   - 逐文件输出 `[OK]` 或 `[FAIL]` 及实际 purge URL
   - 最后输出总文件数、成功数、失败数和关键文件失败数
 - 备注：
-  - 推荐公开入口为 `https://cdn.jsdelivr.net/gh/django604/AI_Digest@main/docs/index.svg`；jsDelivr 会把仓库名大小写视为不同缓存键，应统一使用小写 `django604`；`.html` 会按纯文本返回，因此 CDN 入口使用可渲染的 SVG 兼容壳，GitHub Pages 仍使用原 `index.html`
-  - GitHub Pages 备用入口为 `https://django604.github.io/AI_Digest/`
-  - SVG 入口、前端 JS/CSS、当前 dashboard、月度索引及所有月度 dashboard/summary 属于关键文件；任一关键文件清理失败时脚本返回非零退出码并阻止 workflow 继续发布
+  - 正式公开入口仅为 `https://django604.github.io/AI_Digest/`
+  - 该脚本只保留给历史问题诊断，不应作为 Pages 是否发布成功的判断条件
+  - SVG 入口、前端 JS/CSS、当前 dashboard、月度索引及所有月度 dashboard/summary 属于脚本内部的关键文件；任一关键文件清理失败时脚本返回非零退出码，但不会影响正式 Pages 发布
   - purge API 返回 `throttled=true` 表示该路径刚刚清理过，脚本会记录为 `[THROTTLED]` 并按成功处理，避免紧邻的自动/手动刷新互相误伤
-  - Python 调用方可通过 `repo_paths` 只清理指定仓库路径；日常发布和 GitHub Actions 使用 `--dashboard-only` 对应的 5 条数据路径，不自动清理 SVG / JS / CSS，避免 branch mirror 未同步时把旧静态资源重新写回 CDN
+  - Python 调用方可通过 `repo_paths` 只诊断指定仓库路径；`--dashboard-only` 对应 5 条数据路径
   - 图片、字体等非关键资源也会清理并报告失败，但不会因单个非关键文件失败阻断 dashboard 发布
   - purge API 不需要账号、Token 或其他秘密信息
 
@@ -164,7 +164,7 @@
 ## scripts/publish_dashboard.ps1
 
 - 路径：`./scripts/publish_dashboard.ps1`
-- 作用：一键重建 `dashboard.json`，把发布所需文件提交、推送到 GitHub，并刷新 jsDelivr 关键缓存
+- 作用：一键重建 `dashboard.json`，把发布所需文件提交并推送到 GitHub；随后由 GitHub Actions 自动部署 Pages
 - 使用方法：
   - `powershell -ExecutionPolicy Bypass -File scripts/publish_dashboard.ps1`
   - 指定提交信息：`powershell -ExecutionPolicy Bypass -File scripts/publish_dashboard.ps1 -CommitMessage "Update dashboard data"`
@@ -179,7 +179,7 @@
   - 更新 `docs/data/dashboard.json`
   - 更新 `docs/data/dashboard.summary.json`
   - 自动提交并推送发布相关文件
-  - 推送成功后定点清理 jsDelivr 当前 live 与最新月份归档数据缓存
+  - 推送成功后触发 GitHub Pages workflow
 - 备注：
   - 这个脚本现在只是薄封装，实际的 rebuild / stage / commit / push 逻辑在 `./scripts/dashboard_publish.py`
   - 默认只会提交这 4 个文件：两本 Excel 源文件、`docs/data/dashboard.json` 和 `docs/data/dashboard.summary.json`
@@ -188,7 +188,7 @@
 ## scripts/dashboard_publish.py
 
 - 路径：`./scripts/dashboard_publish.py`
-- 作用：统一承担发布前检查、重建、`git add`、`git commit`、`git push` 与 jsDelivr 定点缓存清理
+- 作用：统一承担发布前检查、重建、`git add`、`git commit` 与 `git push`；Pages 部署由 GitHub Actions 独立完成
 - 使用方法：
   - `python scripts/dashboard_publish.py --remote origin --branch main`
   - 跳过重建：`python scripts/dashboard_publish.py --skip-rebuild`
@@ -197,7 +197,7 @@
   - 定时更新与附魔工作台手动兜底会调用这个 Python 入口
   - `git push` 带 300 秒超时，若被中断会自动重试一次，并在失败时保留完整的阶段与命令信息
   - Python 调用方可传入 `push_if_no_changes=True`，在没有新的发布文件可提交时仍执行 `git push`；默认值为 `False`，原定时更新与更新后自动发布行为不变
-  - 只要实际执行了 `git push`，就会先等待 15 秒让 jsDelivr branch mirror 同步，再清理 live dashboard、summary、月度索引和最新月份 dashboard / summary 共 5 条数据路径；关键缓存失败会以 `cache_purge` 阶段报错，独立推送可直接重试
+  - `git push` 成功即视为本地发布完成，不再等待或调用任何 CDN；远端 workflow 继续完成 GitHub Pages 部署
 
 ## scripts/serve_dashboard.py
 

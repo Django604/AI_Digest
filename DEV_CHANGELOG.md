@@ -1029,3 +1029,13 @@
 - 回滚方法：移除 `NEW_PATHFINDER_TARGET_OVERRIDES`、目标解析兜底及对应测试，回退重建产物、文档和本条日志。
 - 关联提交（如有）：`fb2363a`
 - 备注：业务改动已提交并推送到 `origin/main`；工作区原有发布与缓存清理改动保持原样，未夹带进本次提交。
+
+## 2026-07-17 GitHub Pages 正式入口恢复
+- 需求 / 目标：停止使用不稳定的 jsDelivr 公网入口，恢复 `https://django604.github.io/AI_Digest/` 为唯一正式入口，并避免刷新后回到旧部署数据。
+- 改动内容：移除 Pages workflow 中的 CDN purge 步骤；本地发布脚本在 `git push` 成功后立即结束，不再等待 jsDelivr branch mirror 或清理缓存；发布结果改为返回 GitHub Pages 目标；同步测试与文档。
+- 涉及文件：`.github/workflows/deploy-pages.yml`、`scripts/dashboard_publish.py`、`tests/test_dashboard_publish.py`、`tests/test_public_entry.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 -m unittest discover -s tests -v`、`python -B -X utf8 -m py_compile scripts/dashboard_publish.py scripts/build_dashboard.py`、`node --check docs/assets/app.js`、`python -B -X utf8 scripts/build_dashboard.py ... --preserve-input-modified-times`、`playwright-cli ... http://127.0.0.1:4173/`
+- 验证结果：全量测试 `101/101` 通过，Python / Node / diff 检查通过，Actions 同款构建确认 dashboard 业务数据不变；真实浏览器连续刷新 3 次均只读取 live `/data/dashboard.json`，始终显示 `2026款探陆`、累计实绩 `18`、累计目标 `3,967`、当日目标 `241`、累计达成率 `0.5%`、当日达成率 `5.4%`，无控制台错误。
+- 回滚方法：恢复 workflow 与发布脚本中的 jsDelivr purge 调用，并回退测试、文档和本条日志。
+- 关联提交（如有）：待补充
+- 备注：`scripts/purge_jsdelivr_cache.py` 仅作为遗留诊断工具保留，不再参与正式发布成败判断。

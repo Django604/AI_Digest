@@ -9,12 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-try:
-    from .purge_jsdelivr_cache import build_dashboard_purge_paths, run_purge
-except ImportError:
-    from purge_jsdelivr_cache import build_dashboard_purge_paths, run_purge
-
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LEADS_WORKBOOK = PROJECT_ROOT / "data" / "source" / "NEV+ICE_xsai.xlsm"
 DEFAULT_ARRIVAL_WORKBOOK = PROJECT_ROOT / "data" / "source" / "NEV+ICE_ldai.xlsx"
@@ -30,7 +24,7 @@ PUBLISH_TARGETS = (
 )
 INTERRUPTED_EXIT_CODES = {3221225786, 130}
 PUSH_TIMEOUT_SECONDS = 300
-JSDELIVR_SETTLE_SECONDS = 15
+PAGES_URL = "https://django604.github.io/AI_Digest/"
 
 
 @dataclass(frozen=True)
@@ -256,52 +250,6 @@ def _push_to_remote(*, repo_root: Path, remote: str, branch: str, log: Callable[
         )
 
 
-def _resolve_github_repository(remote_url: str) -> str:
-    normalized = remote_url.strip().rstrip("/")
-    if normalized.endswith(".git"):
-        normalized = normalized[:-4]
-    for marker in ("github.com:", "github.com/"):
-        if marker not in normalized:
-            continue
-        repository = normalized.split(marker, 1)[1].strip("/")
-        if len(repository.split("/")) == 2:
-            owner, name = repository.split("/", 1)
-            return f"{owner.lower()}/{name}"
-    raise PublishError(
-        "cache_purge",
-        f"GitHub push succeeded, but the jsDelivr repository could not be inferred from remote URL: {remote_url}",
-    )
-
-
-def _purge_published_cache(
-    *,
-    repo_root: Path,
-    remote_url: str,
-    branch: str,
-    log: Callable[[str], None],
-) -> int:
-    repository = _resolve_github_repository(remote_url)
-    repo_paths = build_dashboard_purge_paths(repo_root / "docs")
-
-    def purge_log(message: str) -> None:
-        log(f"[jsDelivr] {message}")
-
-    exit_code = run_purge(
-        docs_dir=repo_root / "docs",
-        repo_paths=repo_paths,
-        repository=repository,
-        ref=branch,
-        log=purge_log,
-    )
-    if exit_code != 0:
-        raise PublishError(
-            "cache_purge",
-            "GitHub push succeeded, but one or more critical jsDelivr cache entries failed to purge. "
-            "Run the GitHub-only publish action again to retry cache refresh.",
-        )
-    return len(repo_paths)
-
-
 def publish_dashboard(
     *,
     repo_root: Path | None = None,
@@ -343,12 +291,12 @@ def publish_dashboard(
 
     log(f"Starting publish: remote={remote} branch={branch}")
     if skip_rebuild:
-        log("Step 1/5: rebuild skipped by flag.")
+        log("Step 1/4: rebuild skipped by flag.")
     else:
-        log("Step 1/5: rebuilding dashboard outputs...")
+        log("Step 1/4: rebuilding dashboard outputs...")
         _run_build_dashboard(cwd=repo_root, log=log)
 
-    log("Step 2/5: staging dashboard publish files...")
+    log("Step 2/4: staging dashboard publish files...")
     _run_git(["add", "--", *PUBLISH_TARGETS], cwd=repo_root, log=log)
 
     changed_output = _run_git(["diff", "--cached", "--name-only", "--", *PUBLISH_TARGETS], cwd=repo_root).output
@@ -358,19 +306,8 @@ def publish_dashboard(
             log(f"No publishable changes detected; checking pending commits on {remote}/{branch}...")
             _push_to_remote(repo_root=repo_root, remote=remote, branch=branch, log=log)
             log("GitHub push check completed successfully.")
-            log(f"Waiting {JSDELIVR_SETTLE_SECONDS} seconds for the jsDelivr branch mirror...")
-            time.sleep(JSDELIVR_SETTLE_SECONDS)
-            log("Refreshing jsDelivr dashboard cache...")
-            purged_file_count = _purge_published_cache(
-                repo_root=repo_root,
-                remote_url=remote_url,
-                branch=branch,
-                log=log,
-            )
-            log("jsDelivr dashboard cache refresh completed successfully.")
         else:
             log("No publishable changes detected. Nothing to commit.")
-            purged_file_count = 0
         return {
             "publishStatus": "no_changes",
             "publishRemote": remote,
@@ -379,28 +316,19 @@ def publish_dashboard(
             "publishCurrentBranch": current_branch,
             "publishRemoteUrl": remote_url,
             "publishPushAttempted": str(push_if_no_changes).lower(),
-            "publishCachePurgeStatus": "success" if push_if_no_changes else "skipped",
-            "publishCachePurgedFiles": str(purged_file_count),
+            "publishTarget": "github_pages",
+            "publishPagesUrl": PAGES_URL,
         }
 
-    log("Step 3/5: committing staged publish files...")
+    log("Step 3/4: committing staged publish files...")
     _run_git(["commit", "-m", resolved_commit_message], cwd=repo_root, log=log)
 
-    log(f"Step 4/5: pushing to {remote}/{branch}...")
+    log(f"Step 4/4: pushing to {remote}/{branch}...")
     _push_to_remote(repo_root=repo_root, remote=remote, branch=branch, log=log)
-
-    log(f"Waiting {JSDELIVR_SETTLE_SECONDS} seconds for the jsDelivr branch mirror...")
-    time.sleep(JSDELIVR_SETTLE_SECONDS)
-    log("Step 5/5: refreshing jsDelivr dashboard cache...")
-    purged_file_count = _purge_published_cache(
-        repo_root=repo_root,
-        remote_url=remote_url,
-        branch=branch,
-        log=log,
-    )
 
     log("")
     log("Dashboard publish completed successfully.")
+    log(f"GitHub Pages deployment will continue at: {PAGES_URL}")
     log(f"Remote: {remote}")
     log(f"Branch: {branch}")
     log(f"Current branch: {current_branch}")
@@ -416,8 +344,8 @@ def publish_dashboard(
         "publishCommitMessage": resolved_commit_message,
         "publishCurrentBranch": current_branch,
         "publishRemoteUrl": remote_url,
-        "publishCachePurgeStatus": "success",
-        "publishCachePurgedFiles": str(purged_file_count),
+        "publishTarget": "github_pages",
+        "publishPagesUrl": PAGES_URL,
     }
 
 

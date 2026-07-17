@@ -4,10 +4,9 @@
 
 ## 公开访问入口
 
-- 推荐入口（公司内外网络）：https://cdn.jsdelivr.net/gh/django604/AI_Digest@main/docs/index.svg
-- 备用入口（GitHub Pages）：https://django604.github.io/AI_Digest/
+- 正式入口（公司内外网络）：https://django604.github.io/AI_Digest/
 
-推荐把上方小写仓库名的 jsDelivr 地址发给同事使用。它直接分发仓库 `main` 分支中的 `docs/` 静态文件，不需要安装客户端、修改 `hosts` 或连接公司内网；入口使用 `index.svg` 是因为 jsDelivr 会把普通 HTML 强制按纯文本返回，而 SVG 可以在浏览器中正常承载现有交互页面。GitHub Pages 地址继续保留，在当前网络可正常访问时可作为备用。jsDelivr 会把仓库名大小写视为不同缓存键，请统一使用文档中的小写 `django604` 入口。
+项目只以 GitHub Pages 作为正式网页入口。每次将 `main` 分支推送到 GitHub 后，`Deploy Dashboard To Pages` workflow 会独立完成测试、数据重建和站点部署；不再依赖 jsDelivr 缓存清理，也不要再向同事分发旧 CDN 地址。
 
 ## 为什么不用 Django
 
@@ -26,7 +25,7 @@
 - `data/source/NEV+ICE_ldai.xlsx`：来店源工作簿
 - `requirements.txt`：Python 依赖清单
 - `scripts/build_dashboard.py`：从 Excel 抽取页面数据
-- `scripts/purge_jsdelivr_cache.py`：递归清理 `docs/` 公共文件对应的 jsDelivr CDN 缓存
+- `scripts/purge_jsdelivr_cache.py`：遗留 CDN 诊断工具，不接入正式发布流程
 - `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，抓取线索 + 来店共 6 张日报表并回填两本工作簿；十五代轩逸已停更
 - `scripts/run_leads_nev_exports.py`：NEV 线索全国按日导出包装器，运行时清空 FineReport 默认 `营业状态` 筛选
 - `scripts/run_arrival_nev_exports.py`：NEV 来店导出包装器，运行时切到 FineReport `自定义` tab 并通过后台 `chart.data` 直接抓取按日序列
@@ -96,12 +95,12 @@
    - `docs/data/dashboard.json`
    - `docs/data/dashboard.summary.json`
    - `docs/data/monthly/`
-4. 本地发布脚本在推送成功后定点清理 jsDelivr live 与当前月数据缓存；`GitHub Actions` 使用同一数据路径集再次清理并发布 GitHub Pages，作为第二层保障
-5. 别人打开上方 jsDelivr 推荐入口或 GitHub Pages 备用入口时，就能看到最新数据
+4. 推送成功后，GitHub Actions 会自动测试、重建并部署 `docs/` 到 GitHub Pages
+5. 别人打开上方 GitHub Pages 正式入口时，就能看到最新部署的数据
 
 注意：`GitHub Pages` 不能直接读取你电脑本地文件。你在本地更新完数据后，必须把变更推送到 GitHub，网页才会同步更新。
 
-公开页面首次打开和“回到当前月”会读取 live `docs/data/dashboard.json`；只有明确切换某个年月时才读取 `docs/data/monthly/YYYY-MM/dashboard.json`，避免当前月被月度 CDN 旧缓存卡住。
+公开页面首次打开和“回到当前月”会读取 live `docs/data/dashboard.json`；只有明确切换某个年月时才读取 `docs/data/monthly/YYYY-MM/dashboard.json`，避免当前月误读旧归档。
 
 ## 注意
 

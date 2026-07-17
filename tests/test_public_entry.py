@@ -33,15 +33,16 @@ class PublicEntryTests(unittest.TestCase):
         ):
             self.assertIn(f'id="{element_id}"', source)
 
-    def test_pages_workflow_purges_cdn_after_build_and_before_upload(self) -> None:
+    def test_pages_workflow_builds_and_uploads_without_cdn_dependency(self) -> None:
         workflow = PAGES_WORKFLOW.read_text(encoding="utf-8")
 
         build_position = workflow.index("- name: Build dashboard data")
-        purge_position = workflow.index("- name: Purge jsDelivr cache")
         configure_position = workflow.index("- name: Configure Pages")
-        self.assertLess(build_position, purge_position)
-        self.assertLess(purge_position, configure_position)
-        self.assertIn("run: python scripts/purge_jsdelivr_cache.py --dashboard-only", workflow)
+        upload_position = workflow.index("- name: Upload artifact")
+        self.assertLess(build_position, configure_position)
+        self.assertLess(configure_position, upload_position)
+        self.assertNotIn("jsDelivr", workflow)
+        self.assertNotIn("purge_jsdelivr_cache.py", workflow)
 
     def test_batch_capture_skips_sylphy_15(self) -> None:
         source = APP_SCRIPT.read_text(encoding="utf-8")
