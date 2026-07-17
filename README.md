@@ -96,10 +96,12 @@
    - `docs/data/dashboard.json`
    - `docs/data/dashboard.summary.json`
    - `docs/data/monthly/`
-4. `GitHub Actions` 自动重新生成页面数据、清理 jsDelivr 缓存并继续发布 GitHub Pages
+4. 本地发布脚本在推送成功后定点清理 jsDelivr 关键缓存；`GitHub Actions` 继续执行全量缓存清理并发布 GitHub Pages，作为第二层保障
 5. 别人打开上方 jsDelivr 推荐入口或 GitHub Pages 备用入口时，就能看到最新数据
 
 注意：`GitHub Pages` 不能直接读取你电脑本地文件。你在本地更新完数据后，必须把变更推送到 GitHub，网页才会同步更新。
+
+公开页面首次打开和“回到当前月”会读取 live `docs/data/dashboard.json`；只有明确切换某个年月时才读取 `docs/data/monthly/YYYY-MM/dashboard.json`，避免当前月被月度 CDN 旧缓存卡住。
 
 ## 注意
 

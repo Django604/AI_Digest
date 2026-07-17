@@ -297,6 +297,7 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
         self.assertEqual(kwargs["remote"], "origin")
         self.assertEqual(kwargs["branch"], "main")
         self.assertTrue(kwargs["skip_rebuild"])
+        self.assertFalse(kwargs["push_if_no_changes"])
 
     def test_lock_prevents_duplicate_silent_run(self) -> None:
         runtime_root = self.create_repo_temp_dir()

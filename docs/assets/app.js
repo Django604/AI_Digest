@@ -196,26 +196,10 @@ function buildDashboardRequest(monthKey = "") {
   const normalizedMonthKey = normalizeMonthKey(monthKey);
   if (!normalizedMonthKey) {
     const liveMonthKey = getLiveMonthKeyFromArchiveIndex();
-    const liveArchiveEntry = getArchiveEntry(liveMonthKey);
-    const liveDashboardPath =
-      typeof liveArchiveEntry?.dashboardPath === "string" && liveArchiveEntry.dashboardPath.trim()
-        ? liveArchiveEntry.dashboardPath.trim()
-        : "";
-    if (liveMonthKey && liveDashboardPath) {
-      return {
-        mode: "current",
-        monthKey: liveMonthKey,
-        primaryUrl: state.apiBaseUrl
-          ? `${buildApiUrl("/api/dashboard-data")}?month=${encodeURIComponent(liveMonthKey)}`
-          : liveDashboardPath,
-        fallbackUrl: state.apiBaseUrl ? liveDashboardPath : "",
-      };
-    }
-
     const primaryUrl = state.dashboardDataUrl;
     return {
       mode: "current",
-      monthKey: "",
+      monthKey: liveMonthKey,
       primaryUrl,
       fallbackUrl: primaryUrl !== "./data/dashboard.json" ? "./data/dashboard.json" : "",
     };
@@ -246,7 +230,7 @@ function applyLoadedDashboardState(payload, requestMode, requestedMonthKey = "")
   const reportMonthKey = getMonthKeyFromMeta(payload.meta ?? {});
   const requestedKey = normalizeMonthKey(requestedMonthKey);
   const liveMonthKey = getLiveMonthKeyFromArchiveIndex();
-  const loadedMonthKey = requestMode === "current" ? (liveMonthKey || reportMonthKey) : (requestedKey || reportMonthKey);
+  const loadedMonthKey = requestMode === "current" ? (reportMonthKey || liveMonthKey) : (requestedKey || reportMonthKey);
   state.payload = payload;
   state.activeDashboard = payload.dashboards[state.activeDashboard] ? state.activeDashboard : dashboards[0].id;
   state.selectedMonthKey = loadedMonthKey;

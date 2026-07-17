@@ -56,6 +56,40 @@ class PurgeJsDelivrCacheTests(unittest.TestCase):
             "docs/assets/%E4%B8%AD%E6%96%87%20file.js",
         )
 
+    def test_build_dashboard_purge_paths_includes_latest_month(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            docs_dir = Path(temp_dir) / "docs"
+            index_path = docs_dir / "data" / "monthly" / "index.json"
+            index_path.parent.mkdir(parents=True)
+            index_path.write_text(json.dumps({"latestMonth": "2026-07"}), encoding="utf-8")
+
+            actual = purge_jsdelivr_cache.build_dashboard_purge_paths(docs_dir)
+
+        self.assertIn("docs/data/dashboard.json", actual)
+        self.assertIn("docs/data/monthly/index.json", actual)
+        self.assertIn("docs/data/monthly/2026-07/dashboard.json", actual)
+        self.assertIn("docs/data/monthly/2026-07/dashboard.summary.json", actual)
+
+    def test_run_purge_can_target_only_selected_paths(self) -> None:
+        logs: list[str] = []
+        requests: list[str] = []
+
+        def request(url: str, _timeout: float) -> str:
+            requests.append(url)
+            return successful_payload()
+
+        exit_code = purge_jsdelivr_cache.run_purge(
+            repo_paths=["docs/data/monthly/index.json", "docs/data/dashboard.json"],
+            attempts=1,
+            log=logs.append,
+            request_func=request,
+            sleep_func=lambda _seconds: None,
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(len(requests), 2)
+        self.assertIn("total=2", logs[-1])
+
     def test_purge_file_retries_a_transient_network_error(self) -> None:
         request = mock.Mock(side_effect=[URLError("connection reset"), successful_payload()])
         sleep = mock.Mock()

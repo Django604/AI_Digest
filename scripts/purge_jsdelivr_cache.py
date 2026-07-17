@@ -34,6 +34,14 @@ CRITICAL_FILES = frozenset(
 )
 MONTHLY_CRITICAL_NAMES = frozenset({"dashboard.json", "dashboard.summary.json"})
 TRANSIENT_HTTP_CODES = frozenset({408, 409, 425, 429})
+DASHBOARD_PURGE_PATHS = (
+    "docs/index.svg",
+    "docs/assets/app.js",
+    "docs/assets/styles.css",
+    "docs/data/dashboard.json",
+    "docs/data/dashboard.summary.json",
+    "docs/data/monthly/index.json",
+)
 
 
 @dataclass(frozen=True)
@@ -57,6 +65,34 @@ def enumerate_docs_files(docs_dir: Path) -> list[str]:
         for path in docs_dir.rglob("*")
         if path.is_file()
     )
+
+
+def build_dashboard_purge_paths(docs_dir: Path = DEFAULT_DOCS_DIR) -> list[str]:
+    """Return the focused cache paths needed after a dashboard publish."""
+    repo_paths = list(DASHBOARD_PURGE_PATHS)
+    index_path = docs_dir / "data" / "monthly" / "index.json"
+    try:
+        payload = json.loads(index_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        payload = {}
+
+    latest_month = str(payload.get("latestMonth") or "").strip()
+    if (
+        len(latest_month) == 7
+        and latest_month[:4].isdigit()
+        and latest_month[4] == "-"
+        and latest_month[5:].isdigit()
+    ):
+        month_number = int(latest_month[5:])
+        if 1 <= month_number <= 12:
+            repo_paths.extend(
+                [
+                    f"docs/data/monthly/{latest_month}/dashboard.json",
+                    f"docs/data/monthly/{latest_month}/dashboard.summary.json",
+                ]
+            )
+
+    return sorted(set(repo_paths))
 
 
 def build_purge_url(
@@ -181,6 +217,7 @@ def purge_file(
 def run_purge(
     *,
     docs_dir: Path = DEFAULT_DOCS_DIR,
+    repo_paths: Sequence[str] | None = None,
     repository: str = DEFAULT_REPOSITORY,
     ref: str = DEFAULT_REF,
     attempts: int = DEFAULT_ATTEMPTS,
@@ -189,18 +226,27 @@ def run_purge(
     request_func: Callable[[str, float], str] = _request_purge,
     sleep_func: Callable[[float], None] = time.sleep,
 ) -> int:
-    try:
-        repo_paths = enumerate_docs_files(docs_dir)
-    except FileNotFoundError as exc:
-        log(f"[FAIL] {exc}")
-        return 1
+    if repo_paths is None:
+        try:
+            resolved_repo_paths = enumerate_docs_files(docs_dir)
+        except FileNotFoundError as exc:
+            log(f"[FAIL] {exc}")
+            return 1
+    else:
+        resolved_repo_paths = sorted(
+            {
+                str(path).replace("\\", "/").lstrip("/")
+                for path in repo_paths
+                if str(path).strip()
+            }
+        )
 
-    if not repo_paths:
+    if not resolved_repo_paths:
         log(f"[FAIL] no public files found under {docs_dir}")
         return 1
 
     results: list[PurgeResult] = []
-    for repo_path in repo_paths:
+    for repo_path in resolved_repo_paths:
         result = purge_file(
             repo_path,
             repository=repository,

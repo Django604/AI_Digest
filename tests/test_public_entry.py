@@ -49,6 +49,24 @@ class PublicEntryTests(unittest.TestCase):
         self.assertIn('section?.id === "sylphy-15"', source)
         self.assertIn("已跳过 ICE 总盘与十五代轩逸趋势图", source)
 
+    def test_current_month_uses_live_dashboard_and_explicit_month_uses_archive(self) -> None:
+        source = APP_SCRIPT.read_text(encoding="utf-8")
+        start = source.index('function buildDashboardRequest(monthKey = "")')
+        end = source.index("function applyLoadedDashboardState", start)
+        request_source = source[start:end]
+        current_source, archive_source = request_source.split(
+            "const archiveEntry = getArchiveEntry(normalizedMonthKey);",
+            1,
+        )
+
+        self.assertIn("const primaryUrl = state.dashboardDataUrl;", current_source)
+        self.assertNotIn("liveDashboardPath", current_source)
+        self.assertIn("./data/monthly/${normalizedMonthKey}/dashboard.json", archive_source)
+        self.assertIn(
+            'requestMode === "current" ? (reportMonthKey || liveMonthKey)',
+            source,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

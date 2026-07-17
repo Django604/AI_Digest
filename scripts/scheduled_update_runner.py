@@ -531,6 +531,7 @@ def run_publish_step(
     branch: str,
     commit_message: str,
     log: Callable[[str], None],
+    push_if_no_changes: bool = False,
 ) -> dict[str, str]:
     def publish_log(message: str) -> None:
         log(f"[publish] {message}")
@@ -543,6 +544,7 @@ def run_publish_step(
         business_date=business_date,
         mode=mode,
         skip_rebuild=True,
+        push_if_no_changes=push_if_no_changes,
         log=publish_log,
     )
 
