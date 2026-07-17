@@ -41,7 +41,7 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
         actual = build_start_message(started_at)
 
         self.assertIn("2026-04-22 09:00:00", actual)
-        self.assertIn("抓取 7 张线索 / 来店日报表", actual)
+        self.assertIn("抓取 6 张线索 / 来店日报表", actual)
         self.assertIn("回填 NEV+ICE_xsai.xlsm 与 NEV+ICE_ldai.xlsx", actual)
         self.assertIn("2 分钟内未点击", actual)
 

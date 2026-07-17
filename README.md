@@ -27,7 +27,7 @@
 - `requirements.txt`：Python 依赖清单
 - `scripts/build_dashboard.py`：从 Excel 抽取页面数据
 - `scripts/purge_jsdelivr_cache.py`：递归清理 `docs/` 公共文件对应的 jsDelivr CDN 缓存
-- `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，抓取线索 + 来店共 7 张日报表并回填两本工作簿
+- `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，抓取线索 + 来店共 6 张日报表并回填两本工作簿；十五代轩逸已停更
 - `scripts/run_leads_nev_exports.py`：NEV 线索全国按日导出包装器，运行时清空 FineReport 默认 `营业状态` 筛选
 - `scripts/run_arrival_nev_exports.py`：NEV 来店导出包装器，运行时切到 FineReport `自定义` tab 并通过后台 `chart.data` 直接抓取按日序列
 - `scripts/run_arrival_ice_exports.py`：ICE 来店导出包装器，运行时把 Tableau 导出入口锁定到 `来店批次分车系汇总表_按天T`

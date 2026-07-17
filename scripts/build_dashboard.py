@@ -35,6 +35,7 @@ NEV_DETAIL_MODELS = [
 ]
 NEV_BRIEF_ORDER = [model_name for _, _, model_name in NEV_CORE_MODELS]
 BRIEF_MARKERS = ["①", "②", "③", "④", "⑤", "⑥"]
+SYLPHY_FREEZE_DATE = date(2026, 7, 15)
 SYLPHY_TARGET_OVERRIDES = {
     (2026, 4): [
         1827, 1828, 1828, 1772, 1772, 1772, 1828, 1828, 1828, 1828,
@@ -849,7 +850,7 @@ def make_card(label: str, value: int | float | None, kind: str = "count", note: 
 
 def build_monthly_chart_title(title: str, metric_label: str) -> str:
     special_titles = {
-        ("NEV 总盘", "新增线索"): "NEV 新增线索",
+        ("NEV 总盘", "新增线索"): "NEV 4车新增线索",
         ("ICE 总盘", "有效线索"): "ICE 有效线索",
     }
     return special_titles.get((title, metric_label), f"{title}{metric_label}")
@@ -958,6 +959,7 @@ def build_line_brief(
     sylphy_targets,
     new_pathfinder_daily,
     new_pathfinder_targets,
+    sylphy_report_date: date | None = None,
 ) -> dict[str, Any]:
     total_cum_actual = total_day_actual = total_cum_target = total_day_target = 0
     nev_lines: list[str] = []
@@ -977,7 +979,7 @@ def build_line_brief(
     nev_summary = f"四车累计实绩{fmt_count(total_cum_actual)}，累计达成率{fmt_percent(ratio(total_cum_actual, total_cum_target))}；当日实绩{fmt_count(total_day_actual)}，当日达成率{fmt_percent(ratio(total_day_actual, total_day_target))}"
     sylphy_line = build_single_model_brief_line(
         "十五代轩逸",
-        report_date,
+        sylphy_report_date or report_date,
         sylphy_daily,
         sylphy_targets,
         actual_key="validLeads",
@@ -1286,15 +1288,32 @@ def build_payload(
         nev_targets = load_nev_targets(leads["目标竖版"], current_start, current_end)
         nev_daily_all = load_nev_daily(leads["全国按日NEV"], previous_start, current_end)
         ice_daily_all = load_ice_daily(leads["全国按日ICE"], previous_start, current_end)
-        sylphy_daily_all = load_ice_daily(leads["十五代轩逸按日"], previous_start, current_end)
+        sylphy_report_date = min(report_date, SYLPHY_FREEZE_DATE)
+        sylphy_current_start = month_start(sylphy_report_date)
+        sylphy_previous_start = previous_month(sylphy_report_date)
+        sylphy_previous_end = month_end(sylphy_previous_start)
+        sylphy_current_end = month_end(sylphy_report_date)
+        sylphy_daily_all = load_ice_daily(
+            leads["十五代轩逸按日"],
+            sylphy_previous_start,
+            sylphy_current_end,
+        )
 
         nev_current = {model: {dt: value for dt, value in series.items() if current_start <= dt <= report_date} for model, series in nev_daily_all.items()}
         nev_previous = {model: {dt: value for dt, value in series.items() if previous_start <= dt <= previous_end} for model, series in nev_daily_all.items()}
         ice_current = {dt: value for dt, value in ice_daily_all.items() if current_start <= dt <= report_date}
         ice_previous = {dt: value for dt, value in ice_daily_all.items() if previous_start <= dt <= previous_end}
-        sylphy_current = {dt: value for dt, value in sylphy_daily_all.items() if current_start <= dt <= report_date}
-        sylphy_previous = {dt: value for dt, value in sylphy_daily_all.items() if previous_start <= dt <= previous_end}
-        sylphy_targets = build_sylphy_target_series(report_date)
+        sylphy_current = {
+            dt: value
+            for dt, value in sylphy_daily_all.items()
+            if sylphy_current_start <= dt <= sylphy_report_date
+        }
+        sylphy_previous = {
+            dt: value
+            for dt, value in sylphy_daily_all.items()
+            if sylphy_previous_start <= dt <= sylphy_previous_end
+        }
+        sylphy_targets = build_sylphy_target_series(sylphy_report_date)
         nev_total_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
         nev_total_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
         nev_all_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_DETAIL_MODELS))
@@ -1309,6 +1328,7 @@ def build_payload(
             sylphy_targets,
             nev_current.get("新探陆", {}),
             nev_targets.get("新探陆", {}),
+            sylphy_report_date=sylphy_report_date,
         )
         arrival_brief = build_arrival_brief(report_date, arrival_maps)
         arrival_dashboard = build_arrival_dashboard(report_date, arrival_maps)
@@ -1356,7 +1376,14 @@ def build_payload(
                 "headline": "",
                 "sections": [
                     build_ice_section("ice-total", "ICE 总盘", report_date, ice_current, ice_previous, None),
-                    build_ice_section("sylphy-15", "十五代轩逸", report_date, sylphy_current, sylphy_previous, sylphy_targets),
+                    build_ice_section(
+                        "sylphy-15",
+                        "十五代轩逸",
+                        sylphy_report_date,
+                        sylphy_current,
+                        sylphy_previous,
+                        sylphy_targets,
+                    ),
                 ],
             },
             "arrival": arrival_dashboard,

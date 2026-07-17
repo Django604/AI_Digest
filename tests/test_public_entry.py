@@ -6,6 +6,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SVG_ENTRY = PROJECT_ROOT / "docs" / "index.svg"
 PAGES_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "deploy-pages.yml"
+APP_SCRIPT = PROJECT_ROOT / "docs" / "assets" / "app.js"
 
 
 class PublicEntryTests(unittest.TestCase):
@@ -41,6 +42,12 @@ class PublicEntryTests(unittest.TestCase):
         self.assertLess(build_position, purge_position)
         self.assertLess(purge_position, configure_position)
         self.assertIn("run: python scripts/purge_jsdelivr_cache.py", workflow)
+
+    def test_batch_capture_skips_sylphy_15(self) -> None:
+        source = APP_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn('section?.id === "sylphy-15"', source)
+        self.assertIn("已跳过 ICE 总盘与十五代轩逸趋势图", source)
 
 
 if __name__ == "__main__":

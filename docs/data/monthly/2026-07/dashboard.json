@@ -4,7 +4,7 @@
     "workbookName": "NEV+ICE_xsai.xlsm",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
-    "generatedAt": "2026-07-16T09:05:28",
+    "generatedAt": "2026-07-17T09:09:57",
     "workbookModifiedAt": "2026-07-16T09:05:25",
     "reportDate": "2026-07-15",
     "reportDateLabel": "2026-07-15",
@@ -1282,7 +1282,7 @@
             "auxiliary": []
           },
           "trend": {
-            "chartTitle": "7 月NEV 新增线索趋势",
+            "chartTitle": "7 月NEV 4车新增线索趋势",
             "summary": {
               "items": [
                 {

@@ -596,7 +596,7 @@ function updateCaptureTools(options = {}) {
     return;
   }
 
-  setCaptureStatus("将保存所有板块的趋势图截图，并自动跳过 4 月ICE 有效线索趋势。");
+  setCaptureStatus("将保存所有板块的趋势图截图，并自动跳过 ICE 总盘与十五代轩逸趋势图。");
 }
 
 function setCaptureStatus(message, stateName = "") {
@@ -676,7 +676,7 @@ function updateUpdateTools(options = {}) {
     return;
   }
 
-  setUpdateStatus("点击“数据更新”后，将手动补跑 7 张日报抓取、重建当前页面数据，并在成功后自动发布到 GitHub。");
+  setUpdateStatus("点击“数据更新”后，将手动补跑 6 张日报抓取、重建当前页面数据，并在成功后自动发布到 GitHub。");
 }
 
 function setUpdateStatus(message, stateName = "") {
@@ -860,7 +860,7 @@ async function handleGlobalTrendCapture() {
     }
 
     updateCaptureTools({
-      message: `截图完成，已保存 ${savedCount} 张趋势图到所选文件夹，已跳过 4 月ICE 有效线索趋势。`,
+      message: `截图完成，已保存 ${savedCount} 张趋势图到所选文件夹，已跳过 ICE 总盘与十五代轩逸趋势图。`,
       stateName: "success",
     });
   } catch (error) {
@@ -900,7 +900,11 @@ function buildTrendCaptureJobs() {
 }
 
 function shouldSkipTrendCapture(dashboard, section, chartTitle) {
-  return dashboard?.id === "ice" && (section?.id === "ice-total" || chartTitle === "4 月ICE 有效线索趋势");
+  return dashboard?.id === "ice" && (
+    section?.id === "ice-total"
+    || section?.id === "sylphy-15"
+    || chartTitle === "4 月ICE 有效线索趋势"
+  );
 }
 
 function buildTrendCaptureFileName(job, index) {

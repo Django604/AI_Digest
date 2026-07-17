@@ -16,6 +16,7 @@ from scripts.build_dashboard import (
     MONTHLY_ARCHIVE_DIR,
     NEV_CORE_MODELS,
     NEV_DETAIL_MODELS,
+    SYLPHY_FREEZE_DATE,
     OUT_JSON,
     SUMMARY_JSON,
     apply_preserved_input_modified_times,
@@ -117,6 +118,72 @@ class BuildDashboardPayloadTests(unittest.TestCase):
 
         self.assertEqual(core_model_names, ["NX8", "N7", "N6", "天籁·鸿蒙座舱"])
         self.assertEqual(detail_model_names, [*core_model_names, "新探陆"])
+
+    def test_nev_total_chart_title_identifies_four_model_scope(self) -> None:
+        section = next(
+            item for item in self.synthetic_payload["dashboards"]["nev"]["sections"]
+            if item["id"] == "nev-total"
+        )
+
+        self.assertEqual(section["trend"]["chartTitle"], "7 月NEV 4车新增线索趋势")
+
+    def test_sylphy_section_stays_frozen_after_cutoff(self) -> None:
+        report_date = date(2026, 8, 1)
+        frozen_actual = {
+            SYLPHY_FREEZE_DATE: {
+                "leads": 20,
+                "validLeads": 10,
+                "arrivals": 1,
+                "orders": 0,
+                "deals": 0,
+            },
+            report_date: {
+                "leads": 200,
+                "validLeads": 99,
+                "arrivals": 9,
+                "orders": 9,
+                "deals": 9,
+            },
+        }
+
+        def load_ice_daily_stub(sheet, _start_date, _end_date):
+            return frozen_actual if sheet.title == "十五代轩逸按日" else {}
+
+        empty_arrival_maps = {
+            "total_current": {},
+            "total_previous": {},
+            "nev_current": {},
+            "nev_previous": {},
+            "ice_current": {},
+            "ice_previous": {},
+        }
+        with (
+            patch("scripts.build_dashboard.load_nev_daily", return_value={}),
+            patch("scripts.build_dashboard.load_nev_targets", return_value={}),
+            patch("scripts.build_dashboard.load_ice_daily", side_effect=load_ice_daily_stub),
+            patch("scripts.build_dashboard.build_arrival_daily_maps", return_value=empty_arrival_maps),
+        ):
+            payload = build_payload(
+                LEADS_BOOK,
+                ARRIVAL_BOOK,
+                report_date_override=report_date,
+            )
+
+        section = next(
+            item for item in payload["dashboards"]["ice"]["sections"]
+            if item["id"] == "sylphy-15"
+        )
+        cards = {card["label"]: card for card in section["summary"]["cards"]}
+        brief_section = next(
+            item for item in payload["dashboards"]["brief"]["briefing"]["sections"]
+            if item["kind"] == "sylphy15"
+        )
+
+        self.assertEqual(cards["累计有效线索"]["displayValue"], "10")
+        self.assertEqual(cards["当日有效线索"]["displayValue"], "10")
+        self.assertEqual(cards["当日有效线索"]["note"], "2026-07-15")
+        self.assertIn("当日实绩 10", brief_section["lines"][0])
+        self.assertNotIn("99", brief_section["lines"][0])
 
     def test_new_pathfinder_section_follows_existing_nev_models(self) -> None:
         sections = self.payload["dashboards"]["nev"]["sections"]

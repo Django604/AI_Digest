@@ -979,3 +979,13 @@
 - 回滚方法：基于 `36e0d86`、`5102899` 创建反向提交，不改写远端历史；GitHub Pages 备用入口继续保留。
 - 关联提交（如有）：`36e0d86`、`5102899`
 - 备注：推荐同事使用 `https://cdn.jsdelivr.net/gh/Django604/AI_Digest@main/docs/index.svg`；不要使用同目录 `index.html` 作为 jsDelivr 入口，它会被 CDN 以纯文本返回。
+
+## 2026-07-17 09:15
+- 需求 / 目标：将 NEV 总盘趋势标题改为“7 月NEV 4车新增线索趋势”；十五代轩逸停止后续全部数据更新，并从一键截图中排除。
+- 改动内容：将 NEV 总盘标题生成规则改为 `NEV 4车新增线索`；十五代轩逸固定使用截至 `2026-07-15` 的数据和指标日期；从每日抓取任务中移除 `ice_sylphy15_daily` 及工作簿回填映射；同步将更新流程改为 6 张日报；截图任务按 `sylphy-15` section ID 排除十五代轩逸；重建当前 dashboard 与 7 月归档。
+- 涉及文件：`scripts/build_dashboard.py`、`scripts/fetch_daily_data.py`、`scripts/scheduled_update_runner.py`、`docs/assets/app.js`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-07/dashboard.json`、`tests/test_build_dashboard.py`、`tests/test_fetch_daily_data.py`、`tests/test_public_entry.py`、`tests/test_scheduled_update_runner.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts/build_dashboard.py ...`、`python -B -X utf8 -m unittest discover -s tests -v`、`python -B -X utf8 -m py_compile ...`、`node --check docs/assets/app.js`、`playwright-cli ... http://127.0.0.1:4173/`
+- 验证结果：全量测试 `96/96` 通过；当前及 7 月归档标题均为“7 月NEV 4车新增线索趋势”；冻结测试确认报表跨月推进到 `2026-08-01` 时仍只使用十五代轩逸 `2026-07-15` 数据；真实浏览器批量截图生成 `8` 张，未包含十五代轩逸，NEV 四车标题与截图文件名均正确；仅有既有 `favicon.ico 404`。
+- 回滚方法：恢复原 NEV 标题映射、十五代轩逸抓取键和回填映射，移除冻结日期与截图排除规则，并回退重建产物、测试、文档和本条记录。
+- 关联提交（如有）：待补充
+- 备注：本次未提交或推送；工作区原有的独立 Git 推送功能改动保持原样。

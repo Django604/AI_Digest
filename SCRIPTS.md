@@ -50,7 +50,7 @@
 ## scripts/fetch_daily_data.py
 
 - 路径：`./scripts/fetch_daily_data.py`
-- 作用：复用 `日报取数平台` 的登录与取数逻辑，抓取 `全国按日`、`全国按日ICE`、`十五代轩逸按日`、`NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店` 共 7 张 `N-1` 日报表，分别回填 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx` 后重建 `docs/data/dashboard.json`
+- 作用：复用 `日报取数平台` 的登录与取数逻辑，抓取 `全国按日`、`全国按日ICE`、`NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店` 共 6 张 `N-1` 日报表，分别回填 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx` 后重建 `docs/data/dashboard.json`
 - 使用方法：
   - `python scripts/fetch_daily_data.py`
   - 指定业务日期：`python scripts/fetch_daily_data.py --business-date 2026-04-20`
@@ -61,12 +61,13 @@
   - 同级目录存在 `../日报取数平台/日报线索NEV源/getdata.py` 与 `../日报取数平台/日报线索ICE源/getdata.py`
   - 运行环境可以正常打开本地 Chrome 并访问目标系统
 - 输出结果：
-  - 更新 `data/source/NEV+ICE_xsai.xlsm` 中 `全国按日NEV`、`全国按日ICE`、`十五代轩逸按日`
+  - 更新 `data/source/NEV+ICE_xsai.xlsm` 中 `全国按日NEV`、`全国按日ICE`
   - 更新 `data/source/NEV+ICE_ldai.xlsx` 中 `NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店`
   - 更新 `docs/data/dashboard.json`
   - 更新 `docs/data/dashboard.summary.json`
 - 备注：
   - 默认按当天的 `N-1` 作为业务日期，也可通过 `--business-date` 显式覆盖
+  - 十五代轩逸已于 `2026-07-15` 停更：不再抓取或回填 `十五代轩逸按日`，页面继续保留截至该日的冻结数据
   - 脚本运行成功后会自动清理 `.runtime/daily_update/` 临时目录；若带 `--keep-runtime`，会保留导出文件与日志便于排查
   - NEV 线索中的 `全国按日` 会通过 `scripts/run_leads_nev_exports.py` 内部包装器复用 `日报线索NEV源`，并在运行时显式清空 FineReport 平台默认的 `营业状态` 筛选，避免只取 `营业店`
   - NEV 来店中的 `本期/同期` 会通过 `scripts/run_arrival_nev_exports.py` 内部包装器复用 `日报来店NEV源` 的登录态与参数模板，并在后台执行 `tab/execute -> REPORT2 -> chart.data` 直接抓取自定义按日序列，不依赖前端页面点选与 SVG 解析

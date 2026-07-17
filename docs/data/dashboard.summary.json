@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-16T09:05:28",
+  "generatedAt": "2026-07-17T09:09:57",
   "reportDate": "2026-07-15",
   "reportDateLabel": "2026-07-15",
   "inputs": {
@@ -22,8 +22,8 @@
     "archiveSummaryJson": "./data/monthly/2026-07/dashboard.summary.json",
     "archiveIndexJson": "./data/monthly/index.json",
     "archiveDashboardChanged": true,
-    "archiveSummaryChanged": true,
-    "archiveIndexChanged": true
+    "archiveSummaryChanged": false,
+    "archiveIndexChanged": false
   },
   "stats": {
     "dashboardCount": 5,

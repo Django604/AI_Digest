@@ -11,6 +11,7 @@ from openpyxl import Workbook, load_workbook
 from scripts.build_dashboard import ARRIVAL_BOOK, LEADS_BOOK, safe_close_workbook
 from scripts.fetch_daily_data import (
     ARRIVAL_SHEET_MAPPINGS,
+    FETCH_TASKS,
     LEADS_SHEET_MAPPINGS,
     SHEET_MAPPINGS,
     parse_business_date,
@@ -31,6 +32,15 @@ class FetchDailyDataTests(unittest.TestCase):
 
     def test_parse_business_date_supports_compact_format(self) -> None:
         self.assertEqual(parse_business_date("20260420"), date(2026, 4, 20))
+
+    def test_daily_fetch_no_longer_exports_or_refills_sylphy_15(self) -> None:
+        ice_task = next(task for task in FETCH_TASKS if task.label == "ICE 全国按日")
+
+        self.assertEqual(ice_task.report_keys, ("ice_national_daily",))
+        self.assertNotIn(
+            "十五代轩逸按日",
+            [mapping.target_sheet for mapping in LEADS_SHEET_MAPPINGS],
+        )
 
     def test_resolve_export_path_uses_business_date_suffix(self) -> None:
         output_dir = self.temp_root / "exports"

@@ -75,10 +75,10 @@ FETCH_TASKS = (
         report_keys=("national_daily",),
     ),
     FetchTask(
-        label="ICE 全国按日 + 十五代轩逸",
+        label="ICE 全国按日",
         script_path=ICE_SCRIPT,
         output_subdir="ice",
-        report_keys=("ice_national_daily", "ice_sylphy15_daily"),
+        report_keys=("ice_national_daily",),
     ),
     FetchTask(
         label="NEV 来店本期 + 同期",
@@ -98,7 +98,6 @@ FETCH_TASKS = (
 LEADS_SHEET_MAPPINGS = (
     SheetUpdateMapping(export_names=("全国按日",), result_label="全国按日", target_sheet="全国按日NEV", workbook_kind=LEADS_WORKBOOK_KIND),
     SheetUpdateMapping(export_names=("全国按日ICE",), result_label="全国按日ICE", target_sheet="全国按日ICE", workbook_kind=LEADS_WORKBOOK_KIND),
-    SheetUpdateMapping(export_names=("十五代轩逸按日",), result_label="十五代轩逸按日", target_sheet="十五代轩逸按日", workbook_kind=LEADS_WORKBOOK_KIND),
 )
 
 ARRIVAL_SHEET_MAPPINGS = (
