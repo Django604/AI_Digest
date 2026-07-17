@@ -989,3 +989,13 @@
 - 回滚方法：恢复原 NEV 标题映射、十五代轩逸抓取键和回填映射，移除冻结日期与截图排除规则，并回退重建产物、测试、文档和本条记录。
 - 关联提交（如有）：`057013c`
 - 备注：业务改动已提交并推送到 `origin/main`；工作区原有的独立 Git 推送功能改动保持原样，未夹带进本次提交。
+
+## 2026-07-17 10:33
+- 需求 / 目标：将“新探陆”板块文案改为“2026款探陆”，并从 `NEV+ICE_xsai.xlsm` 的 `全国按日NEV` 工作表读取该车型数据。
+- 改动内容：新增统一车型常量 `2026款探陆`，同步用于车型区块、趋势标题、每日简报、实际数据和未来目标匹配；保留内部 section id `new-pathfinder`；重建 live dashboard 与 2026 年 7 月归档。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`SCRIPTS.md`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-07/dashboard.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts/build_dashboard.py ...`、`python -B -X utf8 -m unittest discover -s tests -v`、`python -B -X utf8 -m py_compile scripts/build_dashboard.py`。
+- 验证结果：全量测试 `101/101` 通过；live 与 7 月归档均显示“2026款探陆”，累计新增线索 `18`、7 月 16 日当日新增线索 `13`，7 月 10/15/16 日分别为 `2 / 3 / 13`；发布 JSON 中旧文案“新探陆”为 `0` 处；NEV 四车总盘口径保持不变。
+- 回滚方法：恢复车型显示名和源车型键为 `新探陆`，回退测试、文档、重建产物和本条日志。
+- 关联提交（如有）：`91b88bd`
+- 备注：业务改动已提交并推送到 `origin/main`；工作区原有的发布与缓存清理改动保持原样，未夹带进本次提交。
