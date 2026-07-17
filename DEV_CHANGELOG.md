@@ -1012,10 +1012,10 @@
 
 ## 2026-07-17 10:50
 - 需求 / 目标：将 jsDelivr 缓存刷新接入 AI_Digest 自动发布，并避免当前月页面继续被月度归档旧缓存卡住。
-- 改动内容：当前月首次加载与“回到当前月”统一读取 live `dashboard.json`，显式切换年月才读取 monthly 归档；发布管线在实际 `git push` 后等待 15 秒，再定点 purge 入口、前端资源、live 数据、月度索引和最新月份归档；独立 GitHub 推送在无新文件时也执行同一缓存流程；公开入口统一使用小写 `django604` 缓存键。
+- 改动内容：当前月首次加载与“回到当前月”统一读取 live `dashboard.json`，显式切换年月才读取 monthly 归档；发布管线在实际 `git push` 后等待 15 秒，再定点 purge live、summary、月度索引和最新月份归档共 5 条数据路径；独立 GitHub 推送在无新文件时也执行同一缓存流程；GitHub Actions 使用相同路径集；公开入口统一使用小写 `django604` 缓存键。
 - 涉及文件：`docs/assets/app.js`、`scripts/dashboard_publish.py`、`scripts/purge_jsdelivr_cache.py`、`scripts/scheduled_update_runner.py`、`tests/test_dashboard_publish.py`、`tests/test_purge_jsdelivr_cache.py`、`tests/test_public_entry.py`、`tests/test_scheduled_update_runner.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
 - 关键命令：Python / Node 语法检查、专项单测、全量单测、`git push origin HEAD:main`、定点 purge、`playwright-cli` 本地与 jsDelivr 公网请求链路验证。
-- 验证结果：全量测试 `101/101` 通过；定点 purge `8/8` 请求成功；本地首次加载命中 live、切换 6 月命中 monthly、返回当前月再次命中 live；小写公网入口显示业务日 `2026-07-16`、请求 `/data/dashboard.json`，控制台无错误，`390 px` 页面横向溢出为 `0`。
+- 验证结果：全量测试 `103/103` 通过；purge API 初始 8 条路径请求均成功，但实测静态资源可能从旧 branch mirror 回填，因此最终自动化收窄为 5 条数据路径；本地首次加载命中 live、切换 6 月命中 monthly、返回当前月再次命中 live；固定提交公网入口显示业务日 `2026-07-16`。
 - 回滚方法：恢复当前月优先 monthly 的请求分支，移除发布后等待 / purge 调用和定点路径参数，恢复原公开入口大小写并回退测试、文档和本条记录。
 - 关联提交（如有）：`69a93bd`、待补充
 - 备注：旧大写 `Django604` 入口在首次 purge 回源时命中旧 branch mirror，并进入约 52 分钟节流窗口；后续统一使用 `https://cdn.jsdelivr.net/gh/django604/AI_Digest@main/docs/index.svg`。

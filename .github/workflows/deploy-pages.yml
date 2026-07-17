@@ -44,7 +44,7 @@ jobs:
         run: python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json --preserve-input-modified-times
 
       - name: Purge jsDelivr cache
-        run: python scripts/purge_jsdelivr_cache.py
+        run: python scripts/purge_jsdelivr_cache.py --dashboard-only
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

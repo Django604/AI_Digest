@@ -35,9 +35,6 @@ CRITICAL_FILES = frozenset(
 MONTHLY_CRITICAL_NAMES = frozenset({"dashboard.json", "dashboard.summary.json"})
 TRANSIENT_HTTP_CODES = frozenset({408, 409, 425, 429})
 DASHBOARD_PURGE_PATHS = (
-    "docs/index.svg",
-    "docs/assets/app.js",
-    "docs/assets/styles.css",
     "docs/data/dashboard.json",
     "docs/data/dashboard.summary.json",
     "docs/data/monthly/index.json",
@@ -292,6 +289,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ref", default=DEFAULT_REF)
     parser.add_argument("--attempts", type=int, default=DEFAULT_ATTEMPTS)
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument(
+        "--dashboard-only",
+        action="store_true",
+        help="Purge live dashboard data, the monthly index, and the latest monthly archive only.",
+    )
     return parser
 
 
@@ -304,6 +306,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--timeout must be greater than 0")
     return run_purge(
         docs_dir=args.docs_dir,
+        repo_paths=build_dashboard_purge_paths(args.docs_dir) if args.dashboard_only else None,
         repository=args.repository,
         ref=args.ref,
         attempts=args.attempts,

@@ -69,6 +69,8 @@ class PurgeJsDelivrCacheTests(unittest.TestCase):
         self.assertIn("docs/data/monthly/index.json", actual)
         self.assertIn("docs/data/monthly/2026-07/dashboard.json", actual)
         self.assertIn("docs/data/monthly/2026-07/dashboard.summary.json", actual)
+        self.assertNotIn("docs/assets/app.js", actual)
+        self.assertNotIn("docs/index.svg", actual)
 
     def test_run_purge_can_target_only_selected_paths(self) -> None:
         logs: list[str] = []

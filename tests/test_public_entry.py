@@ -41,7 +41,7 @@ class PublicEntryTests(unittest.TestCase):
         configure_position = workflow.index("- name: Configure Pages")
         self.assertLess(build_position, purge_position)
         self.assertLess(purge_position, configure_position)
-        self.assertIn("run: python scripts/purge_jsdelivr_cache.py", workflow)
+        self.assertIn("run: python scripts/purge_jsdelivr_cache.py --dashboard-only", workflow)
 
     def test_batch_capture_skips_sylphy_15(self) -> None:
         source = APP_SCRIPT.read_text(encoding="utf-8")
