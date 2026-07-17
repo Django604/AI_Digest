@@ -16,6 +16,7 @@ from scripts.build_dashboard import (
     MONTHLY_ARCHIVE_DIR,
     NEV_CORE_MODELS,
     NEV_DETAIL_MODELS,
+    NEW_PATHFINDER_TARGET_OVERRIDES,
     SYLPHY_FREEZE_DATE,
     OUT_JSON,
     SUMMARY_JSON,
@@ -29,6 +30,7 @@ from scripts.build_dashboard import (
     get_day_calendar_meta,
     load_preserved_input_modified_times,
     load_arrival_daily_sheet,
+    resolve_new_pathfinder_targets,
     validate_report_date_cell,
     validate_sheet_headers,
     validate_workbook_structure,
@@ -85,6 +87,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         with (
             patch("scripts.build_dashboard.load_nev_daily", return_value=cls.synthetic_nev_daily),
             patch("scripts.build_dashboard.load_nev_targets", return_value=synthetic_targets),
+            patch("scripts.build_dashboard.NEW_PATHFINDER_TARGET_OVERRIDES", {}),
         ):
             cls.synthetic_payload = build_payload(
                 LEADS_BOOK,
@@ -99,6 +102,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         with (
             patch("scripts.build_dashboard.load_nev_daily", return_value=synthetic_without_new_pathfinder),
             patch("scripts.build_dashboard.load_nev_targets", return_value=synthetic_targets),
+            patch("scripts.build_dashboard.NEW_PATHFINDER_TARGET_OVERRIDES", {}),
         ):
             cls.synthetic_payload_without_new_pathfinder = build_payload(
                 LEADS_BOOK,
@@ -246,6 +250,25 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertEqual(cards["累计达成率"]["displayValue"], "66.7%")
         self.assertEqual(cards["当日目标"]["displayValue"], "10")
         self.assertEqual(cards["当日达成率"]["displayValue"], "60.0%")
+
+    def test_new_pathfinder_july_target_override_is_complete(self) -> None:
+        report_date = date(2026, 7, 16)
+        targets = resolve_new_pathfinder_targets(report_date, {})
+
+        self.assertEqual(len(NEW_PATHFINDER_TARGET_OVERRIDES[(2026, 7)]), 31)
+        self.assertEqual(sum(targets.values()), 7759)
+        self.assertEqual(sum(value for day, value in targets.items() if day <= report_date), 3967)
+        self.assertEqual(targets[report_date], 241)
+        self.assertEqual(targets[date(2026, 7, 31)], 245)
+
+    def test_new_pathfinder_workbook_targets_take_precedence_over_override(self) -> None:
+        report_date = date(2026, 7, 16)
+        workbook_targets = {report_date: 999}
+
+        self.assertIs(
+            resolve_new_pathfinder_targets(report_date, workbook_targets),
+            workbook_targets,
+        )
 
     def test_nev_total_excludes_new_pathfinder_actuals(self) -> None:
         sections = {

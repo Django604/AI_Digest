@@ -37,6 +37,13 @@ NEV_DETAIL_MODELS = [
 NEV_BRIEF_ORDER = [model_name for _, _, model_name in NEV_CORE_MODELS]
 BRIEF_MARKERS = ["①", "②", "③", "④", "⑤", "⑥"]
 SYLPHY_FREEZE_DATE = date(2026, 7, 15)
+NEW_PATHFINDER_TARGET_OVERRIDES = {
+    (2026, 7): [
+        235, 235, 235, 273, 273, 238, 238, 240, 240, 240,
+        278, 278, 241, 241, 241, 241, 241, 278, 279, 242,
+        242, 242, 242, 242, 279, 281, 244, 245, 245, 245, 245,
+    ],
+}
 SYLPHY_TARGET_OVERRIDES = {
     (2026, 4): [
         1827, 1828, 1828, 1772, 1772, 1772, 1828, 1828, 1828, 1828,
@@ -927,6 +934,24 @@ def build_sylphy_target_series(report_date: date) -> dict[date, int]:
     return {current_date: values[index] for index, current_date in enumerate(month_dates(report_date)) if index < len(values)}
 
 
+def resolve_new_pathfinder_targets(
+    report_date: date,
+    workbook_targets: dict[date, int | float],
+) -> dict[date, int | float]:
+    if workbook_targets:
+        return workbook_targets
+    values = NEW_PATHFINDER_TARGET_OVERRIDES.get((report_date.year, report_date.month), [])
+    if not values:
+        return {}
+    dates = month_dates(report_date)
+    if len(values) != len(dates):
+        raise ValueError(
+            f"{NEW_PATHFINDER_MODEL} {report_date.year}-{report_date.month:02d} target count "
+            f"must be {len(dates)}, got {len(values)}"
+        )
+    return {current_date: values[index] for index, current_date in enumerate(dates)}
+
+
 def build_single_model_brief_line(
     model_name: str,
     report_date: date,
@@ -1287,6 +1312,10 @@ def build_payload(
         current_end = month_end(report_date)
 
         nev_targets = load_nev_targets(leads["目标竖版"], current_start, current_end)
+        nev_targets[NEW_PATHFINDER_MODEL] = resolve_new_pathfinder_targets(
+            report_date,
+            nev_targets.get(NEW_PATHFINDER_MODEL, {}),
+        )
         nev_daily_all = load_nev_daily(leads["全国按日NEV"], previous_start, current_end)
         ice_daily_all = load_ice_daily(leads["全国按日ICE"], previous_start, current_end)
         sylphy_report_date = min(report_date, SYLPHY_FREEZE_DATE)
