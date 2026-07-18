@@ -195,16 +195,15 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertEqual([section["title"] for section in sections][-2:], ["天籁·鸿蒙座舱", "2026款探陆"])
         self.assertEqual(sections[-1]["id"], "new-pathfinder")
 
-    def test_new_pathfinder_section_includes_all_synthetic_current_month_data(self) -> None:
+    def test_new_pathfinder_section_removes_dates_before_july_16(self) -> None:
         section = next(
             item for item in self.synthetic_payload["dashboards"]["nev"]["sections"]
             if item["id"] == "new-pathfinder"
         )
         matrix = section["trend"]["matrix"]
-        rows = {row["key"]: row["displayValues"] for row in matrix["rows"]}
-        values_by_date = dict(zip(matrix["labels"], rows["actual"]))
-
-        self.assertEqual(values_by_date["7/10"], "2")
+        self.assertEqual(matrix["labels"], [f"7/{day}" for day in range(16, 32)])
+        self.assertNotIn("7/10", matrix["labels"])
+        self.assertEqual(section["trend"]["chart"]["labels"], matrix["labels"])
 
     def test_new_pathfinder_without_targets_displays_placeholders(self) -> None:
         section = build_nev_section(
@@ -256,11 +255,23 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         targets = resolve_new_pathfinder_targets(report_date, {})
 
         self.assertEqual(len(NEW_PATHFINDER_TARGET_OVERRIDES[(2026, 7)]), 31)
-        self.assertEqual(sum(targets.values()), 7759)
-        self.assertTrue(all(targets[date(2026, 7, day)] == 0 for day in range(1, 16)))
-        self.assertEqual(sum(value for day, value in targets.items() if day <= report_date), 464)
+        self.assertEqual(sum(value or 0 for value in targets.values()), 7759)
+        self.assertTrue(all(targets[date(2026, 7, day)] is None for day in range(1, 16)))
+        self.assertEqual(sum((value or 0) for day, value in targets.items() if day <= report_date), 464)
         self.assertEqual(targets[report_date], 464)
         self.assertEqual(targets[date(2026, 7, 31)], 473)
+
+        section = build_nev_section("new-pathfinder", "2026款探陆", report_date, {}, {}, targets)
+        rows = {row["key"]: row for row in section["trend"]["matrix"]["rows"]}
+        chart = section["trend"]["chart"]
+        self.assertEqual(section["trend"]["matrix"]["labels"], [f"7/{day}" for day in range(16, 32)])
+        self.assertTrue(all(len(row["displayValues"]) == 16 for row in rows.values()))
+        self.assertEqual(rows["target"]["displayValues"][0], "464")
+        self.assertEqual(rows["cumulativeTarget"]["displayValues"][0], "464")
+        self.assertEqual(chart["labels"], [f"7/{day}" for day in range(16, 32)])
+        self.assertEqual(chart["reportDayIndex"], 0)
+        self.assertEqual(chart["series"]["target"][0], 464)
+        self.assertEqual(chart["series"]["cumulativeTarget"][0], 464)
 
     def test_new_pathfinder_workbook_targets_take_precedence_over_override(self) -> None:
         report_date = date(2026, 7, 16)

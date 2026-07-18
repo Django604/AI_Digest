@@ -39,10 +39,13 @@ BRIEF_MARKERS = ["①", "②", "③", "④", "⑤", "⑥"]
 SYLPHY_FREEZE_DATE = date(2026, 7, 15)
 NEW_PATHFINDER_TARGET_OVERRIDES = {
     (2026, 7): [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 464, 465, 536, 537, 466,
+        None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, 464, 465, 536, 537, 466,
         467, 467, 467, 467, 538, 538, 467, 468, 468, 471, 473,
     ],
+}
+NEW_PATHFINDER_TREND_START_DATES = {
+    (2026, 7): date(2026, 7, 16),
 }
 SYLPHY_TARGET_OVERRIDES = {
     (2026, 4): [
@@ -590,7 +593,7 @@ def build_monthly_series_context(
     current_actuals: dict[date, dict[str, int | float | None]],
     previous_actuals: dict[date, dict[str, int | float | None]],
     actual_key: str,
-    current_targets: dict[date, int | float] | None = None,
+    current_targets: dict[date, int | float | None] | None = None,
 ) -> dict[str, Any]:
     dates = month_dates(report_date)
     report_index = report_date.day - 1
@@ -604,6 +607,7 @@ def build_monthly_series_context(
     column_meta: list[dict[str, Any]] = []
     prev_run = 0
     target_run = 0
+    target_started = False
     curr_run = 0
     has_target = bool(current_targets) and any(value is not None for value in current_targets.values())
     prev_cum: list[int | float | None] = []
@@ -635,7 +639,8 @@ def build_monthly_series_context(
         if has_target:
             if isinstance(target_value, (int, float)):
                 target_run += target_value
-            target_cum.append(target_run)
+                target_started = True
+            target_cum.append(target_run if target_started else None)
         else:
             target_cum.append(None)
 
@@ -779,7 +784,7 @@ def build_monthly_trend(
     current_actuals: dict[date, dict[str, int | float | None]],
     previous_actuals: dict[date, dict[str, int | float | None]],
     actual_key: str,
-    current_targets: dict[date, int | float] | None,
+    current_targets: dict[date, int | float | None] | None,
 ) -> dict[str, Any]:
     context = build_monthly_series_context(report_date, current_actuals, previous_actuals, actual_key, current_targets)
     chart_title = build_monthly_chart_title(title, metric_label)
@@ -864,6 +869,36 @@ def build_monthly_chart_title(title: str, metric_label: str) -> str:
     return special_titles.get((title, metric_label), f"{title}{metric_label}")
 
 
+def trim_monthly_trend_before(trend: dict[str, Any], display_start_date: date) -> dict[str, Any]:
+    offset = max(display_start_date.day - 1, 0)
+    if offset == 0:
+        return trend
+
+    matrix = trend.get("matrix", {})
+    matrix["labels"] = matrix.get("labels", [])[offset:]
+    matrix["columnMeta"] = matrix.get("columnMeta", [])[offset:]
+    for row in matrix.get("rows", []):
+        row["displayValues"] = row.get("displayValues", [])[offset:]
+
+    chart = trend.get("chart", {})
+    chart["labels"] = chart.get("labels", [])[offset:]
+    chart["reportDayIndex"] = max(int(chart.get("reportDayIndex", -1)) - offset, -1)
+    series = chart.get("series", {})
+    for key, values in list(series.items()):
+        series[key] = values[offset:]
+    chart["dailyAxisMax"] = nice_axis_max(
+        [*series.get("previousActual", []), *series.get("target", []), *series.get("actual", [])]
+    )
+    chart["cumulativeAxisMax"] = nice_axis_max(
+        [
+            *series.get("previousCumulative", []),
+            *series.get("cumulativeTarget", []),
+            *series.get("cumulativeActual", []),
+        ]
+    )
+    return trend
+
+
 def build_nev_section(section_id: str, title: str, report_date: date, current_actuals, previous_actuals, current_targets) -> dict[str, Any]:
     latest = current_actuals.get(report_date, {})
     total_new = sum((item.get("newLeads") or 0) for item in current_actuals.values())
@@ -876,6 +911,11 @@ def build_nev_section(section_id: str, title: str, report_date: date, current_ac
     total_arrivals = sum((item.get("arrivals") or 0) for item in current_actuals.values())
     latest_new = latest.get("newLeads")
     latest_target = current_targets.get(report_date) if has_target else None
+    trend = build_monthly_trend(title, "新增线索", report_date, current_actuals, previous_actuals, "newLeads", current_targets)
+    if section_id == "new-pathfinder":
+        display_start_date = NEW_PATHFINDER_TREND_START_DATES.get((report_date.year, report_date.month))
+        if display_start_date is not None:
+            trend = trim_monthly_trend_before(trend, display_start_date)
     return {
         "id": section_id,
         "title": title,
@@ -893,7 +933,7 @@ def build_nev_section(section_id: str, title: str, report_date: date, current_ac
             ],
             "auxiliary": [],
         },
-        "trend": build_monthly_trend(title, "新增线索", report_date, current_actuals, previous_actuals, "newLeads", current_targets),
+        "trend": trend,
         "note": "",
         "noteHasError": False,
     }
@@ -937,7 +977,7 @@ def build_sylphy_target_series(report_date: date) -> dict[date, int]:
 def resolve_new_pathfinder_targets(
     report_date: date,
     workbook_targets: dict[date, int | float],
-) -> dict[date, int | float]:
+) -> dict[date, int | float | None]:
     if workbook_targets:
         return workbook_targets
     values = NEW_PATHFINDER_TARGET_OVERRIDES.get((report_date.year, report_date.month), [])
@@ -956,7 +996,7 @@ def build_single_model_brief_line(
     model_name: str,
     report_date: date,
     actuals: dict[date, dict[str, int | float | None]],
-    targets: dict[date, int | float],
+    targets: dict[date, int | float | None],
     *,
     actual_key: str,
 ) -> str:

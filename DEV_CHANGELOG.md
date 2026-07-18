@@ -1049,3 +1049,13 @@
 - 回滚方法：恢复上一版 7 月目标序列，回退测试、文档、重建产物与本条日志。
 - 关联提交（如有）：待补充
 - 备注：月目标总额仍为 `7,759`；未来 `目标竖版` 出现同名车型目标后仍优先读取工作簿数据。
+
+## 2026-07-18 2026款探陆趋势起始日期调整
+- 需求 / 目标：2026 款探陆趋势中直接删除 7 月 1—15 日，不保留空白列，从 7 月 16 日开始展示。
+- 改动内容：将探陆 7 月 1—15 日目标建模为空值，并对该车型的趋势矩阵、图表标签、全部序列和日期元数据统一裁剪前 15 列；同步平移 `reportDayIndex` 并重算图表坐标轴；更新测试、脚本文档、live dashboard 与 7 月归档。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`SCRIPTS.md`、`docs/data/dashboard.json`、`docs/data/monthly/2026-07/dashboard.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts/build_dashboard.py ...`、`python -B -X utf8 -m unittest discover -s tests -v`、`python -B -X utf8 -m py_compile scripts/build_dashboard.py scripts/dashboard_publish.py`、`node --check docs/assets/app.js`。
+- 验证结果：探陆趋势矩阵和图表均为 `16` 列，日期严格为 `7/16—7/31`，全部矩阵行长度一致；业务日 `7/17` 的图表索引为裁剪后的 `1`；live 与 7 月归档哈希一致；全量测试 `101/101` 通过。
+- 回滚方法：移除探陆趋势起始日期和裁剪逻辑，恢复 31 列矩阵、图表与上一版测试、文档、数据产物。
+- 关联提交（如有）：待补充
+- 备注：汇总卡片及月目标总额 `7,759` 不变，仅删除探陆趋势明细的 7 月 1—15 日列。
