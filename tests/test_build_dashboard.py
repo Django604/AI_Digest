@@ -257,9 +257,10 @@ class BuildDashboardPayloadTests(unittest.TestCase):
 
         self.assertEqual(len(NEW_PATHFINDER_TARGET_OVERRIDES[(2026, 7)]), 31)
         self.assertEqual(sum(targets.values()), 7759)
-        self.assertEqual(sum(value for day, value in targets.items() if day <= report_date), 3967)
-        self.assertEqual(targets[report_date], 241)
-        self.assertEqual(targets[date(2026, 7, 31)], 245)
+        self.assertTrue(all(targets[date(2026, 7, day)] == 0 for day in range(1, 16)))
+        self.assertEqual(sum(value for day, value in targets.items() if day <= report_date), 464)
+        self.assertEqual(targets[report_date], 464)
+        self.assertEqual(targets[date(2026, 7, 31)], 473)
 
     def test_new_pathfinder_workbook_targets_take_precedence_over_override(self) -> None:
         report_date = date(2026, 7, 16)

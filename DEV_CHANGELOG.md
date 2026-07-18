@@ -1039,3 +1039,13 @@
 - 回滚方法：恢复 workflow 与发布脚本中的 jsDelivr purge 调用，并回退测试、文档和本条日志。
 - 关联提交（如有）：待补充
 - 备注：`scripts/purge_jsdelivr_cache.py` 仅作为遗留诊断工具保留，不再参与正式发布成败判断。
+
+## 2026-07-18 2026款探陆 7 月日目标更新
+- 需求 / 目标：按最新序列更新 `2026款探陆` 2026 年 7 月 1 日至 31 日逐日线索目标并推送网页。
+- 改动内容：将 7 月兜底目标改为 1—15 日均为 `0`，16—31 日依次为 `464,465,536,537,466,467,467,467,467,538,538,467,468,468,471,473`；同步测试、脚本文档、live dashboard 与 7 月归档。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`SCRIPTS.md`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-07/dashboard.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts/build_dashboard.py ...`、`python -B -X utf8 -m unittest discover -s tests -v`、`python -B -X utf8 -m py_compile scripts/build_dashboard.py scripts/dashboard_publish.py`、`node --check docs/assets/app.js`。
+- 验证结果：目标序列共 `31` 天、合计 `7,759`；业务日 `2026-07-17` 页面累计目标 `929`、当日目标 `465`，累计实绩 `194`、累计达成率 `20.9%`，当日实绩 `174`、当日达成率 `37.4%`；live 与 7 月归档哈希一致；全量测试 `101/101` 通过。
+- 回滚方法：恢复上一版 7 月目标序列，回退测试、文档、重建产物与本条日志。
+- 关联提交（如有）：待补充
+- 备注：月目标总额仍为 `7,759`；未来 `目标竖版` 出现同名车型目标后仍优先读取工作簿数据。
