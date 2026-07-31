@@ -60,6 +60,7 @@ class SheetUpdateMapping:
     result_label: str
     target_sheet: str
     workbook_kind: str
+    allow_period_suffix: bool = False
 
 
 LEADS_WORKBOOK_KIND = "leads"
@@ -117,6 +118,7 @@ ARRIVAL_SHEET_MAPPINGS = (
         result_label="NEV上期来店",
         target_sheet="NEV上期来店",
         workbook_kind=ARRIVAL_WORKBOOK_KIND,
+        allow_period_suffix=True,
     ),
     SheetUpdateMapping(
         export_names=("NEV同期", "专营店同期"),
@@ -135,6 +137,7 @@ ARRIVAL_SHEET_MAPPINGS = (
         result_label="ICE上期来店",
         target_sheet="ICE上期来店",
         workbook_kind=ARRIVAL_WORKBOOK_KIND,
+        allow_period_suffix=True,
     ),
     SheetUpdateMapping(
         export_names=("来店同期",),
@@ -172,13 +175,36 @@ def build_task_output_dir(task: FetchTask, run_root: Path) -> Path:
     return run_root / task.output_subdir / "exports"
 
 
-def resolve_export_path(output_dir: Path, report_name: str | tuple[str, ...], business_date: date) -> Path:
+def resolve_export_path(
+    output_dir: Path,
+    report_name: str | tuple[str, ...],
+    business_date: date,
+    *,
+    allow_period_suffix: bool = False,
+) -> Path:
     suffix = build_business_suffix(business_date)
     report_names = (report_name,) if isinstance(report_name, str) else report_name
     for candidate_name in report_names:
         candidates = sorted(output_dir.glob(f"{candidate_name}-{suffix}.*"))
         if candidates:
             return candidates[0]
+
+    if allow_period_suffix:
+        period_candidates: set[Path] = set()
+        for candidate_name in report_names:
+            name_prefix = f"{candidate_name}-"
+            for candidate in output_dir.glob(f"{candidate_name}-*.*"):
+                candidate_suffix = candidate.stem.removeprefix(name_prefix)
+                if len(candidate_suffix) == 4 and candidate_suffix.isdigit():
+                    period_candidates.add(candidate)
+        sorted_candidates = sorted(period_candidates)
+        if len(sorted_candidates) == 1:
+            return sorted_candidates[0]
+        if len(sorted_candidates) > 1:
+            candidate_text = ", ".join(path.name for path in sorted_candidates)
+            joined = " / ".join(report_names)
+            raise RuntimeError(f"导出文件匹配不唯一：{joined}（候选：{candidate_text}）")
+
     joined = " / ".join(report_names)
     raise FileNotFoundError(f"未找到导出文件：{joined}-{suffix}.*（目录：{output_dir}）")
 
@@ -428,7 +454,12 @@ def run_update(
                 if mapping.target_sheet in export_paths:
                     continue
                 try:
-                    export_paths[mapping.target_sheet] = resolve_export_path(output_dir, mapping.export_names, resolved_business_date)
+                    export_paths[mapping.target_sheet] = resolve_export_path(
+                        output_dir,
+                        mapping.export_names,
+                        resolved_business_date,
+                        allow_period_suffix=mapping.allow_period_suffix,
+                    )
                 except FileNotFoundError:
                     continue
 

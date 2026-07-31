@@ -48,6 +48,10 @@ class FetchDailyDataTests(unittest.TestCase):
             "十五代轩逸按日",
             [mapping.target_sheet for mapping in LEADS_SHEET_MAPPINGS],
         )
+        period_suffix_sheets = [
+            mapping.target_sheet for mapping in ARRIVAL_SHEET_MAPPINGS if mapping.allow_period_suffix
+        ]
+        self.assertEqual(period_suffix_sheets, ["NEV上期来店", "ICE上期来店"])
 
     def test_resolve_export_path_uses_business_date_suffix(self) -> None:
         output_dir = self.temp_root / "exports"
@@ -69,6 +73,43 @@ class FetchDailyDataTests(unittest.TestCase):
         resolved = resolve_export_path(output_dir, ("NEV本期", "专营店本期"), date(2026, 4, 20))
 
         self.assertEqual(resolved, expected)
+
+    def test_resolve_export_path_supports_nev_and_ice_previous_period_suffixes(self) -> None:
+        cases = (
+            (("NEV上期", "专营店上期"), "NEV上期-0630.xlsx"),
+            (("来店上期",), "来店上期-0630.xlsx"),
+        )
+        for index, (report_names, filename) in enumerate(cases, start=1):
+            with self.subTest(filename=filename):
+                output_dir = self.temp_root / f"previous-period-{index}"
+                output_dir.mkdir(parents=True, exist_ok=True)
+                expected = output_dir / filename
+                expected.write_text("previous", encoding="utf-8")
+
+                with self.assertRaises(FileNotFoundError):
+                    resolve_export_path(output_dir, report_names, date(2026, 7, 30))
+
+                resolved = resolve_export_path(
+                    output_dir,
+                    report_names,
+                    date(2026, 7, 30),
+                    allow_period_suffix=True,
+                )
+                self.assertEqual(resolved, expected)
+
+    def test_resolve_export_path_rejects_ambiguous_previous_period_files(self) -> None:
+        output_dir = self.temp_root / "ambiguous-previous-period"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "来店上期-0629.xlsx").write_text("older", encoding="utf-8")
+        (output_dir / "来店上期-0630.xlsx").write_text("newer", encoding="utf-8")
+
+        with self.assertRaisesRegex(RuntimeError, "导出文件匹配不唯一"):
+            resolve_export_path(
+                output_dir,
+                "来店上期",
+                date(2026, 7, 30),
+                allow_period_suffix=True,
+            )
 
     def test_replace_workbook_sheets_overwrites_target_sheets(self) -> None:
         leads_path = self.temp_root / "NEV+ICE_xsai.xlsx"
