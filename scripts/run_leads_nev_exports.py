@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import importlib.util
 import sys
+from calendar import monthrange
+from datetime import date
 from pathlib import Path
 
 
@@ -19,6 +21,9 @@ BUSINESS_STATUS_PARAMETER_NAME = "营业状态"
 BUSINESS_STATUS_LABEL_PARAMETER_NAME = "营业状态-名称"
 BUSINESS_STATUS_LABEL_TEXT = "营业状态："
 EMPTY_BUSINESS_STATUS: list[str] = []
+SAME_PERIOD_FIRST_DAY_RULE = "same_month_last_year_first_day"
+SAME_PERIOD_DAY_RULE = "same_day_last_year"
+DATE_RESOLVER_PATCH_MARKER = "_ai_digest_same_period_date_rules"
 
 
 def load_leads_nev_module():
@@ -36,6 +41,35 @@ def load_leads_nev_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def patch_date_resolver() -> None:
+    models_module = sys.modules.get("report_fetcher.models")
+    if models_module is None:
+        raise RuntimeError("未加载 report_fetcher.models，无法扩展 NEV 线索同期日期规则。")
+
+    original_resolver = getattr(models_module, "_resolve_date_value", None)
+    parse_business_date = getattr(models_module, "parse_business_date", None)
+    if not callable(original_resolver) or not callable(parse_business_date):
+        raise RuntimeError("report_fetcher.models 日期解析器不可用，无法扩展 NEV 线索同期日期规则。")
+    if getattr(original_resolver, DATE_RESOLVER_PATCH_MARKER, False):
+        return
+
+    def resolve_date_value(config_value, fallback: str, business_date: str | date | None = None) -> str:
+        rule = str(config_value.get("rule", "")).strip() if isinstance(config_value, dict) else ""
+        if rule in (SAME_PERIOD_FIRST_DAY_RULE, SAME_PERIOD_DAY_RULE):
+            current_date = parse_business_date(business_date)
+            target_year = current_date.year - 1
+            target_day = (
+                1
+                if rule == SAME_PERIOD_FIRST_DAY_RULE
+                else min(current_date.day, monthrange(target_year, current_date.month)[1])
+            )
+            return date(target_year, current_date.month, target_day).strftime("%Y-%m-%d")
+        return original_resolver(config_value, fallback, business_date)
+
+    setattr(resolve_date_value, DATE_RESOLVER_PATCH_MARKER, True)
+    setattr(models_module, "_resolve_date_value", resolve_date_value)
 
 
 def patch_report_configs() -> None:
@@ -56,8 +90,8 @@ def patch_report_configs() -> None:
         {
             "enabled": False,
             "report_name": SAME_PERIOD_REPORT_NAME,
-            "start_date": {"rule": "same_month_last_year_first_day"},
-            "end_date": {"rule": "same_day_last_year"},
+            "start_date": {"rule": SAME_PERIOD_FIRST_DAY_RULE},
+            "end_date": {"rule": SAME_PERIOD_DAY_RULE},
         }
     )
     report_configs[SAME_PERIOD_REPORT_KEY] = same_period_config
@@ -81,6 +115,7 @@ def patch_report_configs() -> None:
 
 def main() -> int:
     module = load_leads_nev_module()
+    patch_date_resolver()
     patch_report_configs()
     return int(module.main())
 

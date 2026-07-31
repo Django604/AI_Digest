@@ -28,8 +28,8 @@
 - `scripts/build_dashboard.py`：从 Excel 抽取页面数据
 - `scripts/purge_jsdelivr_cache.py`：遗留 CDN 诊断工具，不接入正式发布流程
 - `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，抓取线索 + 来店共 10 张日报表并回填两本工作簿；十五代轩逸历史数据保留但不再更新或展示
-- `scripts/run_leads_nev_exports.py`：NEV 线索全国按日导出包装器，运行时清空 FineReport 默认 `营业状态` 筛选并生成同期报表
-- `scripts/run_leads_ice_exports.py`：ICE 线索全国按日导出包装器，运行时生成同期报表
+- `scripts/run_leads_nev_exports.py`：NEV 线索全国按日导出包装器，运行时清空 FineReport 默认 `营业状态` 筛选，并扩展去年同期日期规则生成同期报表
+- `scripts/run_leads_ice_exports.py`：ICE 线索全国按日导出包装器，运行时扩展去年同期日期规则并生成同期报表
 - `scripts/run_arrival_nev_exports.py`：NEV 来店导出包装器，运行时切到 FineReport `自定义` tab 并通过后台 `chart.data` 直接抓取按日序列
 - `scripts/run_arrival_ice_exports.py`：ICE 来店导出包装器，运行时把 Tableau 导出入口锁定到 `来店批次分车系汇总表_按天T`
 - `scripts/scheduled_update_runner.py`：定时自动更新执行入口，支持登录态弹窗执行与未登录静默执行

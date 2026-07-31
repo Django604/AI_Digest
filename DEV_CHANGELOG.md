@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-07-31 14:22
+- 需求 / 目标：修复附魔工作台手动兜底更新抓取线索同期表时不识别去年同期日期规则的问题，并让用户自行重新点击验证。
+- 改动内容：在 NEV / ICE 线索导出包装器内扩展 `same_month_last_year_first_day` 与 `same_day_last_year`，保留底层既有日期规则的原解析逻辑，并兼容闰日向去年 `2 月 28 日` 对齐；补充专项测试与脚本文档。
+- 涉及文件：`scripts/run_leads_nev_exports.py`、`scripts/run_leads_ice_exports.py`、`tests/test_run_leads_nev_exports.py`、`tests/test_run_leads_ice_exports.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 -m unittest discover -s tests -v`、分别加载本机 NEV / ICE 真实 `report_fetcher.models` 并调用 `build_report_config()` 校验同期日期。
+- 验证结果：全量单测 `110/110` 通过；NEV / ICE 均将 `2026-07-30` 解析为 `2025-07-01 ~ 2025-07-30`，将 `2024-02-29` 解析为 `2023-02-01 ~ 2023-02-28`；附魔工作台在线且无运行中任务。
+- 回滚方法：移除两个包装器的日期 resolver 补丁及对应测试、文档和本条日志。
+- 关联提交（如有）：待补充
+- 备注：本次未代替用户触发真实手动兜底更新，页面保留的错误信息来自修复前的失败记录。
+
 ## 2026-07-15 00:00
 - 需求 / 目标：支持附魔工作台在不刷新数据的情况下单独执行 GitHub 推送，并可补推已提交但尚未上传的本地提交。
 - 改动内容：为 `publish_dashboard()` 与 `run_publish_step()` 增加默认关闭的 `push_if_no_changes` 参数；抽取统一 push / 中断重试逻辑；独立推送启用该参数后，无发布文件变更时仍执行 `git push`，原更新后自动发布行为保持不变；补充单测和脚本文档。

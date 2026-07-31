@@ -86,7 +86,8 @@
   - 一般不单独调用，由 `python scripts/fetch_daily_data.py ...` 自动串联
   - 需要单独验证时可执行：`python scripts/run_leads_nev_exports.py --business-date 2026-06-09 --report-keys national_daily,national_daily_same_period`
 - 备注：
-  - 该包装器不会改动兄弟项目源码，只在运行时 monkey-patch `report_fetcher.report_configs.REPORT_CONFIGS`
+  - 该包装器不会改动兄弟项目源码，只在运行时 monkey-patch `report_fetcher.report_configs.REPORT_CONFIGS` 与日期 resolver
+  - 同期周期固定为去年同月首日至去年同日；遇到闰年 `2 月 29 日` 时，去年同期结束日自动压到合法的 `2 月 28 日`
   - 空列表 `[]` 表示该筛选条件不选任何营业状态，用来覆盖平台新增的默认 `营业店`
 
 ## scripts/run_leads_ice_exports.py
@@ -97,8 +98,8 @@
   - 一般不单独调用，由 `python scripts/fetch_daily_data.py ...` 自动串联
   - 需要单独验证时可执行：`python scripts/run_leads_ice_exports.py --business-date 2026-06-09 --report-keys ice_national_daily,ice_national_daily_same_period`
 - 备注：
-  - 该包装器不会改动兄弟项目源码，只在运行时深拷贝并扩展 `report_fetcher.report_configs.REPORT_CONFIGS`
-  - 同期周期固定为去年同月首日至去年同日，与本期业务日对齐
+  - 该包装器不会改动兄弟项目源码，只在运行时深拷贝并扩展 `report_fetcher.report_configs.REPORT_CONFIGS` 与日期 resolver
+  - 同期周期固定为去年同月首日至去年同日，与本期业务日对齐；遇到闰年 `2 月 29 日` 时，去年同期结束日自动压到合法的 `2 月 28 日`
 
 ## scripts/run_arrival_nev_exports.py
 
