@@ -612,6 +612,12 @@ button,
   line-height: 1.52;
 }
 
+.brief-page-secondary-line {
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
 .brief-page-card.arrival-brief .brief-page-line {
   color: var(--ink);
 }

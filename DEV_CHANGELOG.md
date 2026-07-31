@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-07-31 16:50
+- 需求 / 目标：调整每日简报指标排版，使“全车系有效线索”的同比与环比、“2026 款探陆线索”的当日实绩与当日达成率分别从第二行完整显示，并发布到 GitHub。
+- 改动内容：按简报板块类型配置换行标记，仅在 `valid-leads` 的“；同比”和 `new-pathfinder` 的“；当日”处分行；为第二行增加不拆分样式，其他板块与原始数据保持不变。
+- 涉及文件：`docs/assets/app.js`、`docs/assets/styles.css`、`tests/test_public_entry.py`、`DEV_CHANGELOG.md`
+- 关键命令：`node --check docs\assets\app.js`、`python -B -X utf8 -m unittest discover -s tests -v`、Playwright 多视口页面验证、`git diff --check`
+- 验证结果：全量单测 `113/113` 通过；在 `375px`、`768px`、`1024px`、`1440px` 视口下，两个指定指标组均完整显示在第二行、位于卡片内部且页面无横向滚动。
+- 回滚方法：移除简报板块换行标记映射、第二行包裹与对应 CSS / 测试，并删除本条日志。
+- 关联提交（如有）：待补充
+- 备注：正式页面地址为 `https://django604.github.io/AI_Digest/`。
+
 ## 2026-07-31 15:41
 - 需求 / 目标：修复慢网络下 NEV 全国按日页面尚未完成 FineReport 参数初始化就超时，导致手动兜底与每日任务连续失败的问题。
 - 改动内容：将 NEV 全国按日任务的参数上下文等待上限从默认 `10000ms` 提高到 `30000ms`；继续使用 fast bootstrap，检测到稳定的 `sessionid + load/content` 后提前继续；补充任务参数测试与说明。

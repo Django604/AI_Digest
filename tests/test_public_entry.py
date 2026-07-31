@@ -7,6 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SVG_ENTRY = PROJECT_ROOT / "docs" / "index.svg"
 PAGES_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "deploy-pages.yml"
 APP_SCRIPT = PROJECT_ROOT / "docs" / "assets" / "app.js"
+STYLESHEET = PROJECT_ROOT / "docs" / "assets" / "styles.css"
 FAVICON = PROJECT_ROOT / "docs" / "favicon.ico"
 
 
@@ -61,6 +62,16 @@ class PublicEntryTests(unittest.TestCase):
 
         self.assertIn('title: "全车系有效线索"', source)
         self.assertNotIn('title: "全车系线索"', source)
+
+    def test_brief_cards_use_controlled_metric_line_breaks(self) -> None:
+        source = APP_SCRIPT.read_text(encoding="utf-8")
+        styles = STYLESHEET.read_text(encoding="utf-8")
+
+        self.assertIn('["valid-leads", "；同比"]', source)
+        self.assertIn('["new-pathfinder", "；当日"]', source)
+        self.assertIn('class="brief-page-secondary-line"', source)
+        self.assertIn(".brief-page-secondary-line", styles)
+        self.assertIn("white-space: nowrap;", styles)
 
     def test_current_month_uses_live_dashboard_and_explicit_month_uses_archive(self) -> None:
         source = APP_SCRIPT.read_text(encoding="utf-8")

@@ -1291,7 +1291,7 @@ function renderBriefPage(dashboard) {
     title.textContent = section.title ?? "";
     card.appendChild(title);
 
-    const bodyHtml = buildBriefBodyHtml(section.lines ?? []);
+    const bodyHtml = buildBriefBodyHtml(section.lines ?? [], section.kind);
     if (bodyHtml) {
       const paragraph = document.createElement("p");
       paragraph.className = "brief-page-line";
@@ -1314,13 +1314,30 @@ function renderBriefPage(dashboard) {
   return article;
 }
 
-function buildBriefBodyHtml(lines) {
+const BRIEF_SECONDARY_LINE_MARKERS = new Map([
+  ["valid-leads", "；同比"],
+  ["new-pathfinder", "；当日"],
+]);
+
+function formatBriefSectionLine(line, sectionKind) {
+  const marker = BRIEF_SECONDARY_LINE_MARKERS.get(String(sectionKind ?? ""));
+  const splitIndex = marker ? line.indexOf(marker) : -1;
+  if (splitIndex < 0) {
+    return formatBriefLine(line);
+  }
+
+  const primaryLine = line.slice(0, splitIndex + 1);
+  const secondaryLine = line.slice(splitIndex + 1);
+  return `${formatBriefLine(primaryLine)}<br><span class="brief-page-secondary-line">${formatBriefLine(secondaryLine)}</span>`;
+}
+
+function buildBriefBodyHtml(lines, sectionKind = "") {
   const numberedLinePattern = /^[①②③④⑤⑥⑦⑧⑨⑩]/;
   return lines
     .map((line) => String(line ?? "").trim())
     .filter(Boolean)
     .map((line) => ({
-      html: formatBriefLine(line),
+      html: formatBriefSectionLine(line, sectionKind),
       isNumbered: numberedLinePattern.test(line),
     }))
     .map((item, index) => {
