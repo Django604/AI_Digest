@@ -22,12 +22,13 @@
 ## 目录
 
 - `data/source/NEV+ICE_xsai.xlsm`：线索源工作簿
-- `data/source/NEV+ICE_ldai.xlsx`：来店源工作簿
+- `data/source/NEV+ICE_ldai.xlsm`：来店源工作簿
 - `requirements.txt`：Python 依赖清单
 - `scripts/build_dashboard.py`：从 Excel 抽取页面数据
 - `scripts/purge_jsdelivr_cache.py`：遗留 CDN 诊断工具，不接入正式发布流程
-- `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，抓取线索 + 来店共 6 张日报表并回填两本工作簿；十五代轩逸已停更
-- `scripts/run_leads_nev_exports.py`：NEV 线索全国按日导出包装器，运行时清空 FineReport 默认 `营业状态` 筛选
+- `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，抓取线索 + 来店共 10 张日报表并回填两本工作簿；十五代轩逸历史数据保留但不再更新或展示
+- `scripts/run_leads_nev_exports.py`：NEV 线索全国按日导出包装器，运行时清空 FineReport 默认 `营业状态` 筛选并生成同期报表
+- `scripts/run_leads_ice_exports.py`：ICE 线索全国按日导出包装器，运行时生成同期报表
 - `scripts/run_arrival_nev_exports.py`：NEV 来店导出包装器，运行时切到 FineReport `自定义` tab 并通过后台 `chart.data` 直接抓取按日序列
 - `scripts/run_arrival_ice_exports.py`：ICE 来店导出包装器，运行时把 Tableau 导出入口锁定到 `来店批次分车系汇总表_按天T`
 - `scripts/scheduled_update_runner.py`：定时自动更新执行入口，支持登录态弹窗执行与未登录静默执行
@@ -43,7 +44,7 @@
 
 ## 本地使用
 
-1. 更新 `data/source/NEV+ICE_xsai.xlsm` 和 `data/source/NEV+ICE_ldai.xlsx`
+1. 更新 `data/source/NEV+ICE_xsai.xlsm` 和 `data/source/NEV+ICE_ldai.xlsm`
 2. 首次运行先执行 `pip install -r requirements.txt`
 3. 运行 `powershell -ExecutionPolicy Bypass -File scripts/rebuild_dashboard.ps1`
    这会同时生成 `docs/data/dashboard.json` 和 `docs/data/dashboard.summary.json`
@@ -52,7 +53,7 @@
    服务端会默认把页面/API 访问记录写到 `.runtime/access_logs/visits-YYYYMMDD.jsonl`，其中包含 `clientIp`、时间、路径、状态码和 `User-Agent`，不会显示在前端页面
 6. 手动兜底更新与“保存当前月为历史数据”已迁移到 `附魔工作台`，本页面只保留静态数据浏览、截图导出和月份切换能力
 7. 如需指定业务日期或保留运行痕迹排查问题，可直接执行 `python scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`
-   其中 `全国按日` 会通过内部包装器清空 FineReport 默认 `营业状态` 筛选，`NEV本期来店`、`NEV同期来店` 会通过内部包装器直接走 FineReport 后台 `chart.data` 导出链，`ICE本期来店`、`ICE同期来店` 会通过内部包装器强制走 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
+   其中两张线索同期表按去年同月周期抓取；`全国按日` 会通过内部包装器清空 FineReport 默认 `营业状态` 筛选；NEV 来店本期/上期/同期通过 FineReport 后台 `chart.data` 导出链；ICE 来店本期/上期/同期通过 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
 8. 如需让这台电脑每天自动更新，可执行 `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1`
    默认会注册两条每天自动运行的 Windows 计划任务：`09:00` 的登录态交互任务会弹出流程窗口，`09:01` 的静默兜底任务会以 `SYSTEM` 服务账号在未登录时后台执行；两者共享同一把运行锁，不会重复更新同一批数据
 9. 如果你在 `09:00` 左右已经登录 Windows，就会看到启动窗口；2 分钟内没有点击“开始更新”也没事，系统会自动继续执行，执行过程中窗口不会消失，而是显示完成进度条，最终在同一窗口展示更新结果后自动关闭
@@ -91,7 +92,7 @@
 2. 直接运行 `powershell -ExecutionPolicy Bypass -File scripts/publish_dashboard.ps1`
 3. 脚本会自动重建 `dashboard.json` 与 `dashboard.summary.json`，内部通过 `scripts/dashboard_publish.py` 统一完成提交与推送，并只提交以下发布相关文件：
    - `data/source/NEV+ICE_xsai.xlsm`
-   - `data/source/NEV+ICE_ldai.xlsx`
+   - `data/source/NEV+ICE_ldai.xlsm`
    - `docs/data/dashboard.json`
    - `docs/data/dashboard.summary.json`
    - `docs/data/monthly/`
@@ -105,7 +106,8 @@
 ## 注意
 
 - 当前方案读取的是 Excel 保存后的缓存结果。你更新完源数据后，必须先让 Excel 完成重算并保存，否则页面会拿到旧结果。
-- 工作流已经改成读取当前实际使用的两本源文件：`NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`。
+- 工作流读取当前实际使用的两本源文件：`NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsm`。
+- 每日简报按“全车系有效线索 / NEV新增线索 / 2026款探陆线索 / 来店简报”四块展示；全车系 2026 年 7 月目标为 `668,262`，线索同比取两张 `全国按日*-同期`，来店环比取两张 `*上期来店`。
 - `docs/data/dashboard.summary.json` 提供了报表日期、输入文件修改时间、dashboard 数量和本次是否真的发生内容变更，方便后续定时任务或自动巡检直接读取。
 - 页面不再显示 `数据更新` 按钮；手动兜底入口已迁移到 `附魔工作台`，本页面不会再提示配置 `serviceBaseUrl` 后进行补跑。
 - 趋势明细表现在会根据年度节假日配置直接标出 `节 / 周 / 班`：`节` 为法定节假日，`周` 为普通周末，`班` 为调休补班日；补班不会再被误判成周末或放假。

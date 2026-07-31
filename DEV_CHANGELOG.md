@@ -1059,3 +1059,43 @@
 - 回滚方法：移除探陆趋势起始日期和裁剪逻辑，恢复 31 列矩阵、图表与上一版测试、文档、数据产物。
 - 关联提交（如有）：待补充
 - 备注：汇总卡片及月目标总额 `7,759` 不变，仅删除探陆趋势明细的 7 月 1—15 日列。
+
+## 2026-07-31 12:15
+- 需求 / 目标：按新版每日简报排版增加全车系有效线索区块，补充线索同比及来店同比/环比数据源，停止展示十五代轩逸，并先提供本地地址验收。
+- 改动内容：每日简报调整为左侧全车系有效线索、2026 款探陆、来店简报与右侧纵向 NEV 新增线索四块；全车系 2026 年 7 月目标设为 `668,262`；线索同比接入 `全国按日NEV-同期 / 全国按日ICE-同期`，来店环比接入 `NEV上期来店 / ICE上期来店`；抓取回填扩展为 4 张线索和 6 张来店共 10 张；十五代轩逸历史底表保留，但当前及历史页面、每日简报和截图均不再展示；新增 favicon 消除入口 404。
+- 涉及文件：`scripts/build_dashboard.py`、`scripts/fetch_daily_data.py`、`scripts/run_leads_nev_exports.py`、`scripts/run_leads_ice_exports.py`、`scripts/run_arrival_ice_exports.py`、`docs/assets/app.js`、`docs/assets/styles.css`、`docs/index.svg`、`docs/favicon.ico`、`.gitignore`、源工作簿路径配置、测试、文档及重建后的 dashboard 数据。
+- 关键命令：`python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsm ...`、`python -m unittest discover -s tests -v`、`playwright-cli` 桌面 `1440x900` 与手机 `390x844` 验收。
+- 验证结果：全量测试 `104/104` 通过；真实数据业务日为 `2026-07-30`，全车系累计实绩 `688,838`、目标 `668,262`、达成率 `103.1%`；新增同期/上期空表安全显示 `-`；桌面和手机均无横向溢出、区块交叠或文字溢出，console 为 `0 error / 0 warning`，十五代轩逸可见数量为 `0`。
+- 回滚方法：恢复原简报 section 生成与网格布局、4 张来店表映射和旧工作簿路径，移除新增同期/上期配置、favicon、测试与本条记录，并重建 dashboard 数据。
+- 关联提交（如有）：待补充
+- 备注：本次仅完成本地版本，未执行 Git 提交或 GitHub 推送；新增同期线索与上期来店 Sheet 当前为空，后续抓取回填后同比/环比会自动显示。
+
+## 2026-07-31 12:25
+- 需求 / 目标：在全车系有效线索和 NEV 新增线索的目标口径说明前统一增加“备注：”。
+- 改动内容：生成文案分别调整为“备注：目标口径为下半年穿透目标分月值”和“备注：目标口径为GTM输入的月度管控值”，同步更新测试、当前 dashboard 与 2026 年 7 月归档。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-07/dashboard.json`、`docs/data/monthly/2026-07/dashboard.summary.json`、`docs/data/monthly/index.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -m unittest tests.test_build_dashboard -v`、`python scripts/build_dashboard.py ...`
+- 验证结果：构建相关测试 `37/37` 通过；当前 JSON、7 月归档及本地 API 均返回两条带“备注：”前缀的新文案。
+- 回滚方法：移除两处“备注：”前缀，恢复测试断言并重新构建 dashboard 数据。
+- 关联提交（如有）：待补充
+- 备注：未执行 Git 提交或 GitHub 推送。
+
+## 2026-07-31 13:22
+- 需求 / 目标：利用每日简报右下空白区域横向延长来店简报，并提高两条目标口径备注的颜色辨识度且不加粗。
+- 改动内容：桌面网格中 NEV 区块由跨 3 行调整为跨上 2 行，来店简报在第 3 行横跨左右两列；两条备注文字改用现有品牌红，保持普通 `400` 字重；移动端继续使用单列布局。
+- 涉及文件：`docs/assets/styles.css`、`DEV_CHANGELOG.md`
+- 关键命令：`playwright-cli` 桌面 `1440x900` 与手机 `390x844` 验收、`node --check docs/assets/app.js`。
+- 验证结果：桌面来店简报宽度由 `426px` 扩至 `1080px`，NEV 与左侧前两块底边对齐；两条备注颜色为 `rgb(194, 15, 47)`、字重为 `400`；桌面及手机卡片均无内容溢出，页面无横向滚动。
+- 回滚方法：恢复 NEV 跨 3 行、来店仅占左列及备注灰色样式，并删除本条记录。
+- 关联提交（如有）：待补充
+- 备注：未执行 Git 提交或 GitHub 推送。
+
+## 2026-07-31 13:36
+- 需求 / 目标：先将本地验收版本发布到原 GitHub Pages 地址，再从正式网址触发一次真实数据更新与自动推送，验证完整发布链路。
+- 改动内容：发布当前每日简报新版布局、全车系有效线索、同比/环比数据源、十五代轩逸隐藏逻辑及现有 dashboard 数据；部署完成后从正式入口执行更新回归。
+- 涉及文件：本次工作区全部业务代码、页面资源、测试、文档、源工作簿及 dashboard 构建产物。
+- 关键命令：`python -m unittest discover -s tests -v`、`python -m compileall -q scripts`、`node --check docs/assets/app.js`、`git diff --check`、GitHub Pages 部署与正式入口更新测试。
+- 验证结果：提交前全量测试 `104/104` 通过，Python / Node / diff 检查通过；正式入口部署及更新回归结果待补充。
+- 回滚方法：回退本次发布提交，并重新运行 GitHub Pages 部署。
+- 关联提交（如有）：待补充
+- 备注：按用户确认采用两阶段流程，第一阶段仅发布已验收版本，第二阶段才执行真实数据更新。

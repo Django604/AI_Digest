@@ -13,6 +13,8 @@ LEADS_NEV_DIR = DAILY_SOURCE_ROOT / "日报线索NEV源"
 LEADS_NEV_GETDATA = LEADS_NEV_DIR / "getdata.py"
 
 TARGET_REPORT_KEY = "national_daily"
+SAME_PERIOD_REPORT_KEY = "national_daily_same_period"
+SAME_PERIOD_REPORT_NAME = "全国按日-同期"
 BUSINESS_STATUS_PARAMETER_NAME = "营业状态"
 BUSINESS_STATUS_LABEL_PARAMETER_NAME = "营业状态-名称"
 BUSINESS_STATUS_LABEL_TEXT = "营业状态："
@@ -45,24 +47,36 @@ def patch_report_configs() -> None:
     if not isinstance(report_configs, dict):
         raise RuntimeError("report_fetcher.report_configs.REPORT_CONFIGS 不可用，无法修正 NEV 线索导出配置。")
 
-    config = report_configs.get(TARGET_REPORT_KEY)
-    if not isinstance(config, dict):
+    base_config = report_configs.get(TARGET_REPORT_KEY)
+    if not isinstance(base_config, dict):
         raise RuntimeError(f"NEV 线索导出配置缺少报表 key：{TARGET_REPORT_KEY}")
 
-    parameter_config = config.get("parameterized_prepare_parameters")
-    if not isinstance(parameter_config, dict):
-        raise RuntimeError("NEV 全国按日缺少 parameterized_prepare_parameters，无法清空营业状态筛选。")
+    same_period_config = copy.deepcopy(base_config)
+    same_period_config.update(
+        {
+            "enabled": False,
+            "report_name": SAME_PERIOD_REPORT_NAME,
+            "start_date": {"rule": "same_month_last_year_first_day"},
+            "end_date": {"rule": "same_day_last_year"},
+        }
+    )
+    report_configs[SAME_PERIOD_REPORT_KEY] = same_period_config
 
-    core_filters = parameter_config.get("core_filters")
-    static_labels = parameter_config.get("static_labels")
-    if isinstance(core_filters, dict):
-        core_filters[BUSINESS_STATUS_PARAMETER_NAME] = copy.deepcopy(EMPTY_BUSINESS_STATUS)
-        if isinstance(static_labels, dict):
-            static_labels[BUSINESS_STATUS_LABEL_PARAMETER_NAME] = BUSINESS_STATUS_LABEL_TEXT
-        return
+    for report_key in (TARGET_REPORT_KEY, SAME_PERIOD_REPORT_KEY):
+        parameter_config = report_configs[report_key].get("parameterized_prepare_parameters")
+        if not isinstance(parameter_config, dict):
+            raise RuntimeError(f"NEV 全国按日缺少 parameterized_prepare_parameters：{report_key}")
 
-    parameter_config[BUSINESS_STATUS_PARAMETER_NAME] = copy.deepcopy(EMPTY_BUSINESS_STATUS)
-    parameter_config[BUSINESS_STATUS_LABEL_PARAMETER_NAME] = BUSINESS_STATUS_LABEL_TEXT
+        core_filters = parameter_config.get("core_filters")
+        static_labels = parameter_config.get("static_labels")
+        if isinstance(core_filters, dict):
+            core_filters[BUSINESS_STATUS_PARAMETER_NAME] = copy.deepcopy(EMPTY_BUSINESS_STATUS)
+            if isinstance(static_labels, dict):
+                static_labels[BUSINESS_STATUS_LABEL_PARAMETER_NAME] = BUSINESS_STATUS_LABEL_TEXT
+            continue
+
+        parameter_config[BUSINESS_STATUS_PARAMETER_NAME] = copy.deepcopy(EMPTY_BUSINESS_STATUS)
+        parameter_config[BUSINESS_STATUS_LABEL_PARAMETER_NAME] = BUSINESS_STATUS_LABEL_TEXT
 
 
 def main() -> int:

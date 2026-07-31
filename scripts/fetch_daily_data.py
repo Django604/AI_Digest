@@ -38,9 +38,8 @@ from scripts.build_dashboard import (  # noqa: E402
 
 DAILY_SOURCE_ROOT = WORKSPACE_ROOT / "日报取数平台"
 NEV_SCRIPT = DAILY_SOURCE_ROOT / "日报线索NEV源" / "getdata.py"
-ICE_SCRIPT = DAILY_SOURCE_ROOT / "日报线索ICE源" / "getdata.py"
 LEADS_NEV_WRAPPER_SCRIPT = PROJECT_ROOT / "scripts" / "run_leads_nev_exports.py"
-ARRIVAL_NEV_SCRIPT = DAILY_SOURCE_ROOT / "日报来店NEV源" / "getdata.py"
+LEADS_ICE_WRAPPER_SCRIPT = PROJECT_ROOT / "scripts" / "run_leads_ice_exports.py"
 ARRIVAL_ICE_SCRIPT = PROJECT_ROOT / "scripts" / "run_arrival_ice_exports.py"
 ARRIVAL_NEV_WRAPPER_SCRIPT = PROJECT_ROOT / "scripts" / "run_arrival_nev_exports.py"
 RUNTIME_ROOT = PROJECT_ROOT / ".runtime" / "daily_update"
@@ -72,32 +71,38 @@ FETCH_TASKS = (
         label="NEV 全国按日",
         script_path=LEADS_NEV_WRAPPER_SCRIPT,
         output_subdir="nev",
-        report_keys=("national_daily",),
+        report_keys=("national_daily", "national_daily_same_period"),
     ),
     FetchTask(
         label="ICE 全国按日",
-        script_path=ICE_SCRIPT,
+        script_path=LEADS_ICE_WRAPPER_SCRIPT,
         output_subdir="ice",
-        report_keys=("ice_national_daily",),
+        report_keys=("ice_national_daily", "ice_national_daily_same_period"),
     ),
     FetchTask(
-        label="NEV 来店本期 + 同期",
+        label="NEV 来店本期 + 上期 + 同期",
         script_path=ARRIVAL_NEV_WRAPPER_SCRIPT,
         output_subdir="arrival-nev",
-        report_keys=("store_current_period", "store_same_period"),
+        report_keys=("store_current_period", "store_previous_period", "store_same_period"),
         extra_args=("--safe-bootstrap", "--capture-wait-ms", "30000"),
     ),
     FetchTask(
-        label="ICE 来店本期 + 同期",
+        label="ICE 来店本期 + 上期 + 同期",
         script_path=ARRIVAL_ICE_SCRIPT,
         output_subdir="arrival-ice",
-        report_keys=("store_batch_vehicle_summary_本期_来店", "store_batch_vehicle_summary_同期_来店"),
+        report_keys=(
+            "store_batch_vehicle_summary_本期_来店",
+            "store_batch_vehicle_summary_上期_来店",
+            "store_batch_vehicle_summary_同期_来店",
+        ),
     ),
 )
 
 LEADS_SHEET_MAPPINGS = (
     SheetUpdateMapping(export_names=("全国按日",), result_label="全国按日", target_sheet="全国按日NEV", workbook_kind=LEADS_WORKBOOK_KIND),
+    SheetUpdateMapping(export_names=("全国按日-同期",), result_label="全国按日-同期", target_sheet="全国按日NEV-同期", workbook_kind=LEADS_WORKBOOK_KIND),
     SheetUpdateMapping(export_names=("全国按日ICE",), result_label="全国按日ICE", target_sheet="全国按日ICE", workbook_kind=LEADS_WORKBOOK_KIND),
+    SheetUpdateMapping(export_names=("全国按日ICE-同期",), result_label="全国按日ICE-同期", target_sheet="全国按日ICE-同期", workbook_kind=LEADS_WORKBOOK_KIND),
 )
 
 ARRIVAL_SHEET_MAPPINGS = (
@@ -105,6 +110,12 @@ ARRIVAL_SHEET_MAPPINGS = (
         export_names=("NEV本期", "专营店本期"),
         result_label="NEV本期来店",
         target_sheet="NEV本期来店",
+        workbook_kind=ARRIVAL_WORKBOOK_KIND,
+    ),
+    SheetUpdateMapping(
+        export_names=("NEV上期", "专营店上期"),
+        result_label="NEV上期来店",
+        target_sheet="NEV上期来店",
         workbook_kind=ARRIVAL_WORKBOOK_KIND,
     ),
     SheetUpdateMapping(
@@ -117,6 +128,12 @@ ARRIVAL_SHEET_MAPPINGS = (
         export_names=("来店本期",),
         result_label="ICE本期来店",
         target_sheet="ICE本期来店",
+        workbook_kind=ARRIVAL_WORKBOOK_KIND,
+    ),
+    SheetUpdateMapping(
+        export_names=("来店上期",),
+        result_label="ICE上期来店",
+        target_sheet="ICE上期来店",
         workbook_kind=ARRIVAL_WORKBOOK_KIND,
     ),
     SheetUpdateMapping(
@@ -431,6 +448,7 @@ def run_update(
             export_paths,
             ARRIVAL_SHEET_MAPPINGS,
             log=log,
+            keep_vba=arrival_path.suffix.lower() == ".xlsm",
         )
         rebuild_summary = rebuild_dashboard(
             business_date=resolved_business_date,

@@ -7,14 +7,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SVG_ENTRY = PROJECT_ROOT / "docs" / "index.svg"
 PAGES_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "deploy-pages.yml"
 APP_SCRIPT = PROJECT_ROOT / "docs" / "assets" / "app.js"
+FAVICON = PROJECT_ROOT / "docs" / "favicon.ico"
 
 
 class PublicEntryTests(unittest.TestCase):
     def test_svg_entry_is_well_formed_and_loads_versioned_assets(self) -> None:
         root = element_tree.parse(SVG_ENTRY).getroot()
+        favicon_root = element_tree.parse(FAVICON).getroot()
         source = SVG_ENTRY.read_text(encoding="utf-8")
 
         self.assertEqual(root.tag, "{http://www.w3.org/2000/svg}svg")
+        self.assertEqual(favicon_root.tag, "{http://www.w3.org/2000/svg}svg")
+        self.assertIn('rel="icon"', source)
         self.assertIn('id="app-styles"', source)
         self.assertIn('./assets/styles.css?v=" + cacheBust', source)
         self.assertIn('./assets/app.js?v=" + cacheBust', source)
@@ -48,7 +52,9 @@ class PublicEntryTests(unittest.TestCase):
         source = APP_SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn('section?.id === "sylphy-15"', source)
-        self.assertIn("已跳过 ICE 总盘与十五代轩逸趋势图", source)
+        self.assertIn("已跳过 ICE 总盘趋势图", source)
+        self.assertIn('section.kind !== "sylphy15"', source)
+        self.assertIn('section?.id !== "sylphy-15"', source)
 
     def test_current_month_uses_live_dashboard_and_explicit_month_uses_archive(self) -> None:
         source = APP_SCRIPT.read_text(encoding="utf-8")

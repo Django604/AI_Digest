@@ -481,7 +481,7 @@ def build_slides(context: dict[str, object]) -> list[SlideSpec]:
         "5. 发布与预览",
     ]
     flow_lines = [
-        ["NEV+ICE_xsai.xlsm", "NEV+ICE_ldai.xlsx", "Excel 先重算并保存"],
+        ["NEV+ICE_xsai.xlsm", "NEV+ICE_ldai.xlsm", "Excel 先重算并保存"],
         ["校验 sheet / header / 日期", "聚合目标、实绩、来店", "补简报文案与统计摘要"],
         ["dashboard.json", "dashboard.summary.json", "忽略 generatedAt 抖动"],
         ["index.html + app.js", "多看板切换", "图表缩放、节假日高亮"],
@@ -503,8 +503,8 @@ def build_slides(context: dict[str, object]) -> list[SlideSpec]:
     elements.append(card(sid, "Rules", 0.72, 4.72, 5.7, 1.55, "项目里的 4 条关键规则", [
         "报表日期取自 参数!C2，按当前月与上月同日做对比。",
         "NEV 线索由“目标竖版 + 全国按日NEV”组合生成。",
-        "到店简报不再吃汇总缓存，改为 4 张来店底表聚合。",
-        "十五代轩逸目标与特殊节假日有单独代码规则。"
+        "到店简报不再吃汇总缓存，改为本期、上期、同期共 6 张来店底表聚合。",
+        "2026 款探陆目标与特殊节假日有单独代码规则。"
     ], fill=COLORS["surface_alt"]))
     sid += 1
     elements.append(card(sid, "Why", 6.62, 4.72, 5.9, 1.55, "为什么这条链靠谱", [
@@ -520,7 +520,7 @@ def build_slides(context: dict[str, object]) -> list[SlideSpec]:
         ("每日简报", [f"自动拼出 {brief_sections[1]['title']}、{brief_sections[2]['title']}、{brief_sections[3]['title']} 文案", "适合直接发群或做晨会口播"]),
         ("线索总控", ["全车有效线索按日、累计、环比同屏展示", "未来日期自动留空，避免 #N/A 污染界面"]),
         ("NEV 看板", [f"覆盖 {' / '.join(context['nev_sections'])}", "总盘 + 分车型拆开看，适合追目标达成"]),
-        ("ICE 看板", [f"覆盖 {' / '.join(context['ice_sections'])}", "既看总盘，也能盯住十五代轩逸子模块"]),
+        ("ICE 看板", [f"覆盖 {' / '.join(context['ice_sections'])}", "保留全车系 ICE 总盘分析"]),
         ("来店看板", ["全国累计来店、当日来店、同比一屏看全", "NEV / ICE 拆分显示，方便识别结构变化"]),
         ("前端体验", ["侧边栏页面导航 + 分支目录", "图表点击放大、节假日高亮、移动端可横向查看"]),
     ]
@@ -597,7 +597,7 @@ def build_slides(context: dict[str, object]) -> list[SlideSpec]:
     elements, sid = base_slide(8, total, "07 / 风险与边界", "能做成，不代表没有坑；这页专门讲坑", "提前把雷区画出来，比上线后装无辜强多了")
     risk_cards = [
         ("风险 1：Excel 缓存依赖", ["脚本读取的是 Excel 保存后的缓存值。", "如果业务改完数据却没让 Excel 重算并保存，网页会吃旧结果。", "建议把“保存前重算”写进操作规范。"]),
-        ("风险 2：口径规则写在代码里", ["例如特殊节假日和十五代轩逸目标 override。", "短期有效，长期容易变成隐形业务规则。", "建议后续抽到配置文件。"]),
+        ("风险 2：口径规则写在代码里", ["例如特殊节假日和 2026 款探陆目标 override。", "短期有效，长期容易变成隐形业务规则。", "建议后续抽到配置文件。"]),
         ("风险 3：前端验证还偏轻", ["当前测试更偏后端结构与构建逻辑。", "页面样式、图表视觉和交互没有自动化回归。", "建议补一层 smoke test 或截图对比。"]),
         ("风险 4：Pages 天生不是业务系统", ["它适合发布读多写少的结果页。", "不适合实时写入、权限控制、审批链之类需求。", "如果未来升级成运营平台，就得重构边界。"]),
     ]

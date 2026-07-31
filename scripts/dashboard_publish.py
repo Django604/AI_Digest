@@ -11,13 +11,13 @@ from typing import Callable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LEADS_WORKBOOK = PROJECT_ROOT / "data" / "source" / "NEV+ICE_xsai.xlsm"
-DEFAULT_ARRIVAL_WORKBOOK = PROJECT_ROOT / "data" / "source" / "NEV+ICE_ldai.xlsx"
+DEFAULT_ARRIVAL_WORKBOOK = PROJECT_ROOT / "data" / "source" / "NEV+ICE_ldai.xlsm"
 DEFAULT_DASHBOARD_JSON = PROJECT_ROOT / "docs" / "data" / "dashboard.json"
 DEFAULT_SUMMARY_JSON = PROJECT_ROOT / "docs" / "data" / "dashboard.summary.json"
 DEFAULT_REBUILD_SCRIPT = PROJECT_ROOT / "scripts" / "build_dashboard.py"
 PUBLISH_TARGETS = (
     "data/source/NEV+ICE_xsai.xlsm",
-    "data/source/NEV+ICE_ldai.xlsx",
+    "data/source/NEV+ICE_ldai.xlsm",
     "docs/data/dashboard.json",
     "docs/data/dashboard.summary.json",
     "docs/data/monthly",

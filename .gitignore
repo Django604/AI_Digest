@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 .runtime/
+.playwright-cli/
 
 .serve_dashboard.pid
 *.log

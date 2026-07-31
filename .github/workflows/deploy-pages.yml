@@ -10,7 +10,7 @@ on:
       - "tests/**"
       - "requirements.txt"
       - "data/source/NEV+ICE_xsai.xlsm"
-      - "data/source/NEV+ICE_ldai.xlsx"
+      - "data/source/NEV+ICE_ldai.xlsm"
   workflow_dispatch:
 
 permissions:
@@ -41,7 +41,7 @@ jobs:
         run: python -m unittest discover -s tests -v
 
       - name: Build dashboard data
-        run: python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json --preserve-input-modified-times
+        run: python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsm --out docs/data/dashboard.json --preserve-input-modified-times
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

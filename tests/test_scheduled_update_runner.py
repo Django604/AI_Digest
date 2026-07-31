@@ -41,8 +41,8 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
         actual = build_start_message(started_at)
 
         self.assertIn("2026-04-22 09:00:00", actual)
-        self.assertIn("抓取 6 张线索 / 来店日报表", actual)
-        self.assertIn("回填 NEV+ICE_xsai.xlsm 与 NEV+ICE_ldai.xlsx", actual)
+        self.assertIn("抓取 10 张线索 / 来店日报表", actual)
+        self.assertIn("回填 NEV+ICE_xsai.xlsm 与 NEV+ICE_ldai.xlsm", actual)
         self.assertIn("2 分钟内未点击", actual)
 
     def test_build_waiting_status_mentions_remaining_seconds(self) -> None:
@@ -93,11 +93,11 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
         self.assertIn(f"窗口会在 {FINISH_AUTO_CLOSE_SECONDS} 秒后自动关闭", actual)
 
     def test_infer_progress_update_advances_by_known_log_rule(self) -> None:
-        actual = infer_progress_update("开始抓取：NEV 来店本期 + 同期", 20)
+        actual = infer_progress_update("开始抓取：NEV 来店本期 + 上期 + 同期", 20)
 
         self.assertEqual(
             actual,
-            ProgressUpdate(progress=50, message="正在抓取 NEV 来店本期与同期。"),
+            ProgressUpdate(progress=50, message="正在抓取 NEV 来店本期、上期与同期。"),
         )
 
     def test_infer_progress_update_tracks_excel_save_stage(self) -> None:

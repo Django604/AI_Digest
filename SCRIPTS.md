@@ -1,16 +1,16 @@
 # 脚本使用手册
 
-最后更新：2026-06-10 00:00
+最后更新：2026-07-31 00:00
 
 ## scripts/build_dashboard.py
 
 - 路径：`./scripts/build_dashboard.py`
-- 作用：读取 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx`，抽取线索与来店页面数据，输出静态站点使用的 `JSON`
+- 作用：读取 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsm`，抽取线索与来店页面数据，输出静态站点使用的 `JSON`
 - 使用方法：
-  - `python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json`
-  - 指定摘要输出：`python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json --summary-out docs/data/dashboard.summary.json`
-  - 指定业务日期覆盖：`python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json --report-date 2026-04-20`
-  - CI 保留已提交的源文件时间：`python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsx --out docs/data/dashboard.json --preserve-input-modified-times`
+  - `python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsm --out docs/data/dashboard.json`
+  - 指定摘要输出：`python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsm --out docs/data/dashboard.json --summary-out docs/data/dashboard.summary.json`
+  - 指定业务日期覆盖：`python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsm --out docs/data/dashboard.json --report-date 2026-04-20`
+  - CI 保留已提交的源文件时间：`python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsm --out docs/data/dashboard.json --preserve-input-modified-times`
 - 运行前提：
   - 本机可用 `Python`
   - 已执行 `pip install -r requirements.txt`
@@ -26,6 +26,8 @@
   - `--preserve-input-modified-times` 仅供 GitHub Actions 重建使用：它会严格复用现有 dashboard 与 summary 中已提交的两本源工作簿修改时间，避免 checkout 后的 UTC 文件时间覆盖本地实际记录；本地更新不要启用该参数
   - 趋势表的 `columnMeta` 现在会同时输出 `holiday / weekend / makeupWorkday / regularWorkday` 语义，前端据此显示 `节 / 周 / 班` 标签并区分补班日
   - `NEV 线索趋势` 会从 `全国按日NEV` 精确匹配车型 `2026款探陆` 并生成独立月度对照与趋势区块；`NEV 总盘` 和每日简报四车合计仍只统计 `NX8 / N7 / N6 / 天籁·鸿蒙座舱`，`全车系有效线索管控` 则包含 `2026款探陆`；2026 年 7 月在 `目标竖版` 暂无该车型时使用月目标 `7,759` 的兜底序列，趋势表和图表直接删除 7 月 1—15 日列并从 7 月 16 日起展示，后续出现同名车型目标后优先读取工作簿数据
+  - 每日简报固定展示全车系有效线索、NEV新增线索、2026款探陆线索、来店简报四块；全车系 2026 年 7 月目标为 `668,262`，同比读取 `全国按日NEV-同期` 与 `全国按日ICE-同期`，环比读取当前全国按日表中的上月数据
+  - 十五代轩逸底表和历史归档继续保留，但当前与历史月份页面均不再渲染该区块
 
 ## scripts/purge_jsdelivr_cache.py
 
@@ -52,7 +54,7 @@
 ## scripts/fetch_daily_data.py
 
 - 路径：`./scripts/fetch_daily_data.py`
-- 作用：复用 `日报取数平台` 的登录与取数逻辑，抓取 `全国按日`、`全国按日ICE`、`NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店` 共 6 张 `N-1` 日报表，分别回填 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsx` 后重建 `docs/data/dashboard.json`
+- 作用：复用 `日报取数平台` 的登录与取数逻辑，抓取 4 张线索表和 6 张来店表共 10 张日报表，分别回填 `NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsm` 后重建 `docs/data/dashboard.json`
 - 使用方法：
   - `python scripts/fetch_daily_data.py`
   - 指定业务日期：`python scripts/fetch_daily_data.py --business-date 2026-04-20`
@@ -63,37 +65,48 @@
   - 同级目录存在 `../日报取数平台/日报线索NEV源/getdata.py` 与 `../日报取数平台/日报线索ICE源/getdata.py`
   - 运行环境可以正常打开本地 Chrome 并访问目标系统
 - 输出结果：
-  - 更新 `data/source/NEV+ICE_xsai.xlsm` 中 `全国按日NEV`、`全国按日ICE`
-  - 更新 `data/source/NEV+ICE_ldai.xlsx` 中 `NEV本期来店`、`NEV同期来店`、`ICE本期来店`、`ICE同期来店`
+  - 更新 `data/source/NEV+ICE_xsai.xlsm` 中 `全国按日NEV`、`全国按日NEV-同期`、`全国按日ICE`、`全国按日ICE-同期`
+  - 更新 `data/source/NEV+ICE_ldai.xlsm` 中 NEV/ICE 的本期、上期、同期共 6 张来店表
   - 更新 `docs/data/dashboard.json`
   - 更新 `docs/data/dashboard.summary.json`
 - 备注：
   - 默认按当天的 `N-1` 作为业务日期，也可通过 `--business-date` 显式覆盖
-  - 十五代轩逸已于 `2026-07-15` 停更：不再抓取或回填 `十五代轩逸按日`，页面继续保留截至该日的冻结数据
+  - 十五代轩逸已于 `2026-07-15` 停更：不再抓取或回填 `十五代轩逸按日`，历史数据保留但页面不再展示
   - 脚本运行成功后会自动清理 `.runtime/daily_update/` 临时目录；若带 `--keep-runtime`，会保留导出文件与日志便于排查
   - NEV 线索中的 `全国按日` 会通过 `scripts/run_leads_nev_exports.py` 内部包装器复用 `日报线索NEV源`，并在运行时显式清空 FineReport 平台默认的 `营业状态` 筛选，避免只取 `营业店`
-  - NEV 来店中的 `本期/同期` 会通过 `scripts/run_arrival_nev_exports.py` 内部包装器复用 `日报来店NEV源` 的登录态与参数模板，并在后台执行 `tab/execute -> REPORT2 -> chart.data` 直接抓取自定义按日序列，不依赖前端页面点选与 SVG 解析
-  - ICE 来店中的 `本期/同期` 会通过 `scripts/run_arrival_ice_exports.py` 内部包装器强制把 Tableau 交叉表缩略图入口锁定到 `来店批次分车系汇总表_按天T`，同时保留实际导出 sheet 名 `E3S报表样式` 以匹配 `sheetdocId`
+  - NEV 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_nev_exports.py` 内部包装器复用 `日报来店NEV源` 的登录态与参数模板，并在后台执行 `tab/execute -> REPORT2 -> chart.data` 直接抓取自定义按日序列
+  - ICE 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_ice_exports.py` 内部包装器强制把 Tableau 交叉表缩略图入口锁定到 `来店批次分车系汇总表_按天T`
   - 该脚本只负责本地更新；静态部署到 `GitHub Pages` 后不会自动具备浏览器取数能力
 
 ## scripts/run_leads_nev_exports.py
 
 - 路径：`./scripts/run_leads_nev_exports.py`
-- 作用：作为 `日报线索NEV源/getdata.py` 的轻量包装器，仅对 `全国按日` 报表运行时注入 `营业状态: []`，清空 FineReport 平台默认勾选的营业状态条件后再交给原取数脚本导出
+- 作用：作为 `日报线索NEV源/getdata.py` 的轻量包装器，清空 `全国按日` 默认营业状态筛选，并生成去年同月周期的 `全国按日-同期`
 - 使用方法：
   - 一般不单独调用，由 `python scripts/fetch_daily_data.py ...` 自动串联
-  - 需要单独验证时可执行：`python scripts/run_leads_nev_exports.py --business-date 2026-06-09 --report-keys national_daily --keep-runtime`
+  - 需要单独验证时可执行：`python scripts/run_leads_nev_exports.py --business-date 2026-06-09 --report-keys national_daily,national_daily_same_period`
 - 备注：
   - 该包装器不会改动兄弟项目源码，只在运行时 monkey-patch `report_fetcher.report_configs.REPORT_CONFIGS`
   - 空列表 `[]` 表示该筛选条件不选任何营业状态，用来覆盖平台新增的默认 `营业店`
 
+## scripts/run_leads_ice_exports.py
+
+- 路径：`./scripts/run_leads_ice_exports.py`
+- 作用：作为 `日报线索ICE源/getdata.py` 的轻量包装器，基于全国按日配置生成去年同月周期的 `全国按日ICE-同期`
+- 使用方法：
+  - 一般不单独调用，由 `python scripts/fetch_daily_data.py ...` 自动串联
+  - 需要单独验证时可执行：`python scripts/run_leads_ice_exports.py --business-date 2026-06-09 --report-keys ice_national_daily,ice_national_daily_same_period`
+- 备注：
+  - 该包装器不会改动兄弟项目源码，只在运行时深拷贝并扩展 `report_fetcher.report_configs.REPORT_CONFIGS`
+  - 同期周期固定为去年同月首日至去年同日，与本期业务日对齐
+
 ## scripts/run_arrival_nev_exports.py
 
 - 路径：`./scripts/run_arrival_nev_exports.py`
-- 作用：作为 `日报来店NEV源/getdata.py` 的轻量包装器，仅对 `NEV本期来店`、`NEV同期来店` 两份 FineReport 报表切换到 `自定义` tab，并通过后台 `chart.data` 接口直接提取按日来店数据后导出为两列表 Excel
+- 作用：作为 `日报来店NEV源/getdata.py` 的轻量包装器，对 `NEV本期/上期/同期来店` 切换到 `自定义` tab，并通过后台 `chart.data` 接口提取按日数据
 - 使用方法：
   - 一般不单独调用，由 `python scripts/fetch_daily_data.py ...` 自动串联
-  - 需要单独验证时可执行：`python scripts/run_arrival_nev_exports.py --business-date 2026-04-21 --report-keys store_current_period,store_same_period --safe-bootstrap --capture-wait-ms 30000`
+  - 需要单独验证时可执行：`python scripts/run_arrival_nev_exports.py --business-date 2026-04-21 --report-keys store_current_period,store_previous_period,store_same_period --safe-bootstrap --capture-wait-ms 30000`
 - 备注：
   - 该包装器不会改动兄弟项目源码，只在运行时修正目标报表 URL、参数模板和导出策略
   - 若 `REPORT2 load/content` 直接返回的不是按日两列表，而是“合计值 + simplechart”，包装器会继续从 `simplechart` 里提取 `chartID` 与 `ecName`，再请求 `chart.data` 还原每日来店量
@@ -101,10 +114,10 @@
 ## scripts/run_arrival_ice_exports.py
 
 - 路径：`./scripts/run_arrival_ice_exports.py`
-- 作用：作为 `日报来店ICE源/getdata.py` 的轻量包装器，仅对 `ICE本期来店`、`ICE同期来店` 两份 Tableau 报表改写导出配置，强制使用 `来店批次分车系汇总表_按天T` 的缩略图入口
+- 作用：作为 `日报来店ICE源/getdata.py` 的轻量包装器，对 `ICE本期/上期/同期来店` 改写 Tableau 导出配置
 - 使用方法：
   - 一般不单独调用，由 `python scripts/fetch_daily_data.py ...` 自动串联
-  - 需要单独验证时可执行：`python scripts/run_arrival_ice_exports.py --business-date 2026-04-20 --report-keys store_batch_vehicle_summary_本期_来店,store_batch_vehicle_summary_同期_来店`
+  - 需要单独验证时可执行：`python scripts/run_arrival_ice_exports.py --business-date 2026-04-20 --report-keys store_batch_vehicle_summary_本期_来店,store_batch_vehicle_summary_上期_来店,store_batch_vehicle_summary_同期_来店`
 - 备注：
   - 该包装器不会改动兄弟项目源码，只在运行时 monkey-patch `build_effective_report_configs`
   - 这里不能把 `crosstab_sheet_name` 直接改成 `来店批次分车系汇总表_按天T`，否则 Tableau 导出响应里会因为拿不到真实的 `sheetdocId` 而失败
@@ -115,11 +128,11 @@
 - 作用：按项目当前默认路径一键重建 `docs/data/dashboard.json`
 - 使用方法：
   - `powershell -ExecutionPolicy Bypass -File scripts/rebuild_dashboard.ps1`
-  - 指定输入输出路径：`powershell -ExecutionPolicy Bypass -File scripts/rebuild_dashboard.ps1 -Workbook data/source/NEV+ICE_xsai.xlsm -ArrivalWorkbook data/source/NEV+ICE_ldai.xlsx -Out docs/data/dashboard.json -SummaryOut docs/data/dashboard.summary.json`
+  - 指定输入输出路径：`powershell -ExecutionPolicy Bypass -File scripts/rebuild_dashboard.ps1 -Workbook data/source/NEV+ICE_xsai.xlsm -ArrivalWorkbook data/source/NEV+ICE_ldai.xlsm -Out docs/data/dashboard.json -SummaryOut docs/data/dashboard.summary.json`
 - 运行前提：
   - 本机可用 `Python`
   - 已执行 `pip install -r requirements.txt`
-  - `data/source/NEV+ICE_xsai.xlsm` 与 `data/source/NEV+ICE_ldai.xlsx` 已更新并保存
+  - `data/source/NEV+ICE_xsai.xlsm` 与 `data/source/NEV+ICE_ldai.xlsm` 已更新并保存
 - 输出结果：
   - 更新 `docs/data/dashboard.json`
   - 更新 `docs/data/dashboard.summary.json`
@@ -174,7 +187,7 @@
   - 已配置好 Git 远程仓库，例如 `origin`
   - 本机可用 `Python`
   - 已执行 `pip install -r requirements.txt`
-  - `data/source/NEV+ICE_xsai.xlsm` 与 `data/source/NEV+ICE_ldai.xlsx` 已更新并保存
+  - `data/source/NEV+ICE_xsai.xlsm` 与 `data/source/NEV+ICE_ldai.xlsm` 已更新并保存
 - 输出结果：
   - 更新 `docs/data/dashboard.json`
   - 更新 `docs/data/dashboard.summary.json`

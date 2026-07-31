@@ -573,9 +573,10 @@ button,
 
 .brief-page-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.35fr);
+  grid-template-rows: repeat(3, auto);
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .brief-page-card {
@@ -636,24 +637,44 @@ button,
   margin-top: 8px;
 }
 
-.brief-page-card.kind-nev {
-  grid-column: 1;
-  grid-row: 1 / span 3;
+.brief-page-note {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(20, 34, 31, 0.1);
+  color: var(--brand-red);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
-.brief-page-card.kind-sylphy15 {
-  grid-column: 2;
+.brief-page-card.kind-valid-leads {
+  grid-column: 1;
   grid-row: 1;
 }
 
-.brief-page-card.kind-new-pathfinder {
+.brief-page-card.kind-nev {
+  display: flex;
+  flex-direction: column;
   grid-column: 2;
+  grid-row: 1 / span 2;
+  height: auto;
+}
+
+.brief-page-card.kind-sylphy15 {
+  display: none;
+}
+
+.brief-page-card.kind-new-pathfinder {
+  grid-column: 1;
   grid-row: 2;
 }
 
 .brief-page-card.kind-arrival {
-  grid-column: 2;
+  grid-column: 1 / -1;
   grid-row: 3;
+}
+
+.brief-page-card.kind-nev .brief-page-note {
+  margin-top: auto;
 }
 
 .data-section {
@@ -1462,6 +1483,7 @@ tbody tr:last-child td {
   }
 
   .brief-page-card.kind-nev,
+  .brief-page-card.kind-valid-leads,
   .brief-page-card.kind-sylphy15,
   .brief-page-card.kind-new-pathfinder,
   .brief-page-card.kind-arrival {

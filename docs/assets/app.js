@@ -580,7 +580,7 @@ function updateCaptureTools(options = {}) {
     return;
   }
 
-  setCaptureStatus("将保存所有板块的趋势图截图，并自动跳过 ICE 总盘与十五代轩逸趋势图。");
+  setCaptureStatus("将保存所有板块的趋势图截图，并自动跳过 ICE 总盘趋势图。");
 }
 
 function setCaptureStatus(message, stateName = "") {
@@ -660,7 +660,7 @@ function updateUpdateTools(options = {}) {
     return;
   }
 
-  setUpdateStatus("点击“数据更新”后，将手动补跑 6 张日报抓取、重建当前页面数据，并在成功后自动发布到 GitHub。");
+  setUpdateStatus("点击“数据更新”后，将手动补跑 10 张日报抓取、重建当前页面数据，并在成功后自动发布到 GitHub。");
 }
 
 function setUpdateStatus(message, stateName = "") {
@@ -844,7 +844,7 @@ async function handleGlobalTrendCapture() {
     }
 
     updateCaptureTools({
-      message: `截图完成，已保存 ${savedCount} 张趋势图到所选文件夹，已跳过 ICE 总盘与十五代轩逸趋势图。`,
+      message: `截图完成，已保存 ${savedCount} 张趋势图到所选文件夹，已跳过 ICE 总盘趋势图。`,
       stateName: "success",
     });
   } catch (error) {
@@ -1241,7 +1241,9 @@ function renderDashboard(dashboard) {
 
 function renderBriefPage(dashboard) {
   const briefing = dashboard.briefing ?? {};
-  const sections = normalizeBriefSections(briefing).filter((section) => section.kind !== "intro");
+  const sections = normalizeBriefSections(briefing).filter(
+    (section) => section.kind !== "intro" && section.kind !== "sylphy15",
+  );
 
   const article = document.createElement("article");
   article.className = "dashboard brief-page";
@@ -1295,6 +1297,13 @@ function renderBriefPage(dashboard) {
       paragraph.className = "brief-page-line";
       paragraph.innerHTML = bodyHtml;
       card.appendChild(paragraph);
+    }
+
+    if (section.note) {
+      const note = document.createElement("p");
+      note.className = "brief-page-note";
+      note.textContent = section.note;
+      card.appendChild(note);
     }
 
     cardFrag.appendChild(card);
@@ -1438,7 +1447,7 @@ function shouldRenderDashboardTitle(dashboard, sections = []) {
 }
 
 function getDisplaySections(dashboard) {
-  const sections = dashboard?.sections ?? [];
+  const sections = (dashboard?.sections ?? []).filter((section) => section?.id !== "sylphy-15");
   if (!sections.length) {
     return sections;
   }

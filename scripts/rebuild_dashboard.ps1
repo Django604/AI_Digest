@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $leadsWorkbook = if ($Workbook) { $Workbook } else { Join-Path $repoRoot "data/source/NEV+ICE_xsai.xlsm" }
-$arrivalWorkbook = if ($ArrivalWorkbook) { $ArrivalWorkbook } else { Join-Path $repoRoot "data/source/NEV+ICE_ldai.xlsx" }
+$arrivalWorkbook = if ($ArrivalWorkbook) { $ArrivalWorkbook } else { Join-Path $repoRoot "data/source/NEV+ICE_ldai.xlsm" }
 $outputJson = if ($Out) { $Out } else { Join-Path $repoRoot "docs/data/dashboard.json" }
 $summaryJson = if ($SummaryOut) { $SummaryOut } else { Join-Path (Split-Path -Parent $outputJson) "dashboard.summary.json" }
 $pythonCommand = Get-Command python -ErrorAction SilentlyContinue

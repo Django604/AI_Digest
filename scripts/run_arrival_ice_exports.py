@@ -15,6 +15,7 @@ ARRIVAL_ICE_DIR = DAILY_SOURCE_ROOT / "日报来店ICE源"
 ARRIVAL_ICE_GETDATA = ARRIVAL_ICE_DIR / "getdata.py"
 TARGET_REPORT_KEYS = {
     "store_batch_vehicle_summary_本期_来店",
+    "store_batch_vehicle_summary_上期_来店",
     "store_batch_vehicle_summary_同期_来店",
 }
 TARGET_THUMBNAIL_SHEET = "来店批次分车系汇总表_按天T"

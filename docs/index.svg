@@ -6,6 +6,7 @@
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Crect%20width='64'%20height='64'%20rx='10'%20fill='%23c20f2f'/%3E%3Cpath%20d='M18%2046V18h7l14%2018V18h7v28h-7L25%2028v18z'%20fill='white'/%3E%3C/svg%3E" />
         <link id="app-styles" rel="stylesheet" />
         <style>
           html, body { width: 100%; height: 100%; overflow: auto; }

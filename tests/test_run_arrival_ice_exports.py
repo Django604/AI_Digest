@@ -92,7 +92,11 @@ class RunArrivalIceExportsTests(unittest.TestCase):
         )
         self.assertEqual(
             set(TARGET_REPORT_KEYS),
-            {"store_batch_vehicle_summary_本期_来店", "store_batch_vehicle_summary_同期_来店"},
+            {
+                "store_batch_vehicle_summary_本期_来店",
+                "store_batch_vehicle_summary_上期_来店",
+                "store_batch_vehicle_summary_同期_来店",
+            },
         )
 
 

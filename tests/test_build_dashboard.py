@@ -22,10 +22,13 @@ from scripts.build_dashboard import (
     SUMMARY_JSON,
     apply_preserved_input_modified_times,
     build_arrival_series,
+    build_arrival_brief,
     build_column_meta,
     build_payload,
     build_run_summary,
     build_nev_section,
+    build_valid_leads_brief,
+    build_valid_leads_control_trend,
     file_mtime_iso,
     get_day_calendar_meta,
     load_preserved_input_modified_times,
@@ -131,63 +134,16 @@ class BuildDashboardPayloadTests(unittest.TestCase):
 
         self.assertEqual(section["trend"]["chartTitle"], "7 月NEV 4车新增线索趋势")
 
-    def test_sylphy_section_stays_frozen_after_cutoff(self) -> None:
-        report_date = date(2026, 8, 1)
-        frozen_actual = {
-            SYLPHY_FREEZE_DATE: {
-                "leads": 20,
-                "validLeads": 10,
-                "arrivals": 1,
-                "orders": 0,
-                "deals": 0,
-            },
-            report_date: {
-                "leads": 200,
-                "validLeads": 99,
-                "arrivals": 9,
-                "orders": 9,
-                "deals": 9,
-            },
-        }
+    def test_sylphy_history_is_preserved_but_not_rendered(self) -> None:
+        ice_section_ids = [item["id"] for item in self.payload["dashboards"]["ice"]["sections"]]
+        brief_kinds = [
+            item["kind"]
+            for item in self.payload["dashboards"]["brief"]["briefing"]["sections"]
+        ]
 
-        def load_ice_daily_stub(sheet, _start_date, _end_date):
-            return frozen_actual if sheet.title == "十五代轩逸按日" else {}
-
-        empty_arrival_maps = {
-            "total_current": {},
-            "total_previous": {},
-            "nev_current": {},
-            "nev_previous": {},
-            "ice_current": {},
-            "ice_previous": {},
-        }
-        with (
-            patch("scripts.build_dashboard.load_nev_daily", return_value={}),
-            patch("scripts.build_dashboard.load_nev_targets", return_value={}),
-            patch("scripts.build_dashboard.load_ice_daily", side_effect=load_ice_daily_stub),
-            patch("scripts.build_dashboard.build_arrival_daily_maps", return_value=empty_arrival_maps),
-        ):
-            payload = build_payload(
-                LEADS_BOOK,
-                ARRIVAL_BOOK,
-                report_date_override=report_date,
-            )
-
-        section = next(
-            item for item in payload["dashboards"]["ice"]["sections"]
-            if item["id"] == "sylphy-15"
-        )
-        cards = {card["label"]: card for card in section["summary"]["cards"]}
-        brief_section = next(
-            item for item in payload["dashboards"]["brief"]["briefing"]["sections"]
-            if item["kind"] == "sylphy15"
-        )
-
-        self.assertEqual(cards["累计有效线索"]["displayValue"], "10")
-        self.assertEqual(cards["当日有效线索"]["displayValue"], "10")
-        self.assertEqual(cards["当日有效线索"]["note"], "2026-07-15")
-        self.assertIn("当日实绩 10", brief_section["lines"][0])
-        self.assertNotIn("99", brief_section["lines"][0])
+        self.assertIn("十五代轩逸按日", self.payload["analysis"]["sheetNames"])
+        self.assertNotIn("sylphy-15", ice_section_ids)
+        self.assertNotIn("sylphy15", brief_kinds)
 
     def test_new_pathfinder_section_follows_existing_nev_models(self) -> None:
         sections = self.payload["dashboards"]["nev"]["sections"]
@@ -324,7 +280,17 @@ class BuildDashboardPayloadTests(unittest.TestCase):
 
         self.assertEqual(
             [section["kind"] for section in sections],
-            ["intro", "nev", "sylphy15", "new-pathfinder", "arrival"],
+            ["intro", "valid-leads", "nev", "new-pathfinder", "arrival"],
+        )
+        self.assertEqual(sections_by_kind["valid-leads"]["title"], "全车系有效线索")
+        self.assertEqual(sections_by_kind["nev"]["title"], "NEV新增线索")
+        self.assertEqual(
+            sections_by_kind["valid-leads"]["note"],
+            "备注：目标口径为下半年穿透目标分月值",
+        )
+        self.assertEqual(
+            sections_by_kind["nev"]["note"],
+            "备注：目标口径为GTM输入的月度管控值",
         )
         self.assertEqual(sections_by_kind["new-pathfinder"]["title"], "2026款探陆线索")
         self.assertIn("2026款探陆累计实绩 2", sections_by_kind["new-pathfinder"]["lines"][0])
@@ -336,10 +302,14 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertEqual(
             trend["matrix"]["visibleRowKeys"],
             [
+                "samePeriodActual",
+                "samePeriodCumulative",
                 "previousActual",
                 "previousCumulative",
                 "actual",
                 "cumulativeActual",
+                "dayYoy",
+                "cumulativeYoy",
                 "dayDelta",
                 "cumulativeDelta",
             ],
@@ -575,6 +545,67 @@ class BuildDashboardPayloadTests(unittest.TestCase):
 
 
 class BuildDashboardValidationTests(unittest.TestCase):
+    def test_valid_leads_target_yoy_and_mom_use_their_expected_sources(self) -> None:
+        report_date = date(2026, 7, 1)
+        current = {report_date: {"validLeads": 334_131}}
+        previous_period = {date(2026, 6, 1): {"validLeads": 320_000}}
+        same_period = {date(2025, 7, 1): {"validLeads": 300_000}}
+
+        trend = build_valid_leads_control_trend(
+            report_date,
+            current,
+            previous_period,
+            same_period,
+            668_262,
+        )
+        items = {item["label"]: item["displayValue"] for item in trend["summary"]["items"]}
+        brief = build_valid_leads_brief(
+            report_date,
+            current,
+            previous_period,
+            same_period,
+            668_262,
+        )
+
+        self.assertEqual(items["累计实绩"], "334,131")
+        self.assertEqual(items["本月目标"], "668,262")
+        self.assertEqual(items["累计达成率"], "50.0%")
+        self.assertEqual(items["同比"], "11.4%")
+        self.assertEqual(items["环比"], "4.4%")
+        self.assertEqual(
+            brief["lines"],
+            ["累计实绩 334,131，累计达成率 50.0%；同比 11.4%，环比 4.4%"],
+        )
+
+    def test_arrival_brief_keeps_same_period_as_yoy_and_previous_month_as_mom(self) -> None:
+        report_date = date(2026, 7, 2)
+        arrival_maps = {
+            "total_current": {date(2026, 7, 1): 100, report_date: 200},
+            "total_same_period": {date(2025, 7, 1): 50, date(2025, 7, 2): 50},
+            "total_previous_period": {date(2026, 6, 1): 80, date(2026, 6, 2): 120},
+            "nev_current": {date(2026, 7, 1): 40, report_date: 60},
+            "nev_same_period": {date(2025, 7, 1): 20, date(2025, 7, 2): 20},
+            "nev_previous_period": {date(2026, 6, 1): 30, date(2026, 6, 2): 50},
+            "ice_current": {date(2026, 7, 1): 60, report_date: 140},
+            "ice_same_period": {date(2025, 7, 1): 30, date(2025, 7, 2): 30},
+            "ice_previous_period": {date(2026, 6, 1): 50, date(2026, 6, 2): 70},
+        }
+
+        brief = build_arrival_brief(report_date, arrival_maps)
+
+        self.assertEqual(
+            brief["lines"][0],
+            "全国累计来店 300，同比 200.0%，环比 50.0%；当日来店 200，同比 300.0%，环比 66.7%",
+        )
+        self.assertEqual(
+            brief["lines"][1],
+            "①NEV累计来店 100，同比 150.0%，环比 25.0%；当日来店 60，同比 200.0%，环比 20.0%",
+        )
+        self.assertEqual(
+            brief["lines"][2],
+            "②ICE累计来店 200，同比 233.3%，环比 66.7%；当日来店 140，同比 366.7%，环比 100.0%",
+        )
+
     def test_day_calendar_meta_distinguishes_holiday_weekend_makeup_and_regular_workday(self) -> None:
         self.assertEqual(get_day_calendar_meta(date(2026, 5, 4))["dayType"], "holiday")
         self.assertEqual(get_day_calendar_meta(date(2026, 5, 5))["dayType"], "holiday")

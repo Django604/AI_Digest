@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-07-31T09:10:03",
+  "generatedAt": "2026-07-31T13:17:01",
   "reportDate": "2026-07-30",
   "reportDateLabel": "2026-07-30",
   "inputs": {
     "workbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_xsai.xlsm",
     "workbookName": "NEV+ICE_xsai.xlsm",
-    "workbookModifiedAt": "2026-07-31T09:09:59",
-    "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsx",
-    "arrivalWorkbookName": "NEV+ICE_ldai.xlsx",
-    "arrivalWorkbookModifiedAt": "2026-07-31T09:10:01"
+    "workbookModifiedAt": "2026-07-31T11:15:29",
+    "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsm",
+    "arrivalWorkbookName": "NEV+ICE_ldai.xlsm",
+    "arrivalWorkbookModifiedAt": "2026-07-31T11:21:53"
   },
   "outputs": {
     "dashboardJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.json",
@@ -22,8 +22,8 @@
     "archiveSummaryJson": "./data/monthly/2026-07/dashboard.summary.json",
     "archiveIndexJson": "./data/monthly/index.json",
     "archiveDashboardChanged": true,
-    "archiveSummaryChanged": true,
-    "archiveIndexChanged": true
+    "archiveSummaryChanged": false,
+    "archiveIndexChanged": false
   },
   "stats": {
     "dashboardCount": 5,
@@ -31,14 +31,15 @@
       "brief": 0,
       "lead-control": 1,
       "nev": 6,
-      "ice": 2,
+      "ice": 1,
       "arrival": 1
     },
-    "sheetCount": 7,
-    "issueCount": 2
+    "sheetCount": 9,
+    "issueCount": 3
   },
   "warnings": [
     "线索简报按底层数据重建，避免继续沿用历史模板文案。",
-    "全国来店简报与趋势改为基于 4 张来店底表聚合生成，不再依赖汇总页缓存结果。"
+    "全国来店简报与趋势基于本期、上期、同期共 6 张来店底表聚合生成。",
+    "历史底表继续保留，页面与每日简报不再展示。"
   ]
 }

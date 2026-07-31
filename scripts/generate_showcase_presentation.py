@@ -568,7 +568,7 @@ def build_slides(context: dict[str, object]) -> list[SlideSpec]:
             ("每日简报", ["适合晨会口播", "自动整理 NEV / 轩逸 / 来店摘要"], COLORS["surface"]),
             ("全车线索总控", ["累计值、当日值、环比同屏", "先看总盘，再决定追哪块"], COLORS["surface_alt"]),
             ("NEV 看板", [f"覆盖 {' / '.join(context['nev_sections'])}", "总盘 + 车型分段追达成"], COLORS["surface"]),
-            ("ICE 看板", [f"覆盖 {' / '.join(context['ice_sections'])}", "总盘外加十五代轩逸重点看"], COLORS["surface_alt"]),
+            ("ICE 看板", [f"覆盖 {' / '.join(context['ice_sections'])}", "保留全车系 ICE 总盘分析"], COLORS["surface_alt"]),
             ("全国来店", ["累计 / 当日 / NEV vs ICE 结构", "适合看门店流量和结构变化"], COLORS["surface"]),
         ],
         [

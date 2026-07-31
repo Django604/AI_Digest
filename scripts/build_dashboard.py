@@ -17,7 +17,7 @@ from openpyxl.utils.datetime import from_excel
 ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = ROOT / "docs"
 LEADS_BOOK = ROOT / "data" / "source" / "NEV+ICE_xsai.xlsm"
-ARRIVAL_BOOK = ROOT / "data" / "source" / "NEV+ICE_ldai.xlsx"
+ARRIVAL_BOOK = ROOT / "data" / "source" / "NEV+ICE_ldai.xlsm"
 OUT_JSON = ROOT / "docs" / "data" / "dashboard.json"
 SUMMARY_JSON = ROOT / "docs" / "data" / "dashboard.summary.json"
 MONTHLY_ARCHIVE_DIR = ROOT / "docs" / "data" / "monthly"
@@ -47,6 +47,9 @@ NEW_PATHFINDER_TARGET_OVERRIDES = {
 NEW_PATHFINDER_TREND_START_DATES = {
     (2026, 7): date(2026, 7, 16),
 }
+VALID_LEADS_MONTHLY_TARGETS = {
+    (2026, 7): 668_262,
+}
 SYLPHY_TARGET_OVERRIDES = {
     (2026, 4): [
         1827, 1828, 1828, 1772, 1772, 1772, 1828, 1828, 1828, 1828,
@@ -66,13 +69,26 @@ SYLPHY_TARGET_OVERRIDES = {
     ],
 }
 AGGREGATE_FIELDS = ("newLeads", "validLeads", "storeLeads", "arrivals", "leads", "orders", "deals")
-REQUIRED_LEADS_SHEETS = ("参数", "目标竖版", "全国按日NEV", "全国按日ICE", "十五代轩逸按日")
-REQUIRED_ARRIVAL_SHEETS = ("NEV本期来店", "NEV同期来店", "ICE本期来店", "ICE同期来店")
+REQUIRED_LEADS_SHEETS = (
+    "参数",
+    "目标竖版",
+    "全国按日NEV",
+    "全国按日NEV-同期",
+    "全国按日ICE",
+    "全国按日ICE-同期",
+)
+REQUIRED_ARRIVAL_SHEETS = (
+    "NEV本期来店",
+    "NEV上期来店",
+    "NEV同期来店",
+    "ICE本期来店",
+    "ICE上期来店",
+    "ICE同期来店",
+)
 REQUIRED_HEADERS = {
     "目标竖版": (2, ("合计",)),
     "全国按日NEV": (2, ("新增线索量", "有效线索量", "门店线索总量", "新增到店量")),
     "全国按日ICE": (1, ("按日", "线索总量", "有效线索量", "到店量", "订单量", "成交量")),
-    "十五代轩逸按日": (1, ("按日", "线索总量", "有效线索量", "到店量", "订单量", "成交量")),
 }
 
 SPECIAL_DAY_OFFS = {
@@ -522,6 +538,18 @@ def load_nev_daily(ws, start_date: date, end_date: date) -> dict[str, dict[date,
     return result
 
 
+def load_optional_nev_daily(
+    ws,
+    start_date: date,
+    end_date: date,
+) -> dict[str, dict[date, dict[str, int | float | None]]]:
+    headers = header_map(ws, 2)
+    required = {"新增线索量", "有效线索量", "门店线索总量", "新增到店量"}
+    if not required.issubset(headers):
+        return {}
+    return load_nev_daily(ws, start_date, end_date)
+
+
 def load_ice_daily(ws, start_date: date, end_date: date) -> dict[date, dict[str, int | float | None]]:
     headers = header_map(ws, 1)
     result: dict[date, dict[str, int | float | None]] = {}
@@ -544,6 +572,18 @@ def load_ice_daily(ws, start_date: date, end_date: date) -> dict[date, dict[str,
     return result
 
 
+def load_optional_ice_daily(
+    ws,
+    start_date: date,
+    end_date: date,
+) -> dict[date, dict[str, int | float | None]]:
+    headers = header_map(ws, 1)
+    required = {"按日", "线索总量", "有效线索量", "到店量", "订单量", "成交量"}
+    if not required.issubset(headers):
+        return {}
+    return load_ice_daily(ws, start_date, end_date)
+
+
 def aggregate_daily_series(*groups: dict[date, dict[str, int | float | None]]) -> dict[date, dict[str, int | float | None]]:
     merged: dict[date, dict[str, int | float | None]] = {}
     all_dates = sorted({d for group in groups for d in group})
@@ -559,6 +599,12 @@ def aggregate_daily_series(*groups: dict[date, dict[str, int | float | None]]) -
                     totals[key] += value
         merged[current_date] = {key: (value or None) for key, value in totals.items()}
     return merged
+
+
+def aggregate_model_daily_series(
+    models: dict[str, dict[date, dict[str, int | float | None]]],
+) -> dict[date, dict[str, int | float | None]]:
+    return aggregate_daily_series(*models.values()) if models else {}
 
 
 def aggregate_targets(*groups: dict[date, int | float]) -> dict[date, int | float]:
@@ -675,9 +721,16 @@ def build_monthly_series_context(
 def build_valid_leads_control_trend(
     report_date: date,
     current_actuals: dict[date, dict[str, int | float | None]],
-    previous_actuals: dict[date, dict[str, int | float | None]],
+    previous_period_actuals: dict[date, dict[str, int | float | None]],
+    same_period_actuals: dict[date, dict[str, int | float | None]],
+    monthly_target: int | float | None,
 ) -> dict[str, Any]:
-    context = build_monthly_series_context(report_date, current_actuals, previous_actuals, "validLeads")
+    context = build_monthly_series_context(
+        report_date,
+        current_actuals,
+        previous_period_actuals,
+        "validLeads",
+    )
     dates = context["dates"]
     report_index = context["reportIndex"]
     prev_dates = context["prevDates"]
@@ -689,50 +742,81 @@ def build_valid_leads_control_trend(
     curr_cum = context["currCumulative"]
     day_delta = context["dayDelta"]
     column_meta = context["columnMeta"]
+    same_dates = [aligned_previous_year_date(item) for item in dates]
+    same_daily = [
+        same_period_actuals.get(same_date, {}).get("validLeads") if same_date else None
+        for same_date in same_dates
+    ]
+    has_same_period = any(isinstance(value, (int, float)) for value in same_daily)
+    same_cum = (
+        build_running_totals(same_daily, stop_at=report_index)
+        if has_same_period
+        else [None] * len(same_daily)
+    )
+    day_yoy = [delta_ratio(current, same) for current, same in zip(curr_daily, same_daily)]
+    cumulative_yoy = [delta_ratio(current, same) for current, same in zip(curr_cum, same_cum)]
     cumulative_delta = [delta_ratio(curr_value, prev_value) for curr_value, prev_value in zip(curr_cum, prev_cum)]
     daily_actual = curr_daily[report_index]
     daily_previous = prev_daily[report_index]
+    daily_same_period = same_daily[report_index]
     cumulative_actual = curr_cum[report_index]
     cumulative_previous = prev_cum[report_index]
+    cumulative_same_period = same_cum[report_index]
+    cumulative_achievement = ratio(cumulative_actual, monthly_target)
+    cumulative_yoy_value = delta_ratio(cumulative_actual, cumulative_same_period)
+    cumulative_mom_value = delta_ratio(cumulative_actual, cumulative_previous)
 
     return {
         "chartTitle": f"{report_date.month}月全车系有效线索趋势",
         "summary": {
             "items": [
-                {"label": "累计本期实绩", "value": normalize_scalar(cumulative_actual), "displayValue": fmt_count(cumulative_actual)},
-                {"label": "累计上期实绩", "value": normalize_scalar(cumulative_previous), "displayValue": fmt_count(cumulative_previous)},
+                {"label": "累计实绩", "value": normalize_scalar(cumulative_actual), "displayValue": fmt_count(cumulative_actual)},
+                {"label": "本月目标", "value": normalize_scalar(monthly_target), "displayValue": fmt_count(monthly_target)},
                 {
-                    "label": "累计环比",
-                    "value": normalize_scalar(delta_ratio(cumulative_actual, cumulative_previous)),
-                    "displayValue": fmt_percent(delta_ratio(cumulative_actual, cumulative_previous)),
+                    "label": "累计达成率",
+                    "value": normalize_scalar(cumulative_achievement),
+                    "displayValue": fmt_percent(cumulative_achievement),
                 },
-                {"label": "当日本期实绩", "value": normalize_scalar(daily_actual), "displayValue": fmt_count(daily_actual)},
-                {"label": "当日上期实绩", "value": normalize_scalar(daily_previous), "displayValue": fmt_count(daily_previous)},
                 {
-                    "label": "当日环比",
-                    "value": normalize_scalar(delta_ratio(daily_actual, daily_previous)),
-                    "displayValue": fmt_percent(delta_ratio(daily_actual, daily_previous)),
+                    "label": "同比",
+                    "value": normalize_scalar(cumulative_yoy_value),
+                    "displayValue": fmt_percent(cumulative_yoy_value),
                 },
+                {
+                    "label": "环比",
+                    "value": normalize_scalar(cumulative_mom_value),
+                    "displayValue": fmt_percent(cumulative_mom_value),
+                },
+                {"label": "当日实绩", "value": normalize_scalar(daily_actual), "displayValue": fmt_count(daily_actual)},
             ]
         },
         "matrix": {
             "labels": [fmt_axis_date(item) for item in dates],
             "columnMeta": column_meta,
             "visibleRowKeys": [
+                "samePeriodActual",
+                "samePeriodCumulative",
                 "previousActual",
                 "previousCumulative",
                 "actual",
                 "cumulativeActual",
+                "dayYoy",
+                "cumulativeYoy",
                 "dayDelta",
                 "cumulativeDelta",
             ],
             "rows": [
+                {"key": "samePeriodDate", "label": "同期日期", "displayValues": [fmt_sheet_date(item) for item in same_dates]},
                 {"key": "previousDate", "label": "上期日期", "displayValues": prev_dates},
                 {"key": "currentDate", "label": "本期日期", "displayValues": curr_dates},
+                {"key": "samePeriodActual", "label": "同期实绩", "displayValues": [fmt_plain(v) for v in same_daily]},
+                {"key": "samePeriodCumulative", "label": "同期累计实绩", "displayValues": [fmt_plain(v) for v in same_cum]},
                 {"key": "previousActual", "label": "上期实绩", "displayValues": [fmt_plain(v) for v in prev_daily]},
                 {"key": "previousCumulative", "label": "上期累计实绩", "displayValues": [fmt_plain(v) for v in prev_cum]},
                 {"key": "actual", "label": "本期实绩", "displayValues": [fmt_plain(v) for v in curr_daily]},
                 {"key": "cumulativeActual", "label": "本期累计实绩", "displayValues": [fmt_plain(v) for v in curr_cum]},
+                {"key": "dayYoy", "label": "同比", "displayValues": [fmt_percent(v) for v in day_yoy]},
+                {"key": "cumulativeYoy", "label": "累计同比", "displayValues": [fmt_percent(v) for v in cumulative_yoy]},
                 {"key": "dayDelta", "label": "环比", "displayValues": [fmt_percent(v) for v in day_delta]},
                 {"key": "cumulativeDelta", "label": "累计环比", "displayValues": [fmt_percent(v) for v in cumulative_delta]},
             ],
@@ -1021,11 +1105,8 @@ def build_line_brief(
     report_date: date,
     nev_daily,
     nev_targets,
-    sylphy_daily,
-    sylphy_targets,
     new_pathfinder_daily,
     new_pathfinder_targets,
-    sylphy_report_date: date | None = None,
 ) -> dict[str, Any]:
     total_cum_actual = total_day_actual = total_cum_target = total_day_target = 0
     nev_lines: list[str] = []
@@ -1043,13 +1124,6 @@ def build_line_brief(
         marker = BRIEF_MARKERS[index]
         nev_lines.append(f"{marker}{model_name}累计实绩{fmt_count(cum_actual)}，累计达成率{fmt_percent(ratio(cum_actual, cum_target))}；当日实绩{fmt_count(day_actual)}，当日达成率{fmt_percent(ratio(day_actual, day_target))}")
     nev_summary = f"四车累计实绩{fmt_count(total_cum_actual)}，累计达成率{fmt_percent(ratio(total_cum_actual, total_cum_target))}；当日实绩{fmt_count(total_day_actual)}，当日达成率{fmt_percent(ratio(total_day_actual, total_day_target))}"
-    sylphy_line = build_single_model_brief_line(
-        "十五代轩逸",
-        sylphy_report_date or report_date,
-        sylphy_daily,
-        sylphy_targets,
-        actual_key="validLeads",
-    )
     new_pathfinder_line = build_single_model_brief_line(
         NEW_PATHFINDER_MODEL,
         report_date,
@@ -1060,8 +1134,12 @@ def build_line_brief(
     headline = f"请查收{report_date.strftime('%m.%d')}线索&来店日报"
     sections = [
         {"kind": "intro", "title": "开场", "lines": ["各位领导：", headline]},
-        {"kind": "nev", "title": "NEV线索", "lines": [nev_summary, *nev_lines]},
-        {"kind": "sylphy15", "title": "十五代轩逸线索", "lines": [sylphy_line]},
+        {
+            "kind": "nev",
+            "title": "NEV新增线索",
+            "lines": [nev_summary, *nev_lines],
+            "note": "备注：目标口径为GTM输入的月度管控值",
+        },
         {"kind": "new-pathfinder", "title": f"{NEW_PATHFINDER_MODEL}线索", "lines": [new_pathfinder_line]},
     ]
     return {
@@ -1071,48 +1149,90 @@ def build_line_brief(
         "dateLabel": report_date.strftime("%m.%d"),
         "reportDate": report_date.isoformat(),
         "sections": sections,
-        "generatedText": "\n\n".join(["\n".join(item["lines"]) if item["kind"] == "intro" else "\n".join([f"【{item['title']}】", *item["lines"]]) for item in sections]),
+        "generatedText": "\n\n".join(
+            "\n".join(item["lines"])
+            if item["kind"] == "intro"
+            else "\n".join([f"【{item['title']}】", *item["lines"], *([item["note"]] if item.get("note") else [])])
+            for item in sections
+        ),
+    }
+
+
+def build_valid_leads_brief(
+    report_date: date,
+    current_actuals: dict[date, dict[str, int | float | None]],
+    previous_period_actuals: dict[date, dict[str, int | float | None]],
+    same_period_actuals: dict[date, dict[str, int | float | None]],
+    monthly_target: int | float | None,
+) -> dict[str, Any]:
+    cumulative_actual = sum(
+        (item.get("validLeads") or 0)
+        for current_date, item in current_actuals.items()
+        if current_date <= report_date
+    )
+    cumulative_previous = sum((item.get("validLeads") or 0) for item in previous_period_actuals.values())
+    cumulative_same_period = sum((item.get("validLeads") or 0) for item in same_period_actuals.values())
+    has_previous = any(isinstance(item.get("validLeads"), (int, float)) for item in previous_period_actuals.values())
+    has_same_period = any(isinstance(item.get("validLeads"), (int, float)) for item in same_period_actuals.values())
+    yoy = delta_ratio(cumulative_actual, cumulative_same_period if has_same_period else None)
+    mom = delta_ratio(cumulative_actual, cumulative_previous if has_previous else None)
+    achievement = ratio(cumulative_actual, monthly_target)
+    return {
+        "kind": "valid-leads",
+        "title": "全车系有效线索",
+        "lines": [
+            (
+                f"累计实绩 {fmt_count(cumulative_actual)}，累计达成率 {fmt_percent(achievement)}；"
+                f"同比 {fmt_percent(yoy)}，环比 {fmt_percent(mom)}"
+            )
+        ],
+        "note": "备注：目标口径为下半年穿透目标分月值",
     }
 
 
 def build_arrival_brief(report_date: date, arrival_maps: dict[str, dict[date, int | float]]) -> dict[str, Any]:
-    total_series = build_arrival_series(report_date, arrival_maps["total_current"], arrival_maps["total_previous"])
-    nev_series = build_arrival_series(report_date, arrival_maps["nev_current"], arrival_maps["nev_previous"])
-    ice_series = build_arrival_series(report_date, arrival_maps["ice_current"], arrival_maps["ice_previous"])
-
-    total_index = total_series["reportIndex"]
-    nev_index = nev_series["reportIndex"]
-    ice_index = ice_series["reportIndex"]
-    lines = [
-        format_arrival_brief_line(
-            "全国",
-            total_series["currentCumulative"][total_index],
-            total_series["previousCumulative"][total_index],
-            total_series["currentDaily"][total_index],
-            total_series["previousDaily"][total_index],
-        ),
-        format_arrival_brief_line(
-            "NEV",
-            nev_series["currentCumulative"][nev_index],
-            nev_series["previousCumulative"][nev_index],
-            nev_series["currentDaily"][nev_index],
-            nev_series["previousDaily"][nev_index],
-            marker="①",
-        ),
-        format_arrival_brief_line(
-            "ICE",
-            ice_series["currentCumulative"][ice_index],
-            ice_series["previousCumulative"][ice_index],
-            ice_series["currentDaily"][ice_index],
-            ice_series["previousDaily"][ice_index],
-            marker="②",
-        ),
-    ]
+    lines: list[str] = []
+    for label, prefix, marker in (
+        ("全国", "total", ""),
+        ("NEV", "nev", "①"),
+        ("ICE", "ice", "②"),
+    ):
+        same_period_series = build_arrival_series(
+            report_date,
+            arrival_maps[f"{prefix}_current"],
+            arrival_maps[f"{prefix}_same_period"],
+        )
+        previous_period_series = build_arrival_series(
+            report_date,
+            arrival_maps[f"{prefix}_current"],
+            arrival_maps[f"{prefix}_previous_period"],
+            comparison_period="month",
+        )
+        report_index = same_period_series["reportIndex"]
+        lines.append(
+            format_arrival_brief_line(
+                label,
+                same_period_series["currentCumulative"][report_index],
+                same_period_series["previousCumulative"][report_index],
+                previous_period_series["previousCumulative"][report_index],
+                same_period_series["currentDaily"][report_index],
+                same_period_series["previousDaily"][report_index],
+                previous_period_series["previousDaily"][report_index],
+                marker=marker,
+            )
+        )
     return {
         "kind": "arrival",
         "title": "来店简报",
         "lines": [item for item in lines if item],
-        "sourceSheets": ["NEV本期来店", "NEV同期来店", "ICE本期来店", "ICE同期来店"],
+        "sourceSheets": [
+            "NEV本期来店",
+            "NEV上期来店",
+            "NEV同期来店",
+            "ICE本期来店",
+            "ICE上期来店",
+            "ICE同期来店",
+        ],
     }
 
 
@@ -1128,13 +1248,18 @@ def safe_close_workbook(workbook: Any) -> None:
                 pass
 
 
-def aligned_previous_year_date(current_date: date) -> date:
-    return date(current_date.year - 1, current_date.month, current_date.day)
+def aligned_previous_year_date(current_date: date) -> date | None:
+    try:
+        return date(current_date.year - 1, current_date.month, current_date.day)
+    except ValueError:
+        return None
 
 
 def load_arrival_daily_sheet(ws) -> dict[date, int | float]:
     result: dict[date, int | float] = {}
     for row in ws.iter_rows(min_row=1, values_only=True):
+        if len(row) < 2:
+            continue
         current_date = coerce_date(row[0])
         current_value = num(row[1])
         if current_date is None or current_value is None:
@@ -1145,40 +1270,54 @@ def load_arrival_daily_sheet(ws) -> dict[date, int | float]:
 
 def build_arrival_daily_maps(arrival_wb) -> dict[str, dict[date, int | float]]:
     nev_current = load_arrival_daily_sheet(arrival_wb["NEV本期来店"])
-    nev_previous = load_arrival_daily_sheet(arrival_wb["NEV同期来店"])
+    nev_previous_period = load_arrival_daily_sheet(arrival_wb["NEV上期来店"])
+    nev_same_period = load_arrival_daily_sheet(arrival_wb["NEV同期来店"])
     ice_current = load_arrival_daily_sheet(arrival_wb["ICE本期来店"])
-    ice_previous = load_arrival_daily_sheet(arrival_wb["ICE同期来店"])
+    ice_previous_period = load_arrival_daily_sheet(arrival_wb["ICE上期来店"])
+    ice_same_period = load_arrival_daily_sheet(arrival_wb["ICE同期来店"])
 
     total_current: dict[date, int | float] = {}
-    total_previous: dict[date, int | float] = {}
+    total_previous_period: dict[date, int | float] = {}
+    total_same_period: dict[date, int | float] = {}
     for current_date in sorted({*nev_current.keys(), *ice_current.keys()}):
         total_current[current_date] = (nev_current.get(current_date) or 0) + (ice_current.get(current_date) or 0)
-    for current_date in sorted({*nev_previous.keys(), *ice_previous.keys()}):
-        total_previous[current_date] = (nev_previous.get(current_date) or 0) + (ice_previous.get(current_date) or 0)
+    for current_date in sorted({*nev_previous_period.keys(), *ice_previous_period.keys()}):
+        total_previous_period[current_date] = (nev_previous_period.get(current_date) or 0) + (ice_previous_period.get(current_date) or 0)
+    for current_date in sorted({*nev_same_period.keys(), *ice_same_period.keys()}):
+        total_same_period[current_date] = (nev_same_period.get(current_date) or 0) + (ice_same_period.get(current_date) or 0)
 
     return {
         "total_current": total_current,
-        "total_previous": total_previous,
+        "total_previous_period": total_previous_period,
+        "total_same_period": total_same_period,
         "nev_current": nev_current,
-        "nev_previous": nev_previous,
+        "nev_previous_period": nev_previous_period,
+        "nev_same_period": nev_same_period,
         "ice_current": ice_current,
-        "ice_previous": ice_previous,
+        "ice_previous_period": ice_previous_period,
+        "ice_same_period": ice_same_period,
     }
 
 
 def build_arrival_series(
     report_date: date,
     current_map: dict[date, int | float],
-    previous_map: dict[date, int | float],
+    comparison_map: dict[date, int | float],
+    *,
+    comparison_period: str = "year",
 ) -> dict[str, Any]:
     dates = month_dates(report_date)
     current_daily: list[int | float | None] = []
     previous_daily: list[int | float | None] = []
 
     for current_date in dates:
-        previous_date = aligned_previous_year_date(current_date)
+        previous_date = (
+            aligned_previous_date(current_date)
+            if comparison_period == "month"
+            else aligned_previous_year_date(current_date)
+        )
         current_daily.append(current_map.get(current_date) if current_date <= report_date else None)
-        previous_daily.append(previous_map.get(previous_date))
+        previous_daily.append(comparison_map.get(previous_date) if previous_date else None)
 
     report_indexes = [index for index, value in enumerate(current_daily) if isinstance(value, (int, float))]
     report_index = report_indexes[-1] if report_indexes else max(report_date.day - 1, 0)
@@ -1207,20 +1346,31 @@ def build_arrival_series(
 def format_arrival_brief_line(
     label: str,
     current_cumulative: int | float | None,
-    previous_cumulative: int | float | None,
+    same_period_cumulative: int | float | None,
+    previous_period_cumulative: int | float | None,
     daily_current: int | float | None,
-    daily_previous: int | float | None,
+    daily_same_period: int | float | None,
+    daily_previous_period: int | float | None,
     *,
     marker: str = "",
 ) -> str:
     prefix = f"{marker}{label}"
-    return f"{prefix}累计来店{fmt_count(current_cumulative)}；当日来店{fmt_count(daily_current)}"
+    return (
+        f"{prefix}累计来店 {fmt_count(current_cumulative)}，"
+        f"同比 {fmt_percent(delta_ratio(current_cumulative, same_period_cumulative))}，"
+        f"环比 {fmt_percent(delta_ratio(current_cumulative, previous_period_cumulative))}；"
+        f"当日来店 {fmt_count(daily_current)}，"
+        f"同比 {fmt_percent(delta_ratio(daily_current, daily_same_period))}，"
+        f"环比 {fmt_percent(delta_ratio(daily_current, daily_previous_period))}"
+    )
 
 
 def build_valid_leads_control_section(
     report_date: date,
     current_actuals: dict[date, dict[str, int | float | None]],
-    previous_actuals: dict[date, dict[str, int | float | None]],
+    previous_period_actuals: dict[date, dict[str, int | float | None]],
+    same_period_actuals: dict[date, dict[str, int | float | None]],
+    monthly_target: int | float | None,
 ) -> dict[str, Any]:
     return {
         "id": "lead-control-total",
@@ -1228,51 +1378,87 @@ def build_valid_leads_control_section(
         "title": "",
         "headline": "",
         "summary": {"cards": []},
-        "trend": build_valid_leads_control_trend(report_date, current_actuals, previous_actuals),
+        "trend": build_valid_leads_control_trend(
+            report_date,
+            current_actuals,
+            previous_period_actuals,
+            same_period_actuals,
+            monthly_target,
+        ),
         "note": "",
         "noteHasError": False,
     }
 
 
 def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date, int | float]]) -> dict[str, Any]:
-    total_series = build_arrival_series(report_date, arrival_maps["total_current"], arrival_maps["total_previous"])
-    nev_series = build_arrival_series(report_date, arrival_maps["nev_current"], arrival_maps["nev_previous"])
-    ice_series = build_arrival_series(report_date, arrival_maps["ice_current"], arrival_maps["ice_previous"])
+    total_series = build_arrival_series(report_date, arrival_maps["total_current"], arrival_maps["total_same_period"])
+    total_previous_period_series = build_arrival_series(
+        report_date,
+        arrival_maps["total_current"],
+        arrival_maps["total_previous_period"],
+        comparison_period="month",
+    )
+    nev_series = build_arrival_series(report_date, arrival_maps["nev_current"], arrival_maps["nev_same_period"])
+    nev_previous_period_series = build_arrival_series(
+        report_date,
+        arrival_maps["nev_current"],
+        arrival_maps["nev_previous_period"],
+        comparison_period="month",
+    )
+    ice_series = build_arrival_series(report_date, arrival_maps["ice_current"], arrival_maps["ice_same_period"])
+    ice_previous_period_series = build_arrival_series(
+        report_date,
+        arrival_maps["ice_current"],
+        arrival_maps["ice_previous_period"],
+        comparison_period="month",
+    )
 
     current_dates = total_series["dates"]
     previous_dates = [aligned_previous_year_date(item) for item in current_dates]
     current_daily = total_series["currentDaily"]
     previous_daily = total_series["previousDaily"]
+    previous_period_daily = total_previous_period_series["previousDaily"]
     current_target = [None] * len(current_dates)
     chart_actual = total_series["chartActual"]
     current_cumulative = total_series["currentCumulative"]
     previous_cumulative = total_series["previousCumulative"]
+    previous_period_cumulative = total_previous_period_series["previousCumulative"]
     target_cumulative = [None] * len(current_dates)
     report_index = total_series["reportIndex"]
     month_prefix = f"{current_dates[report_index].month}月" if current_dates and current_dates[report_index] else ""
 
     matrix_rows = [
         {"key": "previousActual", "label": "同期来店", "displayValues": [fmt_plain(item) for item in previous_daily]},
+        {"key": "previousPeriodActual", "label": "上期来店", "displayValues": [fmt_plain(item) for item in previous_period_daily]},
         {"key": "target", "label": "本期目标", "displayValues": [fmt_plain(item) for item in current_target]},
         {"key": "actual", "label": "本期来店", "displayValues": [fmt_plain(item) for item in current_daily]},
         {"key": "dayDelta", "label": "同比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(current_daily, previous_daily)]},
+        {"key": "dayMom", "label": "环比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(current_daily, previous_period_daily)]},
         {"key": "nevActual", "label": "NEV本期实绩", "displayValues": [fmt_plain(item) for item in nev_series["currentDaily"]]},
+        {"key": "nevYoy", "label": "NEV同比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(nev_series["currentDaily"], nev_series["previousDaily"])]},
+        {"key": "nevMom", "label": "NEV环比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(nev_series["currentDaily"], nev_previous_period_series["previousDaily"])]},
         {"key": "iceActual", "label": "ICE本期实绩", "displayValues": [fmt_plain(item) for item in ice_series["currentDaily"]]},
         {"key": "iceDelta", "label": "ICE同比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(ice_series["currentDaily"], ice_series["previousDaily"])]},
+        {"key": "iceMom", "label": "ICE环比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(ice_series["currentDaily"], ice_previous_period_series["previousDaily"])]},
     ]
 
     trend = {
         "viewType": "arrival",
         "chartTitle": f"{current_dates[report_index].month}月全车系来店日趋势" if current_dates and current_dates[report_index] else "全车系来店日趋势",
-        "chartSubtitle": "同期来店 / 本期目标 / 本期来店 / 累计来店",
+        "chartSubtitle": "同期来店 / 本期来店 / 累计来店",
         "tableTitle": "全国来店明细表",
         "summary": {
             "items": [
                 {"label": "累计来店", "value": normalize_scalar(current_cumulative[report_index]), "displayValue": fmt_count(current_cumulative[report_index])},
                 {"label": "累计同期来店", "value": normalize_scalar(previous_cumulative[report_index]), "displayValue": fmt_count(previous_cumulative[report_index])},
-                {"label": "累计同期同比", "value": normalize_scalar(delta_ratio(current_cumulative[report_index], previous_cumulative[report_index])), "displayValue": fmt_percent(delta_ratio(current_cumulative[report_index], previous_cumulative[report_index]))},
+                {"label": "累计同比", "value": normalize_scalar(delta_ratio(current_cumulative[report_index], previous_cumulative[report_index])), "displayValue": fmt_percent(delta_ratio(current_cumulative[report_index], previous_cumulative[report_index]))},
+                {"label": "累计上期来店", "value": normalize_scalar(previous_period_cumulative[report_index]), "displayValue": fmt_count(previous_period_cumulative[report_index])},
+                {"label": "累计环比", "value": normalize_scalar(delta_ratio(current_cumulative[report_index], previous_period_cumulative[report_index])), "displayValue": fmt_percent(delta_ratio(current_cumulative[report_index], previous_period_cumulative[report_index]))},
                 {"label": "当日来店", "value": normalize_scalar(current_daily[report_index]), "displayValue": fmt_count(current_daily[report_index])},
                 {"label": "同期来店", "value": normalize_scalar(previous_daily[report_index]), "displayValue": fmt_count(previous_daily[report_index])},
+                {"label": "当日同比", "value": normalize_scalar(delta_ratio(current_daily[report_index], previous_daily[report_index])), "displayValue": fmt_percent(delta_ratio(current_daily[report_index], previous_daily[report_index]))},
+                {"label": "上期来店", "value": normalize_scalar(previous_period_daily[report_index]), "displayValue": fmt_count(previous_period_daily[report_index])},
+                {"label": "当日环比", "value": normalize_scalar(delta_ratio(current_daily[report_index], previous_period_daily[report_index])), "displayValue": fmt_percent(delta_ratio(current_daily[report_index], previous_period_daily[report_index]))},
             ]
         },
         "matrix": {
@@ -1280,11 +1466,16 @@ def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date
             "labels": [fmt_axis_date(item) for item in current_dates],
             "visibleRowKeys": [
                 "previousActual",
+                "previousPeriodActual",
                 "actual",
                 "dayDelta",
+                "dayMom",
                 "nevActual",
+                "nevYoy",
+                "nevMom",
                 "iceActual",
                 "iceDelta",
+                "iceMom",
             ],
             "columnMeta": [build_column_calendar_meta(current, previous) for current, previous in zip(current_dates, previous_dates)],
             "rows": matrix_rows,
@@ -1350,6 +1541,9 @@ def build_payload(
         previous_start = previous_month(report_date)
         previous_end = month_end(previous_start)
         current_end = month_end(report_date)
+        same_period_start = date(report_date.year - 1, report_date.month, 1)
+        same_period_end = month_end(same_period_start)
+        same_period_report_date = aligned_previous_year_date(report_date) or same_period_end
 
         nev_targets = load_nev_targets(leads["目标竖版"], current_start, current_end)
         nev_targets[NEW_PATHFINDER_MODEL] = resolve_new_pathfinder_targets(
@@ -1357,48 +1551,48 @@ def build_payload(
             nev_targets.get(NEW_PATHFINDER_MODEL, {}),
         )
         nev_daily_all = load_nev_daily(leads["全国按日NEV"], previous_start, current_end)
+        nev_same_period_all = load_optional_nev_daily(
+            leads["全国按日NEV-同期"],
+            same_period_start,
+            same_period_end,
+        )
         ice_daily_all = load_ice_daily(leads["全国按日ICE"], previous_start, current_end)
-        sylphy_report_date = min(report_date, SYLPHY_FREEZE_DATE)
-        sylphy_current_start = month_start(sylphy_report_date)
-        sylphy_previous_start = previous_month(sylphy_report_date)
-        sylphy_previous_end = month_end(sylphy_previous_start)
-        sylphy_current_end = month_end(sylphy_report_date)
-        sylphy_daily_all = load_ice_daily(
-            leads["十五代轩逸按日"],
-            sylphy_previous_start,
-            sylphy_current_end,
+        ice_same_period_all = load_optional_ice_daily(
+            leads["全国按日ICE-同期"],
+            same_period_start,
+            same_period_end,
         )
 
         nev_current = {model: {dt: value for dt, value in series.items() if current_start <= dt <= report_date} for model, series in nev_daily_all.items()}
         nev_previous = {model: {dt: value for dt, value in series.items() if previous_start <= dt <= previous_end} for model, series in nev_daily_all.items()}
+        nev_same_period = {
+            model: {
+                dt: value
+                for dt, value in series.items()
+                if same_period_start <= dt <= same_period_report_date
+            }
+            for model, series in nev_same_period_all.items()
+        }
         ice_current = {dt: value for dt, value in ice_daily_all.items() if current_start <= dt <= report_date}
         ice_previous = {dt: value for dt, value in ice_daily_all.items() if previous_start <= dt <= previous_end}
-        sylphy_current = {
+        ice_same_period = {
             dt: value
-            for dt, value in sylphy_daily_all.items()
-            if sylphy_current_start <= dt <= sylphy_report_date
+            for dt, value in ice_same_period_all.items()
+            if same_period_start <= dt <= same_period_report_date
         }
-        sylphy_previous = {
-            dt: value
-            for dt, value in sylphy_daily_all.items()
-            if sylphy_previous_start <= dt <= sylphy_previous_end
-        }
-        sylphy_targets = build_sylphy_target_series(sylphy_report_date)
         nev_total_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
         nev_total_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
-        nev_all_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_DETAIL_MODELS))
-        nev_all_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in NEV_DETAIL_MODELS))
+        nev_all_current = aggregate_model_daily_series(nev_current)
+        nev_all_previous = aggregate_model_daily_series(nev_previous)
+        nev_all_same_period = aggregate_model_daily_series(nev_same_period)
         arrival_maps = build_arrival_daily_maps(arrival)
 
         line_brief = build_line_brief(
             report_date,
             nev_current,
             nev_targets,
-            sylphy_current,
-            sylphy_targets,
             nev_current.get(NEW_PATHFINDER_MODEL, {}),
             nev_targets.get(NEW_PATHFINDER_MODEL, {}),
-            sylphy_report_date=sylphy_report_date,
         )
         arrival_brief = build_arrival_brief(report_date, arrival_maps)
         arrival_dashboard = build_arrival_dashboard(report_date, arrival_maps)
@@ -1406,7 +1600,28 @@ def build_payload(
         nev_total_targets = aggregate_targets(*(nev_targets.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
         valid_leads_total_current = aggregate_daily_series(nev_all_current, ice_current)
         valid_leads_total_previous = aggregate_daily_series(nev_all_previous, ice_previous)
-        data_dates = sorted({*nev_total_current.keys(), *ice_current.keys(), *sylphy_current.keys(), *valid_leads_total_current.keys()})
+        valid_leads_total_same_period = aggregate_daily_series(nev_all_same_period, ice_same_period)
+        valid_leads_monthly_target = VALID_LEADS_MONTHLY_TARGETS.get((report_date.year, report_date.month))
+        valid_leads_brief = build_valid_leads_brief(
+            report_date,
+            valid_leads_total_current,
+            valid_leads_total_previous,
+            valid_leads_total_same_period,
+            valid_leads_monthly_target,
+        )
+        brief_sections = [
+            line_brief["sections"][0],
+            valid_leads_brief,
+            *line_brief["sections"][1:],
+            arrival_brief,
+        ]
+        brief_generated_text = "\n\n".join(
+            "\n".join(item["lines"])
+            if item["kind"] == "intro"
+            else "\n".join([f"【{item['title']}】", *item["lines"], *([item["note"]] if item.get("note") else [])])
+            for item in brief_sections
+        )
+        data_dates = sorted({*nev_total_current.keys(), *ice_current.keys(), *valid_leads_total_current.keys()})
 
         dashboards = {
             "brief": {
@@ -1414,7 +1629,12 @@ def build_payload(
                 "pageType": "brief",
                 "title": "每日简报",
                 "headline": "",
-                "briefing": {**line_brief, "sections": [*line_brief["sections"], arrival_brief], "arrivalBrief": arrival_brief},
+                "briefing": {
+                    **line_brief,
+                    "sections": brief_sections,
+                    "generatedText": brief_generated_text,
+                    "arrivalBrief": arrival_brief,
+                },
                 "sections": [],
             },
             "lead-control": {
@@ -1423,7 +1643,13 @@ def build_payload(
                 "title": "全车系有效线索管控",
                 "headline": "",
                 "sections": [
-                    build_valid_leads_control_section(report_date, valid_leads_total_current, valid_leads_total_previous),
+                    build_valid_leads_control_section(
+                        report_date,
+                        valid_leads_total_current,
+                        valid_leads_total_previous,
+                        valid_leads_total_same_period,
+                        valid_leads_monthly_target,
+                    ),
                 ],
             },
             "nev": {
@@ -1446,14 +1672,6 @@ def build_payload(
                 "headline": "",
                 "sections": [
                     build_ice_section("ice-total", "ICE 总盘", report_date, ice_current, ice_previous, None),
-                    build_ice_section(
-                        "sylphy-15",
-                        "十五代轩逸",
-                        sylphy_report_date,
-                        sylphy_current,
-                        sylphy_previous,
-                        sylphy_targets,
-                    ),
                 ],
             },
             "arrival": arrival_dashboard,
@@ -1477,7 +1695,8 @@ def build_payload(
                 "sheetNames": leads.sheetnames,
                 "issues": [
                     {"sheet": "每日NEV早报模板", "summary": "线索简报按底层数据重建，避免继续沿用历史模板文案。"},
-                    {"sheet": "NEV+ICE_ldai", "summary": "全国来店简报与趋势改为基于 4 张来店底表聚合生成，不再依赖汇总页缓存结果。"},
+                    {"sheet": "NEV+ICE_ldai", "summary": "全国来店简报与趋势基于本期、上期、同期共 6 张来店底表聚合生成。"},
+                    {"sheet": "十五代轩逸按日", "summary": "历史底表继续保留，页面与每日简报不再展示。"},
                 ],
             },
             "dashboards": dashboards,

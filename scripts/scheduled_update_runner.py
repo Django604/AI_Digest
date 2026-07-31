@@ -56,10 +56,10 @@ PROGRESS_RULES: tuple[tuple[str, int, str], ...] = (
     ("抓取完成：NEV 全国按日", 20, "NEV 全国按日抓取完成。"),
     ("开始抓取：ICE 全国按日", 28, "正在抓取 ICE 全国按日。"),
     ("抓取完成：ICE 全国按日", 42, "ICE 全国按日抓取完成。"),
-    ("开始抓取：NEV 来店本期 + 同期", 50, "正在抓取 NEV 来店本期与同期。"),
-    ("抓取完成：NEV 来店本期 + 同期", 64, "NEV 来店本期与同期抓取完成。"),
-    ("开始抓取：ICE 来店本期 + 同期", 72, "正在抓取 ICE 来店本期与同期。"),
-    ("抓取完成：ICE 来店本期 + 同期", 84, "ICE 来店本期与同期抓取完成。"),
+    ("开始抓取：NEV 来店本期 + 上期 + 同期", 50, "正在抓取 NEV 来店本期、上期与同期。"),
+    ("抓取完成：NEV 来店本期 + 上期 + 同期", 64, "NEV 来店本期、上期与同期抓取完成。"),
+    ("开始抓取：ICE 来店本期 + 上期 + 同期", 72, "正在抓取 ICE 来店本期、上期与同期。"),
+    ("抓取完成：ICE 来店本期 + 上期 + 同期", 84, "ICE 来店本期、上期与同期抓取完成。"),
     ("回填工作表：", 90, "正在回填工作簿。"),
     ("[Excel COM] saving target workbook", 93, "正在保存 Excel 目标工作簿。"),
     ("[Excel COM] saved target workbook", 95, "Excel 目标工作簿保存完成。"),
@@ -77,8 +77,8 @@ def build_start_message(started_at: datetime) -> str:
         "AI Digest 每日自动更新已启动。\n\n"
         f"启动时间：{started_label}（北京时间）\n"
         "更新流程：\n"
-        "1. 抓取 6 张线索 / 来店日报表\n"
-        "2. 回填 NEV+ICE_xsai.xlsm 与 NEV+ICE_ldai.xlsx\n"
+        "1. 抓取 10 张线索 / 来店日报表\n"
+        "2. 回填 NEV+ICE_xsai.xlsm 与 NEV+ICE_ldai.xlsm\n"
         "3. 重建 dashboard.json 与 dashboard.summary.json\n"
         "4. 执行过程中会持续显示当前进度与最终结果\n\n"
         "你可以立即点击“开始更新”，如果 2 分钟内未点击，系统会自动继续执行。"

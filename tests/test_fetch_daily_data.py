@@ -33,10 +33,17 @@ class FetchDailyDataTests(unittest.TestCase):
     def test_parse_business_date_supports_compact_format(self) -> None:
         self.assertEqual(parse_business_date("20260420"), date(2026, 4, 20))
 
-    def test_daily_fetch_no_longer_exports_or_refills_sylphy_15(self) -> None:
+    def test_daily_fetch_exports_same_period_leads_and_never_refills_sylphy_15(self) -> None:
         ice_task = next(task for task in FETCH_TASKS if task.label == "ICE 全国按日")
 
-        self.assertEqual(ice_task.report_keys, ("ice_national_daily",))
+        self.assertEqual(
+            ice_task.report_keys,
+            ("ice_national_daily", "ice_national_daily_same_period"),
+        )
+        self.assertEqual(
+            [mapping.target_sheet for mapping in LEADS_SHEET_MAPPINGS],
+            ["全国按日NEV", "全国按日NEV-同期", "全国按日ICE", "全国按日ICE-同期"],
+        )
         self.assertNotIn(
             "十五代轩逸按日",
             [mapping.target_sheet for mapping in LEADS_SHEET_MAPPINGS],
@@ -106,7 +113,7 @@ class FetchDailyDataTests(unittest.TestCase):
 
     def test_replace_workbook_sheets_supports_macro_and_non_macro_targets(self) -> None:
         macro_path = self.temp_root / "NEV+ICE_xsai.xlsm"
-        arrival_path = self.temp_root / "NEV+ICE_ldai.xlsx"
+        arrival_path = self.temp_root / "NEV+ICE_ldai.xlsm"
 
         for workbook_path, mappings in ((macro_path, LEADS_SHEET_MAPPINGS), (arrival_path, ARRIVAL_SHEET_MAPPINGS)):
             workbook = Workbook()

@@ -127,7 +127,7 @@ class ServeDashboardTests(unittest.TestCase):
     def test_update_task_manager_skips_fetch_when_dashboard_is_current(self) -> None:
         lock_path = self.create_lock_path()
         leads_path = self.create_source_file(lock_path.parent, "NEV+ICE_xsai.xlsm", "leads")
-        arrival_path = self.create_source_file(lock_path.parent, "NEV+ICE_ldai.xlsx", "arrival")
+        arrival_path = self.create_source_file(lock_path.parent, "NEV+ICE_ldai.xlsm", "arrival")
         summary_path = lock_path.parent / "dashboard.summary.json"
         summary_path.write_text(
             json.dumps(
@@ -180,7 +180,7 @@ class ServeDashboardTests(unittest.TestCase):
     def test_update_task_manager_does_not_skip_when_current_workbook_changed(self) -> None:
         lock_path = self.create_lock_path()
         leads_path = self.create_source_file(lock_path.parent, "NEV+ICE_xsai.xlsm", "leads-newer")
-        arrival_path = self.create_source_file(lock_path.parent, "NEV+ICE_ldai.xlsx", "arrival")
+        arrival_path = self.create_source_file(lock_path.parent, "NEV+ICE_ldai.xlsm", "arrival")
         summary_path = lock_path.parent / "dashboard.summary.json"
         stale_leads_mtime = "2026-05-02T00:30:33"
         summary_path.write_text(
