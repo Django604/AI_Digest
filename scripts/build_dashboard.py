@@ -22,6 +22,7 @@ OUT_JSON = ROOT / "docs" / "data" / "dashboard.json"
 SUMMARY_JSON = ROOT / "docs" / "data" / "dashboard.summary.json"
 MONTHLY_ARCHIVE_DIR = ROOT / "docs" / "data" / "monthly"
 MONTHLY_ARCHIVE_INDEX = MONTHLY_ARCHIVE_DIR / "index.json"
+DASHBOARD_TARGETS_CONFIG = ROOT / "config" / "dashboard_targets.json"
 
 NEV_CORE_MODELS = [
     ("nx8", "NX8", "NX8"),
@@ -46,9 +47,6 @@ NEW_PATHFINDER_TARGET_OVERRIDES = {
 }
 NEW_PATHFINDER_TREND_START_DATES = {
     (2026, 7): date(2026, 7, 16),
-}
-VALID_LEADS_MONTHLY_TARGETS = {
-    (2026, 7): 668_262,
 }
 SYLPHY_TARGET_OVERRIDES = {
     (2026, 4): [
@@ -90,6 +88,26 @@ REQUIRED_HEADERS = {
     "全国按日NEV": (2, ("新增线索量", "有效线索量", "门店线索总量", "新增到店量")),
     "全国按日ICE": (1, ("按日", "线索总量", "有效线索量", "到店量", "订单量", "成交量")),
 }
+
+
+def load_valid_leads_monthly_targets(
+    config_path: Path = DASHBOARD_TARGETS_CONFIG,
+) -> dict[tuple[int, int], int]:
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    raw_targets = payload.get("validLeadsMonthlyTargets")
+    if not isinstance(raw_targets, dict):
+        raise ValueError("dashboard target config is missing validLeadsMonthlyTargets")
+
+    targets: dict[tuple[int, int], int] = {}
+    for month_key, raw_target in raw_targets.items():
+        try:
+            parsed_month = datetime.strptime(str(month_key), "%Y-%m")
+        except ValueError as exc:
+            raise ValueError(f"invalid dashboard target month: {month_key}") from exc
+        if isinstance(raw_target, bool) or not isinstance(raw_target, int) or raw_target <= 0:
+            raise ValueError(f"invalid valid leads target for {month_key}: {raw_target}")
+        targets[(parsed_month.year, parsed_month.month)] = raw_target
+    return targets
 
 SPECIAL_DAY_OFFS = {
     date(2026, 4, 6),
@@ -1531,6 +1549,7 @@ def build_payload(
     arrival_path: Path,
     report_date_override: date | None = None,
 ) -> dict[str, Any]:
+    valid_leads_monthly_targets = load_valid_leads_monthly_targets()
     leads = load_workbook(leads_path, data_only=True)
     arrival = load_workbook(arrival_path, data_only=True)
     try:
@@ -1601,7 +1620,7 @@ def build_payload(
         valid_leads_total_current = aggregate_daily_series(nev_all_current, ice_current)
         valid_leads_total_previous = aggregate_daily_series(nev_all_previous, ice_previous)
         valid_leads_total_same_period = aggregate_daily_series(nev_all_same_period, ice_same_period)
-        valid_leads_monthly_target = VALID_LEADS_MONTHLY_TARGETS.get((report_date.year, report_date.month))
+        valid_leads_monthly_target = valid_leads_monthly_targets.get((report_date.year, report_date.month))
         valid_leads_brief = build_valid_leads_brief(
             report_date,
             valid_leads_total_current,

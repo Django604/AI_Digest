@@ -23,6 +23,7 @@
 
 - `data/source/NEV+ICE_xsai.xlsm`：线索源工作簿
 - `data/source/NEV+ICE_ldai.xlsm`：来店源工作簿
+- `config/dashboard_targets.json`：全车系有效线索月目标配置，由附魔工作台的“手动兜底更新”工具维护
 - `requirements.txt`：Python 依赖清单
 - `scripts/build_dashboard.py`：从 Excel 抽取页面数据
 - `scripts/purge_jsdelivr_cache.py`：遗留 CDN 诊断工具，不接入正式发布流程
@@ -93,6 +94,7 @@
 3. 脚本会自动重建 `dashboard.json` 与 `dashboard.summary.json`，内部通过 `scripts/dashboard_publish.py` 统一完成提交与推送，并只提交以下发布相关文件：
    - `data/source/NEV+ICE_xsai.xlsm`
    - `data/source/NEV+ICE_ldai.xlsm`
+   - `config/dashboard_targets.json`
    - `docs/data/dashboard.json`
    - `docs/data/dashboard.summary.json`
    - `docs/data/monthly/`
@@ -107,7 +109,7 @@
 
 - 当前方案读取的是 Excel 保存后的缓存结果。你更新完源数据后，必须先让 Excel 完成重算并保存，否则页面会拿到旧结果。
 - 工作流读取当前实际使用的两本源文件：`NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsm`。
-- 每日简报按“全车系有效线索 / NEV新增线索 / 2026款探陆线索 / 来店简报”四块展示；全车系 2026 年 7 月目标为 `668,262`，线索同比取两张 `全国按日*-同期`，来店环比取两张 `*上期来店`。
+- 每日简报按“全车系有效线索 / NEV新增线索 / 2026款探陆线索 / 来店简报”四块展示；全车系月目标按报表月份读取 `config/dashboard_targets.json`（2026 年 7 月为 `668,262`），可在附魔工作台的“手动兜底更新”工具中填写；线索同比取两张 `全国按日*-同期`，来店环比取两张 `*上期来店`。
 - `docs/data/dashboard.summary.json` 提供了报表日期、输入文件修改时间、dashboard 数量和本次是否真的发生内容变更，方便后续定时任务或自动巡检直接读取。
 - 页面不再显示 `数据更新` 按钮；手动兜底入口已迁移到 `附魔工作台`，本页面不会再提示配置 `serviceBaseUrl` 后进行补跑。
 - 趋势明细表现在会根据年度节假日配置直接标出 `节 / 周 / 班`：`节` 为法定节假日，`周` 为普通周末，`班` 为调休补班日；补班不会再被误判成周末或放假。
@@ -119,7 +121,7 @@
 - To let scheduled updates publish to GitHub Pages automatically, register the tasks with `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -AutoPublish -PublishRemote origin -PublishBranch main`.
 - The scheduled runner now supports `--auto-publish`, `--publish-remote`, `--publish-branch`, and `--publish-commit-message`.
 - `附魔工作台` now owns write actions such as manual fallback and month archive publish; `scripts/serve_dashboard.py` only serves read APIs for the static dashboard.
-- Auto publish reuses `scripts/dashboard_publish.py -SkipRebuild`, so it stages the two workbook files, current dashboard JSON files, and `docs/data/monthly/`.
+- Auto publish reuses `scripts/dashboard_publish.py -SkipRebuild`, so it stages the dashboard target config, two workbook files, current dashboard JSON files, and `docs/data/monthly/`.
 - No Codex approval is needed when the scheduled task runs later on this machine. The task uses the local account context configured in Windows Task Scheduler.
 - If the silent fallback task runs as `SYSTEM`, Git credentials must also be available to `SYSTEM`; otherwise data refresh may succeed but `git push` can still fail.
 

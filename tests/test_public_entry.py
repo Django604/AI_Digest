@@ -56,6 +56,12 @@ class PublicEntryTests(unittest.TestCase):
         self.assertIn('section.kind !== "sylphy15"', source)
         self.assertIn('section?.id !== "sylphy-15"', source)
 
+    def test_lead_control_uses_full_valid_leads_title(self) -> None:
+        source = APP_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn('title: "全车系有效线索"', source)
+        self.assertNotIn('title: "全车系线索"', source)
+
     def test_current_month_uses_live_dashboard_and_explicit_month_uses_archive(self) -> None:
         source = APP_SCRIPT.read_text(encoding="utf-8")
         start = source.index('function buildDashboardRequest(monthKey = "")')

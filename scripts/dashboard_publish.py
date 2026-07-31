@@ -16,6 +16,7 @@ DEFAULT_DASHBOARD_JSON = PROJECT_ROOT / "docs" / "data" / "dashboard.json"
 DEFAULT_SUMMARY_JSON = PROJECT_ROOT / "docs" / "data" / "dashboard.summary.json"
 DEFAULT_REBUILD_SCRIPT = PROJECT_ROOT / "scripts" / "build_dashboard.py"
 PUBLISH_TARGETS = (
+    "config/dashboard_targets.json",
     "data/source/NEV+ICE_xsai.xlsm",
     "data/source/NEV+ICE_ldai.xlsm",
     "docs/data/dashboard.json",

@@ -1095,7 +1095,17 @@
 - 改动内容：发布当前每日简报新版布局、全车系有效线索、同比/环比数据源、十五代轩逸隐藏逻辑及现有 dashboard 数据；部署完成后从正式入口执行更新回归。
 - 涉及文件：本次工作区全部业务代码、页面资源、测试、文档、源工作簿及 dashboard 构建产物。
 - 关键命令：`python -m unittest discover -s tests -v`、`python -m compileall -q scripts`、`node --check docs/assets/app.js`、`git diff --check`、GitHub Pages 部署与正式入口更新测试。
-- 验证结果：提交前全量测试 `104/104` 通过，Python / Node / diff 检查通过；正式入口部署及更新回归结果待补充。
+- 验证结果：提交前全量测试 `104/104` 通过，Python / Node / diff 检查通过；本地版本已推送到 `origin/main`，正式入口验收受当前网络 `ERR_CONNECTION_RESET` 影响待后续重试。
 - 回滚方法：回退本次发布提交，并重新运行 GitHub Pages 部署。
-- 关联提交（如有）：待补充
+- 关联提交（如有）：`97a6b63`
 - 备注：按用户确认采用两阶段流程，第一阶段仅发布已验收版本，第二阶段才执行真实数据更新。
+
+## 2026-07-31 13:57
+- 需求 / 目标：将页面标题完整显示为“全车系有效线索”，并在附魔工作台的“手动兜底更新”工具中提供可手填的月目标入口，同时兼容每日自动更新与 GitHub 自动发布。
+- 改动内容：新增版本化 `config/dashboard_targets.json`，按 `YYYY-MM` 保存全车系有效线索月目标；构建器改为读取并校验该配置；自动发布白名单纳入目标配置；前端缺省标题改为“全车系有效线索”；附魔工作台手动兜底页新增月份、目标输入、保存状态及 GET/POST API，保存采用原子替换。
+- 涉及文件：`config/dashboard_targets.json`、`scripts/build_dashboard.py`、`scripts/dashboard_publish.py`、`docs/assets/app.js`、测试与文档；附魔工作台本地的 `scripts/manual_fallback_service.py`、`scripts/serve_workbench.py`、`tools/manual-fallback/*`、`favicon.svg`。
+- 关键命令：AI_Digest 全量单测、附魔工作台专项单测、Python / Node 语法检查、`playwright-cli` 桌面与手机真实表单保存验收、dashboard 本地重建。
+- 验证结果：AI_Digest `108/108`、附魔工作台专项 `7/7` 通过；工作台从 UI 保存 `2026-07 / 668,262` 成功，刷新后值保持；手机 `390px` 视口无横向滚动，控制台 `0 error / 0 warning`；本地重建后 dashboard 业务内容不变。
+- 回滚方法：恢复构建器内固定月目标字典和前端旧标题，移除目标配置、发布白名单、工作台目标 API / 表单及对应测试文档。
+- 关联提交（如有）：待补充
+- 备注：工作台保存后的配置会被“开始更新”“仅推送 GitHub”和每日计划任务的统一发布流程提交；当前 2026 年 7 月目标保持 `668,262`。

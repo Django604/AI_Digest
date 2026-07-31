@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-31T11:59:33",
+  "generatedAt": "2026-07-31T13:58:03",
   "reportDate": "2026-07-30",
   "reportDateLabel": "2026-07-30",
   "inputs": {
@@ -13,8 +13,8 @@
   "outputs": {
     "dashboardJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.json",
     "dashboardJsonName": "dashboard.json",
-    "dashboardChanged": true,
-    "dashboardStatus": "updated",
+    "dashboardChanged": false,
+    "dashboardStatus": "unchanged",
     "summaryJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.summary.json",
     "summaryJsonName": "dashboard.summary.json"
   },

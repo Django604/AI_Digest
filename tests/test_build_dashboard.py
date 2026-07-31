@@ -5,6 +5,7 @@ import json
 from datetime import date
 from pathlib import Path
 import shutil
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -33,6 +34,7 @@ from scripts.build_dashboard import (
     get_day_calendar_meta,
     load_preserved_input_modified_times,
     load_arrival_daily_sheet,
+    load_valid_leads_monthly_targets,
     resolve_new_pathfinder_targets,
     validate_report_date_cell,
     validate_sheet_headers,
@@ -545,6 +547,29 @@ class BuildDashboardPayloadTests(unittest.TestCase):
 
 
 class BuildDashboardValidationTests(unittest.TestCase):
+    def test_valid_leads_monthly_targets_load_from_versioned_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            config_path = Path(temporary_directory) / "dashboard_targets.json"
+            config_path.write_text(
+                json.dumps({"validLeadsMonthlyTargets": {"2026-07": 668262}}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            actual = load_valid_leads_monthly_targets(config_path)
+
+        self.assertEqual(actual, {(2026, 7): 668262})
+
+    def test_valid_leads_monthly_targets_reject_invalid_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            config_path = Path(temporary_directory) / "dashboard_targets.json"
+            config_path.write_text(
+                json.dumps({"validLeadsMonthlyTargets": {"2026-07": 0}}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "invalid valid leads target"):
+                load_valid_leads_monthly_targets(config_path)
+
     def test_valid_leads_target_yoy_and_mom_use_their_expected_sources(self) -> None:
         report_date = date(2026, 7, 1)
         current = {report_date: {"validLeads": 334_131}}

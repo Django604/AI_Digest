@@ -1479,7 +1479,7 @@ function getDisplaySections(dashboard) {
 
     return {
       ...section,
-      title: "全车系线索",
+      title: "全车系有效线索",
       sectionLabel: "",
     };
   });

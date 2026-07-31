@@ -111,6 +111,15 @@ class DashboardPublishTests(unittest.TestCase):
         ):
             dashboard_publish._check_staged_files(dashboard_publish.PROJECT_ROOT)
 
+    def test_publish_scope_includes_dashboard_target_config(self) -> None:
+        self.assertIn("config/dashboard_targets.json", dashboard_publish.PUBLISH_TARGETS)
+
+        with mock.patch(
+            "scripts.dashboard_publish._run_git",
+            return_value=dashboard_publish.CommandResult(0, "config/dashboard_targets.json\n"),
+        ):
+            dashboard_publish._check_staged_files(dashboard_publish.PROJECT_ROOT)
+
 
 if __name__ == "__main__":
     unittest.main()
