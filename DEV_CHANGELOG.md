@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-07-31 15:41
+- 需求 / 目标：修复慢网络下 NEV 全国按日页面尚未完成 FineReport 参数初始化就超时，导致手动兜底与每日任务连续失败的问题。
+- 改动内容：将 NEV 全国按日任务的参数上下文等待上限从默认 `10000ms` 提高到 `30000ms`；继续使用 fast bootstrap，检测到稳定的 `sessionid + load/content` 后提前继续；补充任务参数测试与说明。
+- 涉及文件：`scripts/fetch_daily_data.py`、`tests/test_fetch_daily_data.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 -m unittest discover -s tests -v`、对比成功 / 失败 NEV bootstrap trace。
+- 验证结果：全量单测 `112/112` 通过；失败 trace 停在 `i18n/template`，成功 trace 随后出现 `design/config`、`para/config`、`load/content`，等待参数已按该差异延长；工作台当前空闲。
+- 回滚方法：移除 NEV 任务的 `--capture-wait-ms 30000` 参数、对应测试、文档和本条日志。
+- 关联提交（如有）：待补充
+- 备注：本次未代替用户触发新的真实更新，需推送后由用户再次点击验证。
+
 ## 2026-07-31 15:00
 - 需求 / 目标：修复手动兜底更新已成功导出 NEV / ICE 上期来店、但因导出日期后缀协议不同而误报缺少结果的问题。
 - 改动内容：仅为 `NEV上期来店` 与 `ICE上期来店` 开启周期后缀兼容；优先匹配本次业务日，精确文件不存在时接受当前任务目录内唯一的四位日期后缀文件，多个候选时明确报错；其他报表继续严格匹配业务日。

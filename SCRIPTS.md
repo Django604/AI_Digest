@@ -74,6 +74,7 @@
   - 十五代轩逸已于 `2026-07-15` 停更：不再抓取或回填 `十五代轩逸按日`，历史数据保留但页面不再展示
   - 脚本运行成功后会自动清理 `.runtime/daily_update/` 临时目录；若带 `--keep-runtime`，会保留导出文件与日志便于排查
   - NEV 线索中的 `全国按日` 会通过 `scripts/run_leads_nev_exports.py` 内部包装器复用 `日报线索NEV源`，并在运行时显式清空 FineReport 平台默认的 `营业状态` 筛选，避免只取 `营业店`
+  - NEV 线索共享初始化的参数上下文等待上限为 `30000ms`；上下文稳定后会提前继续，用于兼容网络较慢时 `load/content` 晚于默认 `10000ms` 到达的情况
   - NEV 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_nev_exports.py` 内部包装器复用 `日报来店NEV源` 的登录态与参数模板，并在后台执行 `tab/execute -> REPORT2 -> chart.data` 直接抓取自定义按日序列
   - ICE 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_ice_exports.py` 内部包装器强制把 Tableau 交叉表缩略图入口锁定到 `来店批次分车系汇总表_按天T`
   - NEV / ICE 上期来店在汇总时兼容导出器的两种命名方式：可使用本次业务日后缀，也可使用上期实际结束日后缀；非上期报表仍严格匹配本次业务日

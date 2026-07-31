@@ -73,6 +73,7 @@ FETCH_TASKS = (
         script_path=LEADS_NEV_WRAPPER_SCRIPT,
         output_subdir="nev",
         report_keys=("national_daily", "national_daily_same_period"),
+        extra_args=("--capture-wait-ms", "30000"),
     ),
     FetchTask(
         label="ICE 全国按日",

@@ -34,8 +34,10 @@ class FetchDailyDataTests(unittest.TestCase):
         self.assertEqual(parse_business_date("20260420"), date(2026, 4, 20))
 
     def test_daily_fetch_exports_same_period_leads_and_never_refills_sylphy_15(self) -> None:
+        nev_task = next(task for task in FETCH_TASKS if task.label == "NEV 全国按日")
         ice_task = next(task for task in FETCH_TASKS if task.label == "ICE 全国按日")
 
+        self.assertEqual(nev_task.extra_args, ("--capture-wait-ms", "30000"))
         self.assertEqual(
             ice_task.report_keys,
             ("ice_national_daily", "ice_national_daily_same_period"),
