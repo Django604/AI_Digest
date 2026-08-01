@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-08-01 21:03
+- 需求 / 目标：同步 `NEV+ICE_xsai.xlsm` 中新录入的 2026 年 8 月车型目标到网页并发布到 GitHub，`2026款探陆` 不纳入本次目标更新。
+- 改动内容：保留用户更新后的源工作簿，以 `2026-08-01` 为报告日重建 live dashboard、8 月月度归档及月份索引，将网页默认月份切换到 8 月；7 月历史归档保持不变。
+- 涉及文件：`data/source/NEV+ICE_xsai.xlsm`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-08/dashboard.json`、`docs/data/monthly/2026-08/dashboard.summary.json`、`docs/data/monthly/index.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py --workbook data\source\NEV+ICE_xsai.xlsm --arrival-workbook data\source\NEV+ICE_ldai.xlsm --out docs\data\dashboard.json --summary-out docs\data\dashboard.summary.json --report-date 2026-08-01`、`python -B -X utf8 -m unittest discover -s tests -v`、`git diff --check`
+- 验证结果：全量单测 `115/115` 通过；8 月月目标为 NX8 `164,000`、N7 `68,950`、N6 `71,739`、天籁·鸿蒙座舱 `117,647`，四车合计 `422,336`；每个车型均包含 31 天目标，`2026款探陆` 目标继续为空；8 月页面未带入 7 月实绩。
+- 回滚方法：恢复本次源工作簿、live dashboard、8 月归档、月份索引并删除本条日志。
+- 关联提交（如有）：待补充
+- 备注：后续每日自动更新会继续从已提交的源工作簿读取这组 8 月目标。
+
 ## 2026-08-01 08:36
 - 需求 / 目标：修复本月有 31 日而上月没有对应日期时，全车系来店上期数据与环比显示为 `-` 的问题，并发布到 GitHub。
 - 改动内容：来店月环比的当日对比日期在超出上月天数时回退到上月最后一天；累计上期序列按实际日期去重，确保全月累计只计算一次上月月末数据；同步更新每日简报、live dashboard 与 2026 年 7 月归档。
