@@ -1327,15 +1327,25 @@ def build_arrival_series(
     dates = month_dates(report_date)
     current_daily: list[int | float | None] = []
     previous_daily: list[int | float | None] = []
+    previous_cumulative_daily: list[int | float | None] = []
+    seen_previous_dates: set[date] = set()
 
     for current_date in dates:
-        previous_date = (
-            aligned_previous_date(current_date)
-            if comparison_period == "month"
-            else aligned_previous_year_date(current_date)
-        )
+        if comparison_period == "month":
+            previous_date = aligned_previous_date(current_date)
+            if previous_date is None:
+                previous_date = month_end(previous_month(current_date))
+        else:
+            previous_date = aligned_previous_year_date(current_date)
+        previous_value = comparison_map.get(previous_date) if previous_date else None
         current_daily.append(current_map.get(current_date) if current_date <= report_date else None)
-        previous_daily.append(comparison_map.get(previous_date) if previous_date else None)
+        previous_daily.append(previous_value)
+        if previous_date is not None and previous_date in seen_previous_dates:
+            previous_cumulative_daily.append(0 if isinstance(previous_value, (int, float)) else None)
+        else:
+            previous_cumulative_daily.append(previous_value)
+            if previous_date is not None:
+                seen_previous_dates.add(previous_date)
 
     report_indexes = [index for index, value in enumerate(current_daily) if isinstance(value, (int, float))]
     report_index = report_indexes[-1] if report_indexes else max(report_date.day - 1, 0)
@@ -1344,7 +1354,7 @@ def build_arrival_series(
     chart_actual = [value if index <= report_index and value is not None else 0 for index, value in enumerate(current_daily)]
     current_cumulative = build_running_totals(current_daily, stop_at=report_index)
     previous_cumulative = (
-        build_running_totals(previous_daily, stop_at=previous_report_index)
+        build_running_totals(previous_cumulative_daily, stop_at=previous_report_index)
         if previous_report_index is not None
         else [None] * len(previous_daily)
     )

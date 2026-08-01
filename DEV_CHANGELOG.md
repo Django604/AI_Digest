@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-08-01 08:36
+- 需求 / 目标：修复本月有 31 日而上月没有对应日期时，全车系来店上期数据与环比显示为 `-` 的问题，并发布到 GitHub。
+- 改动内容：来店月环比的当日对比日期在超出上月天数时回退到上月最后一天；累计上期序列按实际日期去重，确保全月累计只计算一次上月月末数据；同步更新每日简报、live dashboard 与 2026 年 7 月归档。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`SCRIPTS.md`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-07/dashboard.json`、`DEV_CHANGELOG.md`
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py --workbook data\source\NEV+ICE_xsai.xlsm --arrival-workbook data\source\NEV+ICE_ldai.xlsm --out docs\data\dashboard.json --summary-out docs\data\dashboard.summary.json`、`python -B -X utf8 -m unittest discover -s tests -v`、`git diff --check`
+- 验证结果：全量单测 `115/115` 通过；截至 `2026-07-31`，累计上期来店为 `107,646`、累计环比为 `-21.6%`，当日上期来店回退为 `7,184`、当日环比为 `-36.1%`；NEV / ICE 环比同步恢复。
+- 回滚方法：移除来店上期月末回退及累计日期去重逻辑、对应测试与文档，并恢复本次生成的 live / 7 月归档数据。
+- 关联提交（如有）：待补充
+- 备注：源工作簿未修改；每日自动更新、附魔工作台和 GitHub Pages 重建均复用本次修复后的构建器。
+
 ## 2026-07-31 16:50
 - 需求 / 目标：调整每日简报指标排版，使“全车系有效线索”的同比与环比、“2026 款探陆线索”的当日实绩与当日达成率分别从第二行完整显示，并发布到 GitHub。
 - 改动内容：按简报板块类型配置换行标记，仅在 `valid-leads` 的“；同比”和 `new-pathfinder` 的“；当日”处分行；为第二行增加不拆分样式，其他板块与原始数据保持不变。

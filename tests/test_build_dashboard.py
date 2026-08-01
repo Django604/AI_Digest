@@ -22,6 +22,7 @@ from scripts.build_dashboard import (
     OUT_JSON,
     SUMMARY_JSON,
     apply_preserved_input_modified_times,
+    build_arrival_dashboard,
     build_arrival_series,
     build_arrival_brief,
     build_column_meta,
@@ -678,6 +679,47 @@ class BuildDashboardValidationTests(unittest.TestCase):
 
         self.assertIsNone(series["previousReportIndex"])
         self.assertTrue(all(value is None for value in series["previousCumulative"]))
+
+    def test_arrival_month_comparison_uses_previous_month_end_without_double_counting(self) -> None:
+        series = build_arrival_series(
+            date(2026, 7, 31),
+            {date(2026, 7, day): 10 for day in range(1, 32)},
+            {date(2026, 6, day): day for day in range(1, 31)},
+            comparison_period="month",
+        )
+
+        self.assertEqual(series["previousDaily"][30], 30)
+        self.assertEqual(series["previousCumulative"][29], 465)
+        self.assertEqual(series["previousCumulative"][30], 465)
+        self.assertEqual(series["previousReportIndex"], 30)
+
+    def test_arrival_dashboard_populates_month_comparison_cards_on_extra_month_day(self) -> None:
+        report_date = date(2026, 7, 31)
+        current = {date(2026, 7, day): 10 for day in range(1, 32)}
+        previous_period = {date(2026, 6, day): 5 for day in range(1, 31)}
+        same_period = {date(2025, 7, day): 5 for day in range(1, 32)}
+        arrival_maps = {
+            "total_current": current,
+            "total_previous_period": previous_period,
+            "total_same_period": same_period,
+            "nev_current": current,
+            "nev_previous_period": previous_period,
+            "nev_same_period": same_period,
+            "ice_current": current,
+            "ice_previous_period": previous_period,
+            "ice_same_period": same_period,
+        }
+
+        dashboard = build_arrival_dashboard(report_date, arrival_maps)
+        items = {
+            item["label"]: item["displayValue"]
+            for item in dashboard["sections"][0]["trend"]["summary"]["items"]
+        }
+
+        self.assertEqual(items["累计上期来店"], "150")
+        self.assertEqual(items["累计环比"], "106.7%")
+        self.assertEqual(items["上期来店"], "5")
+        self.assertEqual(items["当日环比"], "100.0%")
 
     def test_load_arrival_daily_sheet_supports_sheets_without_header_row(self) -> None:
         workbook = Workbook()
