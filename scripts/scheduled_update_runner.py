@@ -38,6 +38,9 @@ except ImportError:  # pragma: no cover - script entrypoint fallback
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCHEDULED_RUNTIME_ROOT = PROJECT_ROOT / ".runtime" / "scheduled_update"
+DASHBOARD_TARGETS_CONFIG = PROJECT_ROOT / "config" / "dashboard_targets.json"
+DASHBOARD_JSON_PATH = PROJECT_ROOT / "docs" / "data" / "dashboard.json"
+MONTHLY_ARCHIVE_DIR = PROJECT_ROOT / "docs" / "data" / "monthly"
 WINDOW_TITLE = "AI Digest 定时更新"
 AUTO_START_SECONDS = 120
 FINISH_AUTO_CLOSE_SECONDS = 180
@@ -523,6 +526,46 @@ def resolve_publish_commit_message(
     )
 
 
+def dashboard_targets_require_rebuild(
+    target_config_path: Path = DASHBOARD_TARGETS_CONFIG,
+    dashboard_path: Path = DASHBOARD_JSON_PATH,
+    monthly_archive_dir: Path = MONTHLY_ARCHIVE_DIR,
+) -> bool:
+    try:
+        target_payload = json.loads(target_config_path.read_text(encoding="utf-8"))
+        dashboard_payload = json.loads(dashboard_path.read_text(encoding="utf-8"))
+        report_month = str(dashboard_payload["meta"]["reportDate"])[:7]
+        configured_targets = target_payload["validLeadsMonthlyTargets"]
+    except (OSError, KeyError, TypeError, json.JSONDecodeError):
+        return True
+    if not isinstance(configured_targets, dict):
+        return True
+    expected_target = configured_targets.get(report_month)
+
+    missing_target = object()
+    def read_dashboard_target(payload: dict[str, object]) -> object:
+        try:
+            items = payload["dashboards"]["lead-control"]["sections"][0]["trend"]["summary"]["items"]
+        except (KeyError, IndexError, TypeError):
+            return missing_target
+        if not isinstance(items, list):
+            return missing_target
+        for item in items:
+            if isinstance(item, dict) and item.get("label") == "本月目标":
+                return item.get("value")
+        return missing_target
+
+    if read_dashboard_target(dashboard_payload) != expected_target:
+        return True
+
+    archive_path = monthly_archive_dir / report_month / "dashboard.json"
+    try:
+        archive_payload = json.loads(archive_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return True
+    return read_dashboard_target(archive_payload) != expected_target
+
+
 def run_publish_step(
     *,
     business_date: str,
@@ -536,6 +579,10 @@ def run_publish_step(
     def publish_log(message: str) -> None:
         log(f"[publish] {message}")
 
+    rebuild_required = dashboard_targets_require_rebuild()
+    if rebuild_required:
+        publish_log("检测到全车系有效线索目标尚未写入页面，发布前先重建 dashboard。")
+
     return publish_dashboard(
         repo_root=PROJECT_ROOT,
         remote=remote,
@@ -543,7 +590,7 @@ def run_publish_step(
         commit_message=commit_message,
         business_date=business_date,
         mode=mode,
-        skip_rebuild=True,
+        skip_rebuild=not rebuild_required,
         push_if_no_changes=push_if_no_changes,
         log=publish_log,
     )

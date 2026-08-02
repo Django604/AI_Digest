@@ -15,6 +15,7 @@ from scripts.scheduled_update_runner import (
     ProgressUpdate,
     SILENT_MODE,
     ScheduledUpdateLock,
+    dashboard_targets_require_rebuild,
     build_run_dir,
     build_failure_message,
     build_lock_path,
@@ -276,6 +277,9 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
         }
 
         with mock.patch(
+            "scripts.scheduled_update_runner.dashboard_targets_require_rebuild",
+            return_value=False,
+        ), mock.patch(
             "scripts.scheduled_update_runner.publish_dashboard",
             return_value=fake_publish,
         ) as publish_mock:
@@ -298,6 +302,77 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
         self.assertEqual(kwargs["branch"], "main")
         self.assertTrue(kwargs["skip_rebuild"])
         self.assertFalse(kwargs["push_if_no_changes"])
+
+    def test_run_publish_step_rebuilds_when_target_outputs_are_stale(self) -> None:
+        logs: list[str] = []
+        with mock.patch(
+            "scripts.scheduled_update_runner.dashboard_targets_require_rebuild",
+            return_value=True,
+        ), mock.patch(
+            "scripts.scheduled_update_runner.publish_dashboard",
+            return_value={"publishStatus": "success"},
+        ) as publish_mock:
+            run_publish_step(
+                business_date="2026-08-01",
+                mode=SILENT_MODE,
+                remote="origin",
+                branch="main",
+                commit_message="",
+                log=logs.append,
+            )
+
+        self.assertFalse(publish_mock.call_args.kwargs["skip_rebuild"])
+        self.assertTrue(any("发布前先重建 dashboard" in item for item in logs))
+
+    def test_dashboard_targets_require_rebuild_compares_live_and_monthly_outputs(self) -> None:
+        temp_dir = self.create_repo_temp_dir()
+        try:
+            target_path = temp_dir / "config" / "dashboard_targets.json"
+            dashboard_path = temp_dir / "docs" / "data" / "dashboard.json"
+            archive_root = temp_dir / "docs" / "data" / "monthly"
+            archive_path = archive_root / "2026-08" / "dashboard.json"
+            target_path.parent.mkdir(parents=True)
+            dashboard_path.parent.mkdir(parents=True)
+            archive_path.parent.mkdir(parents=True)
+            target_path.write_text(
+                json.dumps({"validLeadsMonthlyTargets": {"2026-08": 661677}}),
+                encoding="utf-8",
+            )
+
+            def write_dashboard(path: Path, target: int | None) -> None:
+                path.write_text(
+                    json.dumps(
+                        {
+                            "meta": {"reportDate": "2026-08-01"},
+                            "dashboards": {
+                                "lead-control": {
+                                    "sections": [
+                                        {
+                                            "trend": {
+                                                "summary": {
+                                                    "items": [{"label": "本月目标", "value": target}]
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            write_dashboard(dashboard_path, None)
+            write_dashboard(archive_path, None)
+            self.assertTrue(dashboard_targets_require_rebuild(target_path, dashboard_path, archive_root))
+
+            write_dashboard(dashboard_path, 661677)
+            self.assertTrue(dashboard_targets_require_rebuild(target_path, dashboard_path, archive_root))
+
+            write_dashboard(archive_path, 661677)
+            self.assertFalse(dashboard_targets_require_rebuild(target_path, dashboard_path, archive_root))
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     def test_lock_prevents_duplicate_silent_run(self) -> None:
         runtime_root = self.create_repo_temp_dir()

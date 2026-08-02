@@ -213,6 +213,7 @@
   - 允许已有暂存文件：`python scripts/dashboard_publish.py --allow-existing-staged`
 - 备注：
   - 定时更新与附魔工作台手动兜底会调用这个 Python 入口
+  - 独立 GitHub 推送会比较 `config/dashboard_targets.json` 与 live / 当前月归档中的全车系有效线索目标；发现目标尚未写入页面时先自动重建，再提交推送。每日更新已生成一致页面时继续跳过重复重建
   - `git push` 带 300 秒超时，若被中断会自动重试一次，并在失败时保留完整的阶段与命令信息
   - Python 调用方可传入 `push_if_no_changes=True`，在没有新的发布文件可提交时仍执行 `git push`；默认值为 `False`，原定时更新与更新后自动发布行为不变
   - `git push` 成功即视为本地发布完成，不再等待或调用任何 CDN；远端 workflow 继续完成 GitHub Pages 部署

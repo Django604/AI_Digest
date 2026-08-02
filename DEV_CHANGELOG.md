@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-08-02 08:40
+- 需求 / 目标：修复附魔工作台已保存 2026 年 8 月全车系有效线索目标 `661,677`，但独立推送后网页目标与达成率仍显示 `-` 的问题，并发布到 GitHub。
+- 改动内容：独立发布前比较目标配置与 live / 当前月归档中的“本月目标”；任一页面产物未同步最新目标时自动先重建 dashboard，再提交推送；每日更新已生成一致产物时继续跳过重复重建；同步修正本机工作台发布提示并重建 8 月页面。
+- 涉及文件：`scripts/scheduled_update_runner.py`、`tests/test_scheduled_update_runner.py`、`SCRIPTS.md`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-08/dashboard.json`、`DEV_CHANGELOG.md`；本机附魔工作台 `scripts/manual_fallback_service.py`。
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py ...`、`python -B -X utf8 -m unittest discover -s tests -v`、附魔工作台全量单测、`git diff --check`。
+- 验证结果：AI_Digest 全量单测 `117/117`、附魔工作台全量单测 `39/39` 通过；8 月 live 与归档均显示本月目标 `661,677`、累计实绩 `27,781`、累计达成率 `4.2%`；重建前一致性检测为 `True`，重建后为 `False`。
+- 回滚方法：移除目标配置与页面产物一致性检测及对应测试 / 文档，恢复本次生成的 8 月 dashboard，并还原工作台发布提示。
+- 关联提交（如有）：待补充
+- 备注：根因是 dashboard 在 `08:24` 生成，而目标配置在 `08:29` 保存并单独推送；旧发布链只提交配置，没有重建静态页面。
+
 ## 2026-08-01 21:03
 - 需求 / 目标：同步 `NEV+ICE_xsai.xlsm` 中新录入的 2026 年 8 月车型目标到网页并发布到 GitHub，`2026款探陆` 不纳入本次目标更新。
 - 改动内容：保留用户更新后的源工作簿，以 `2026-08-01` 为报告日重建 live dashboard、8 月月度归档及月份索引，将网页默认月份切换到 8 月；7 月历史归档保持不变。
