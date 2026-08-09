@@ -760,6 +760,9 @@ def build_valid_leads_control_trend(
     curr_cum = context["currCumulative"]
     day_delta = context["dayDelta"]
     column_meta = context["columnMeta"]
+    for index, value in enumerate(prev_cum):
+        if value is None and index > 0:
+            prev_cum[index] = prev_cum[index - 1]
     same_dates = [aligned_previous_year_date(item) for item in dates]
     same_daily = [
         same_period_actuals.get(same_date, {}).get("validLeads") if same_date else None
@@ -1188,9 +1191,22 @@ def build_valid_leads_brief(
         for current_date, item in current_actuals.items()
         if current_date <= report_date
     )
-    cumulative_previous = sum((item.get("validLeads") or 0) for item in previous_period_actuals.values())
+    previous_period_start = previous_month(report_date)
+    previous_period_end = aligned_previous_date(report_date) or month_end(previous_period_start)
+    aligned_previous_period_actuals = [
+        item
+        for current_date, item in previous_period_actuals.items()
+        if previous_period_start <= current_date <= previous_period_end
+    ]
+    cumulative_previous = sum(
+        (item.get("validLeads") or 0)
+        for item in aligned_previous_period_actuals
+    )
     cumulative_same_period = sum((item.get("validLeads") or 0) for item in same_period_actuals.values())
-    has_previous = any(isinstance(item.get("validLeads"), (int, float)) for item in previous_period_actuals.values())
+    has_previous = any(
+        isinstance(item.get("validLeads"), (int, float))
+        for item in aligned_previous_period_actuals
+    )
     has_same_period = any(isinstance(item.get("validLeads"), (int, float)) for item in same_period_actuals.values())
     yoy = delta_ratio(cumulative_actual, cumulative_same_period if has_same_period else None)
     mom = delta_ratio(cumulative_actual, cumulative_previous if has_previous else None)

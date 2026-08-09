@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-08-09 21:46
+- 需求 / 目标：修复每日简报与全车系有效线索趋势卡的累计环比不一致问题，并发布到 GitHub。
+- 改动内容：将每日简报累计环比统一为本月截至报告日对比上月同日累计；本月日期超出上月天数时回退上月最后一天；趋势卡的上期累计序列在大小月边界沿用上月月末累计值，确保两处口径持续一致。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`SCRIPTS.md`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-08/dashboard.json`、`DEV_CHANGELOG.md`。
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py ... --report-date 2026-08-08`、`python -B -X utf8 -m unittest discover -s tests -v`、`python -B -X utf8 -m py_compile scripts\build_dashboard.py`、`git diff --check`。
+- 验证结果：全量单测 `119/119` 通过；截至 `2026-08-08`，本月累计 `217,789`、上月同期累计 `145,067`，live 与 8 月归档中的每日简报和趋势卡累计环比均为 `50.1%`。
+- 回滚方法：恢复有效线索简报的上期汇总与趋势累计序列逻辑、对应测试和文档，并还原本次生成的 live / 8 月归档数据。
+- 关联提交（如有）：待补充
+- 备注：原每日简报将本月前 8 天错误地与上月整月 `693,929` 对比，得到 `-68.6%`；趋势卡的同周期 `50.1%` 为正确口径。
+
 ## 2026-08-02 08:40
 - 需求 / 目标：修复附魔工作台已保存 2026 年 8 月全车系有效线索目标 `661,677`，但独立推送后网页目标与达成率仍显示 `-` 的问题，并发布到 GitHub。
 - 改动内容：独立发布前比较目标配置与 live / 当前月归档中的“本月目标”；任一页面产物未同步最新目标时自动先重建 dashboard，再提交推送；每日更新已生成一致产物时继续跳过重复重建；同步修正本机工作台发布提示并重建 8 月页面。

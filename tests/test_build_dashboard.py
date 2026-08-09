@@ -603,6 +603,36 @@ class BuildDashboardValidationTests(unittest.TestCase):
             ["累计实绩 334,131，累计达成率 50.0%；同比 11.4%，环比 4.4%"],
         )
 
+    def test_valid_leads_brief_mom_matches_trend_for_month_to_date_period(self) -> None:
+        report_date = date(2026, 8, 8)
+        current = {date(2026, 8, 1): {"validLeads": 217_789}}
+        previous_period = {
+            date(2026, 7, 1): {"validLeads": 145_067},
+            date(2026, 7, 31): {"validLeads": 548_862},
+        }
+
+        trend = build_valid_leads_control_trend(report_date, current, previous_period, {}, None)
+        trend_items = {item["label"]: item["displayValue"] for item in trend["summary"]["items"]}
+        brief = build_valid_leads_brief(report_date, current, previous_period, {}, None)
+
+        self.assertEqual(trend_items["环比"], "50.1%")
+        self.assertIn("环比 50.1%", brief["lines"][0])
+
+    def test_valid_leads_brief_mom_uses_previous_month_end_for_extra_day(self) -> None:
+        report_date = date(2026, 7, 31)
+        current = {date(2026, 7, 31): {"validLeads": 120}}
+        previous_period = {
+            date(2026, 6, 1): {"validLeads": 40},
+            date(2026, 6, 30): {"validLeads": 60},
+        }
+
+        trend = build_valid_leads_control_trend(report_date, current, previous_period, {}, None)
+        trend_items = {item["label"]: item["displayValue"] for item in trend["summary"]["items"]}
+        brief = build_valid_leads_brief(report_date, current, previous_period, {}, None)
+
+        self.assertEqual(trend_items["环比"], "20.0%")
+        self.assertIn("环比 20.0%", brief["lines"][0])
+
     def test_arrival_brief_keeps_same_period_as_yoy_and_previous_month_as_mom(self) -> None:
         report_date = date(2026, 7, 2)
         arrival_maps = {
