@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-08-10T16:31:21",
-  "reportDate": "2026-08-09",
-  "reportDateLabel": "2026-08-09",
+  "generatedAt": "2026-08-11T09:09:18",
+  "reportDate": "2026-08-10",
+  "reportDateLabel": "2026-08-10",
   "inputs": {
     "workbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_xsai.xlsm",
     "workbookName": "NEV+ICE_xsai.xlsm",
-    "workbookModifiedAt": "2026-08-10T16:31:12",
+    "workbookModifiedAt": "2026-08-11T09:09:15",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsm",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsm",
-    "arrivalWorkbookModifiedAt": "2026-08-10T16:31:16"
+    "arrivalWorkbookModifiedAt": "2026-08-11T09:09:17"
   },
   "outputs": {
     "dashboardJson": "D:/WorkCode/AI_Digest/docs/data/dashboard.json",
