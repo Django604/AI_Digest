@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-08-12 10:58
+- 需求 / 目标：在每日简报的全车系有效线索与 NEV 新增线索板块增加带当月月份的目标取值说明，并发布到 GitHub。
+- 改动内容：将两块既有备注更新为“（目标取值为 H2 穿透目标 × 月值）”与“（目标取值为 GTM 输入的管控目标 × 月值）”，其中月份由报表日期动态生成；重建 live 与 2026 年 8 月归档。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`SCRIPTS.md`、`docs/data/dashboard.json`、`docs/data/dashboard.summary.json`、`docs/data/monthly/2026-08/dashboard.json`、`DEV_CHANGELOG.md`。
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py ...`、`python -B -X utf8 -m unittest discover -s tests -v`、`node --check docs\assets\app.js`、`git diff --check`。
+- 验证结果：全量单测 `119/119` 通过；live 与 8 月归档均显示“（目标取值为 H2 穿透目标 8 月值）”和“（目标取值为 GTM 输入的管控目标 8 月值）”。
+- 回滚方法：恢复两条简报 note 文案、对应测试与说明，并还原本次生成的 live / 8 月归档数据。
+- 关联提交（如有）：待补充
+- 备注：后续每日自动更新和附魔工作台重建均复用同一生成器，跨月时说明月份会自动切换。
+
 ## 2026-08-09 21:46
 - 需求 / 目标：修复每日简报与全车系有效线索趋势卡的累计环比不一致问题，并发布到 GitHub。
 - 改动内容：将每日简报累计环比统一为本月截至报告日对比上月同日累计；本月日期超出上月天数时回退上月最后一天；趋势卡的上期累计序列在大小月边界沿用上月月末累计值，确保两处口径持续一致。

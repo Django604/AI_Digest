@@ -289,11 +289,11 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertEqual(sections_by_kind["nev"]["title"], "NEV新增线索")
         self.assertEqual(
             sections_by_kind["valid-leads"]["note"],
-            "备注：目标口径为下半年穿透目标分月值",
+            "（目标取值为H2穿透目标7月值）",
         )
         self.assertEqual(
             sections_by_kind["nev"]["note"],
-            "备注：目标口径为GTM输入的月度管控值",
+            "（目标取值为GTM输入的管控目标7月值）",
         )
         self.assertEqual(sections_by_kind["new-pathfinder"]["title"], "2026款探陆线索")
         self.assertIn("2026款探陆累计实绩 2", sections_by_kind["new-pathfinder"]["lines"][0])

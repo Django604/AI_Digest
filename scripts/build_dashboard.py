@@ -1159,7 +1159,7 @@ def build_line_brief(
             "kind": "nev",
             "title": "NEV新增线索",
             "lines": [nev_summary, *nev_lines],
-            "note": "备注：目标口径为GTM输入的月度管控值",
+            "note": f"（目标取值为GTM输入的管控目标{report_date.month}月值）",
         },
         {"kind": "new-pathfinder", "title": f"{NEW_PATHFINDER_MODEL}线索", "lines": [new_pathfinder_line]},
     ]
@@ -1220,7 +1220,7 @@ def build_valid_leads_brief(
                 f"同比 {fmt_percent(yoy)}，环比 {fmt_percent(mom)}"
             )
         ],
-        "note": "备注：目标口径为下半年穿透目标分月值",
+        "note": f"（目标取值为H2穿透目标{report_date.month}月值）",
     }
 
 
