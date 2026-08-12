@@ -1,5 +1,15 @@
 # DEV CHANGELOG
 
+## 2026-08-12 11:12
+- 需求 / 目标：修正目标取值说明的展示位置，解决用户认为截图一未更新的问题，并重新发布到 GitHub。
+- 改动内容：将全车系有效线索的 H2 目标说明从卡片底部移到指标文字末尾；NEV 的 GTM 目标说明继续显示在板块下方；同步更新测试、说明与 8 月页面产物。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`SCRIPTS.md`、`docs/data/dashboard.json`、`docs/data/monthly/2026-08/dashboard.json`、`DEV_CHANGELOG.md`。
+- 关键命令：`python -B -X utf8 scripts\build_dashboard.py ...`、`python -B -X utf8 -m unittest discover -s tests -v`、`node --check docs\assets\app.js`、`git diff --check`。
+- 验证结果：全量单测 `119/119` 通过；全车系指标行以“（目标取值为 H2 穿透目标 8 月值）”结尾且不再生成底部 note，NEV 底部说明保持不变。
+- 回滚方法：将全车系目标说明恢复为 note 字段，恢复对应测试、文档和页面产物。
+- 关联提交（如有）：待补充
+- 备注：上一版远端数据与截图中实际已有两条红字，本次按“截图一后面、截图二下面”的位置要求进一步纠正。
+
 ## 2026-08-12 10:58
 - 需求 / 目标：在每日简报的全车系有效线索与 NEV 新增线索板块增加带当月月份的目标取值说明，并发布到 GitHub。
 - 改动内容：将两块既有备注更新为“（目标取值为 H2 穿透目标 × 月值）”与“（目标取值为 GTM 输入的管控目标 × 月值）”，其中月份由报表日期动态生成；重建 live 与 2026 年 8 月归档。
