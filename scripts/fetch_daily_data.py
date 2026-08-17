@@ -277,6 +277,16 @@ def run_fetch_task(
         log(f"开始抓取：{task.label}{suffix}")
         try:
             stream_subprocess(command, task.script_path.parent, log, task.label)
+            # ponytail: one configured report writes one Excel file into this run's unique directory.
+            export_count = sum(
+                1
+                for path in output_dir.iterdir()
+                if path.is_file() and path.suffix.lower() in {".xls", ".xlsx", ".xlsm"}
+            )
+            if export_count < len(task.report_keys):
+                raise RuntimeError(
+                    f"{task.label} 导出结果不完整：预期 {len(task.report_keys)} 个 Excel，实际 {export_count} 个"
+                )
             break
         except RuntimeError as exc:
             if attempt_index >= max_attempts:

@@ -79,6 +79,7 @@
   - NEV 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_nev_exports.py` 内部包装器复用 `日报来店NEV源` 的登录态与参数模板，并在后台执行 `tab/execute -> REPORT2 -> chart.data` 直接抓取自定义按日序列
   - ICE 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_ice_exports.py` 内部包装器强制把 Tableau 交叉表缩略图入口锁定到 `来店批次分车系汇总表_按天T`
   - NEV / ICE 上期来店在汇总时兼容导出器的两种命名方式：可使用本次业务日后缀，也可使用上期实际结束日后缀；非上期报表仍严格匹配本次业务日
+  - 每项抓取任务结束后会校验预期 Excel 数量；即使底层导出器跳过失败报表但返回成功退出码，仍会触发现有任务级重试
   - 该脚本只负责本地更新；静态部署到 `GitHub Pages` 后不会自动具备浏览器取数能力
 
 ## scripts/run_leads_nev_exports.py
@@ -171,12 +172,12 @@
 - 使用方法：
   - 直接注册默认任务：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1`
   - 自定义时间：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -Time 09:00`
-  - 自定义静默兜底延迟：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -Time 09:00 -SilentDelayMinutes 1`
+  - 自定义静默兜底延迟：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -Time 09:00 -SilentDelayMinutes 20`
   - 自定义 Python 路径：`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -PythonPath C:\Python313\pythonw.exe`
 - 备注：
   - 计划任务按当前 Windows 本地时区执行；这台机器的场景即北京时间
   - 注册脚本会优先使用 `pythonw.exe`，避免计划任务运行时弹黑色控制台窗口
-  - 脚本默认注册两条任务：`AI_Digest_Daily_Update_Interactive` 会在登录态下弹窗执行，`AI_Digest_Daily_Update_Silent` 会以 `SYSTEM` 服务账号在未登录时静默兜底
+  - 脚本默认注册两条任务：`AI_Digest_Daily_Update_Interactive` 会在登录态下弹窗执行，`AI_Digest_Daily_Update_Silent` 会以 `SYSTEM` 服务账号在未登录时静默兜底；静默任务默认延后 20 分钟，避免主任务正常取数期间因持锁而直接跳过
   - 两条任务通过 `scheduled_update_runner.py` 内部的文件锁互斥，避免同时回填 Excel 与 dashboard 数据
 
 ## scripts/publish_dashboard.ps1

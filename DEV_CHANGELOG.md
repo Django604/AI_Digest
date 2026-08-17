@@ -1,5 +1,25 @@
 # DEV CHANGELOG
 
+## 2026-08-17 11:01
+- 需求 / 目标：排查今天自动更新未完成是否由上次修改未推送导致，修复可控问题并完成当天更新与 GitHub 推送。
+- 改动内容：确认线上代码已同步，今天实际因 ICE 全国按日页面导航超时且底层导出器跳过失败报表后仍返回 `0`，导致既有任务级重试未触发；在每项抓取后增加预期 Excel 数量校验，使缺文件进入既有两次重试；将静默兜底默认延迟由 1 分钟改为 20 分钟，并重注册本机任务为 09:00 / 09:20。
+- 涉及文件：`scripts/fetch_daily_data.py`、`scripts/register_daily_update_task.ps1`、`tests/test_fetch_daily_data.py`、`SCRIPTS.md`、`DEV_CHANGELOG.md`；本机 Windows 计划任务。
+- 关键命令：读取 `.runtime/scheduled_update/20260817_090002_466743/`、`python -B -X utf8 -m unittest discover -s tests -v`、`powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -Time 09:00 -SilentDelayMinutes 20 -AutoPublish ...`。
+- 验证结果：全量单测 `120/120` 通过，新增测试确认导出器返回 `0` 但 Excel 不完整时会重试；本机下次交互任务为 `2026-08-18 09:00`、静默任务为 `09:20`；附魔工作台已完成业务日期 `2026-08-16` 的更新与发布，远端数据提交为 `4c7d6b3`。
+- 回滚方法：移除抓取后的 Excel 数量校验与对应测试，将 `SilentDelayMinutes` 恢复为 `1` 并重新注册计划任务。
+- 关联提交（如有）：待补充
+- 备注：今天失败不是上次代码未推送造成；手动兜底运行期间共享文件锁正确阻止了重复补跑。
+
+## 2026-08-14 10:02
+- 需求 / 目标：排查 2026 年 8 月 13 日、14 日上午 9 点自动更新失败原因。
+- 改动内容：仅诊断并记录结果，未修改任务配置、抓取逻辑或页面数据。
+- 涉及文件：`.runtime/scheduled_update/20260813_090002_406860/`、`.runtime/scheduled_update/20260814_090002_536303/`、`.runtime/daily_update/20260813_20260814-090005/`、`DEV_CHANGELOG.md`。
+- 关键命令：`Get-ScheduledTaskInfo`、读取两日 `result.json` / `scheduled_update.log` / `report2_api_trace.json`、`git ls-remote origin refs/heads/main`。
+- 验证结果：8 月 13 日取数、回填、重建与提交均成功，仅自动 `git push` 因 SSH 远端连接失败而报错，随后 09:32 附魔工作台已补推；8 月 14 日在 NEV 本期来店阶段失败，上游 FineReport 返回 `11300001`，其 SQL 无法解析表 `ods_orgcenter.t_usc_mdmn_db_base_dlr_info`，重试一次仍失败；两日 09:01 静默任务均因交互任务持锁而正常跳过。
+- 回滚方法：删除本条诊断记录。
+- 关联提交（如有）：待补充
+- 备注：当前 GitHub SSH 已恢复，远端 `main` 为 `bb01175`；当前 dashboard 业务日期仍为 `2026-08-12`。需另行决定是否增强上游错误提示 / 延迟重试，或等待数据平台修复后重新执行更新。
+
 ## 2026-08-12 11:12
 - 需求 / 目标：修正目标取值说明的展示位置，解决用户认为截图一未更新的问题，并重新发布到 GitHub。
 - 改动内容：将全车系有效线索的 H2 目标说明从卡片底部移到指标文字末尾；NEV 的 GTM 目标说明继续显示在板块下方；同步更新测试、说明与 8 月页面产物。

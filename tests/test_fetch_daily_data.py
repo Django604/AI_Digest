@@ -5,6 +5,7 @@ import shutil
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 from openpyxl import Workbook, load_workbook
 
@@ -12,12 +13,14 @@ from scripts.build_dashboard import ARRIVAL_BOOK, LEADS_BOOK, safe_close_workboo
 from scripts.fetch_daily_data import (
     ARRIVAL_SHEET_MAPPINGS,
     FETCH_TASKS,
+    FetchTask,
     LEADS_SHEET_MAPPINGS,
     SHEET_MAPPINGS,
     parse_business_date,
     rebuild_dashboard,
     replace_workbook_sheets,
     resolve_export_path,
+    run_fetch_task,
 )
 
 
@@ -112,6 +115,42 @@ class FetchDailyDataTests(unittest.TestCase):
                 date(2026, 7, 30),
                 allow_period_suffix=True,
             )
+
+    def test_run_fetch_task_retries_when_exporter_exits_zero_without_all_files(self) -> None:
+        task = FetchTask(
+            label="测试报表",
+            script_path=self.temp_root / "fake_exporter.py",
+            output_subdir="retry-check",
+            report_keys=("first", "second"),
+        )
+        runtime_root = self.temp_root / "runtime"
+        output_dir = runtime_root / task.output_subdir / "exports"
+        attempts = 0
+
+        def fake_stream(*_args, **_kwargs) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 2:
+                (output_dir / "first-0420.xlsx").write_text("first", encoding="utf-8")
+                (output_dir / "second-0420.xlsx").write_text("second", encoding="utf-8")
+
+        with (
+            patch("scripts.fetch_daily_data.stream_subprocess", side_effect=fake_stream),
+            patch("scripts.fetch_daily_data.time.sleep"),
+        ):
+            resolved = run_fetch_task(
+                task,
+                business_date=date(2026, 4, 20),
+                runtime_root=runtime_root,
+                log=lambda _message: None,
+                headless=True,
+                username=None,
+                password=None,
+                chrome_path=None,
+            )
+
+        self.assertEqual(attempts, 2)
+        self.assertEqual(resolved, output_dir)
 
     def test_replace_workbook_sheets_overwrites_target_sheets(self) -> None:
         leads_path = self.temp_root / "NEV+ICE_xsai.xlsx"

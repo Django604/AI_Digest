@@ -1,7 +1,7 @@
 param(
   [string]$TaskNamePrefix = "AI_Digest_Daily_Update",
   [string]$Time = "09:00",
-  [int]$SilentDelayMinutes = 1,
+  [int]$SilentDelayMinutes = 20,
   [string]$PythonPath = "",
   [switch]$AutoPublish,
   [string]$PublishRemote = "origin",
