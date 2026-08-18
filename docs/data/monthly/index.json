@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-18T09:05:42",
+  "generatedAt": "2026-08-18T09:27:15",
   "latestMonth": "2026-08",
   "months": [
     {
@@ -11,7 +11,7 @@
       "reportDateLabel": "2026-08-17",
       "dashboardPath": "./data/monthly/2026-08/dashboard.json",
       "summaryPath": "./data/monthly/2026-08/dashboard.summary.json",
-      "generatedAt": "2026-08-18T09:05:42"
+      "generatedAt": "2026-08-18T09:27:15"
     },
     {
       "key": "2026-07",
