@@ -635,7 +635,7 @@ class BuildDashboardValidationTests(unittest.TestCase):
         self.assertEqual(trend_items["环比"], "20.0%")
         self.assertIn("环比 20.0%", brief["lines"][0])
 
-    def test_arrival_brief_keeps_same_period_as_yoy_and_previous_month_as_mom(self) -> None:
+    def test_arrival_brief_only_displays_previous_month_comparison(self) -> None:
         report_date = date(2026, 7, 2)
         arrival_maps = {
             "total_current": {date(2026, 7, 1): 100, report_date: 200},
@@ -653,16 +653,17 @@ class BuildDashboardValidationTests(unittest.TestCase):
 
         self.assertEqual(
             brief["lines"][0],
-            "全国累计来店 300，同比 200.0%，环比 50.0%；当日来店 200，同比 300.0%，环比 66.7%",
+            "全国累计来店 300，环比 50.0%；当日来店 200，环比 66.7%",
         )
         self.assertEqual(
             brief["lines"][1],
-            "①NEV累计来店 100，同比 150.0%，环比 25.0%；当日来店 60，同比 200.0%，环比 20.0%",
+            "①NEV累计来店 100，环比 25.0%；当日来店 60，环比 20.0%",
         )
         self.assertEqual(
             brief["lines"][2],
-            "②ICE累计来店 200，同比 233.3%，环比 66.7%；当日来店 140，同比 366.7%，环比 100.0%",
+            "②ICE累计来店 200，环比 66.7%；当日来店 140，环比 100.0%",
         )
+        self.assertEqual(brief["sourceSheets"], ["NEV本期来店", "NEV上期来店", "ICE本期来店", "ICE上期来店"])
 
     def test_day_calendar_meta_distinguishes_holiday_weekend_makeup_and_regular_workday(self) -> None:
         self.assertEqual(get_day_calendar_meta(date(2026, 5, 4))["dayType"], "holiday")
@@ -752,6 +753,14 @@ class BuildDashboardValidationTests(unittest.TestCase):
         self.assertEqual(items["累计环比"], "106.7%")
         self.assertEqual(items["上期来店"], "5")
         self.assertEqual(items["当日环比"], "100.0%")
+        self.assertNotIn("累计同期来店", items)
+        self.assertNotIn("累计同比", items)
+
+        trend = dashboard["sections"][0]["trend"]
+        self.assertEqual(trend["chartSubtitle"], "上期来店 / 本期来店 / 累计来店")
+        self.assertEqual(trend["chart"]["seriesDefinitions"][0]["label"], "上期来店")
+        self.assertEqual(trend["chart"]["seriesDefinitions"][-1]["label"], "累计上期来店")
+        self.assertEqual(trend["chart"]["series"]["previousActual"][-1], 5)
 
     def test_load_arrival_daily_sheet_supports_sheets_without_header_row(self) -> None:
         workbook = Workbook()

@@ -1231,26 +1231,19 @@ def build_arrival_brief(report_date: date, arrival_maps: dict[str, dict[date, in
         ("NEV", "nev", "①"),
         ("ICE", "ice", "②"),
     ):
-        same_period_series = build_arrival_series(
-            report_date,
-            arrival_maps[f"{prefix}_current"],
-            arrival_maps[f"{prefix}_same_period"],
-        )
         previous_period_series = build_arrival_series(
             report_date,
             arrival_maps[f"{prefix}_current"],
             arrival_maps[f"{prefix}_previous_period"],
             comparison_period="month",
         )
-        report_index = same_period_series["reportIndex"]
+        report_index = previous_period_series["reportIndex"]
         lines.append(
             format_arrival_brief_line(
                 label,
-                same_period_series["currentCumulative"][report_index],
-                same_period_series["previousCumulative"][report_index],
+                previous_period_series["currentCumulative"][report_index],
                 previous_period_series["previousCumulative"][report_index],
-                same_period_series["currentDaily"][report_index],
-                same_period_series["previousDaily"][report_index],
+                previous_period_series["currentDaily"][report_index],
                 previous_period_series["previousDaily"][report_index],
                 marker=marker,
             )
@@ -1262,10 +1255,8 @@ def build_arrival_brief(report_date: date, arrival_maps: dict[str, dict[date, in
         "sourceSheets": [
             "NEV本期来店",
             "NEV上期来店",
-            "NEV同期来店",
             "ICE本期来店",
             "ICE上期来店",
-            "ICE同期来店",
         ],
     }
 
@@ -1390,10 +1381,8 @@ def build_arrival_series(
 def format_arrival_brief_line(
     label: str,
     current_cumulative: int | float | None,
-    same_period_cumulative: int | float | None,
     previous_period_cumulative: int | float | None,
     daily_current: int | float | None,
-    daily_same_period: int | float | None,
     daily_previous_period: int | float | None,
     *,
     marker: str = "",
@@ -1401,10 +1390,8 @@ def format_arrival_brief_line(
     prefix = f"{marker}{label}"
     return (
         f"{prefix}累计来店 {fmt_count(current_cumulative)}，"
-        f"同比 {fmt_percent(delta_ratio(current_cumulative, same_period_cumulative))}，"
         f"环比 {fmt_percent(delta_ratio(current_cumulative, previous_period_cumulative))}；"
         f"当日来店 {fmt_count(daily_current)}，"
-        f"同比 {fmt_percent(delta_ratio(daily_current, daily_same_period))}，"
         f"环比 {fmt_percent(delta_ratio(daily_current, daily_previous_period))}"
     )
 
@@ -1458,49 +1445,39 @@ def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date
     )
 
     current_dates = total_series["dates"]
-    previous_dates = [aligned_previous_year_date(item) for item in current_dates]
+    previous_dates = [aligned_previous_date(item) for item in current_dates]
     current_daily = total_series["currentDaily"]
-    previous_daily = total_series["previousDaily"]
     previous_period_daily = total_previous_period_series["previousDaily"]
     current_target = [None] * len(current_dates)
     chart_actual = total_series["chartActual"]
     current_cumulative = total_series["currentCumulative"]
-    previous_cumulative = total_series["previousCumulative"]
     previous_period_cumulative = total_previous_period_series["previousCumulative"]
     target_cumulative = [None] * len(current_dates)
     report_index = total_series["reportIndex"]
     month_prefix = f"{current_dates[report_index].month}月" if current_dates and current_dates[report_index] else ""
 
     matrix_rows = [
-        {"key": "previousActual", "label": "同期来店", "displayValues": [fmt_plain(item) for item in previous_daily]},
-        {"key": "previousPeriodActual", "label": "上期来店", "displayValues": [fmt_plain(item) for item in previous_period_daily]},
+        {"key": "previousActual", "label": "上期来店", "displayValues": [fmt_plain(item) for item in previous_period_daily]},
         {"key": "target", "label": "本期目标", "displayValues": [fmt_plain(item) for item in current_target]},
         {"key": "actual", "label": "本期来店", "displayValues": [fmt_plain(item) for item in current_daily]},
-        {"key": "dayDelta", "label": "同比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(current_daily, previous_daily)]},
         {"key": "dayMom", "label": "环比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(current_daily, previous_period_daily)]},
         {"key": "nevActual", "label": "NEV本期实绩", "displayValues": [fmt_plain(item) for item in nev_series["currentDaily"]]},
-        {"key": "nevYoy", "label": "NEV同比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(nev_series["currentDaily"], nev_series["previousDaily"])]},
         {"key": "nevMom", "label": "NEV环比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(nev_series["currentDaily"], nev_previous_period_series["previousDaily"])]},
         {"key": "iceActual", "label": "ICE本期实绩", "displayValues": [fmt_plain(item) for item in ice_series["currentDaily"]]},
-        {"key": "iceDelta", "label": "ICE同比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(ice_series["currentDaily"], ice_series["previousDaily"])]},
         {"key": "iceMom", "label": "ICE环比", "displayValues": [fmt_percent(delta_ratio(current, previous)) for current, previous in zip(ice_series["currentDaily"], ice_previous_period_series["previousDaily"])]},
     ]
 
     trend = {
         "viewType": "arrival",
         "chartTitle": f"{current_dates[report_index].month}月全车系来店日趋势" if current_dates and current_dates[report_index] else "全车系来店日趋势",
-        "chartSubtitle": "同期来店 / 本期来店 / 累计来店",
+        "chartSubtitle": "上期来店 / 本期来店 / 累计来店",
         "tableTitle": "全国来店明细表",
         "summary": {
             "items": [
                 {"label": "累计来店", "value": normalize_scalar(current_cumulative[report_index]), "displayValue": fmt_count(current_cumulative[report_index])},
-                {"label": "累计同期来店", "value": normalize_scalar(previous_cumulative[report_index]), "displayValue": fmt_count(previous_cumulative[report_index])},
-                {"label": "累计同比", "value": normalize_scalar(delta_ratio(current_cumulative[report_index], previous_cumulative[report_index])), "displayValue": fmt_percent(delta_ratio(current_cumulative[report_index], previous_cumulative[report_index]))},
                 {"label": "累计上期来店", "value": normalize_scalar(previous_period_cumulative[report_index]), "displayValue": fmt_count(previous_period_cumulative[report_index])},
                 {"label": "累计环比", "value": normalize_scalar(delta_ratio(current_cumulative[report_index], previous_period_cumulative[report_index])), "displayValue": fmt_percent(delta_ratio(current_cumulative[report_index], previous_period_cumulative[report_index]))},
                 {"label": "当日来店", "value": normalize_scalar(current_daily[report_index]), "displayValue": fmt_count(current_daily[report_index])},
-                {"label": "同期来店", "value": normalize_scalar(previous_daily[report_index]), "displayValue": fmt_count(previous_daily[report_index])},
-                {"label": "当日同比", "value": normalize_scalar(delta_ratio(current_daily[report_index], previous_daily[report_index])), "displayValue": fmt_percent(delta_ratio(current_daily[report_index], previous_daily[report_index]))},
                 {"label": "上期来店", "value": normalize_scalar(previous_period_daily[report_index]), "displayValue": fmt_count(previous_period_daily[report_index])},
                 {"label": "当日环比", "value": normalize_scalar(delta_ratio(current_daily[report_index], previous_period_daily[report_index])), "displayValue": fmt_percent(delta_ratio(current_daily[report_index], previous_period_daily[report_index]))},
             ]
@@ -1510,15 +1487,11 @@ def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date
             "labels": [fmt_axis_date(item) for item in current_dates],
             "visibleRowKeys": [
                 "previousActual",
-                "previousPeriodActual",
                 "actual",
-                "dayDelta",
                 "dayMom",
                 "nevActual",
-                "nevYoy",
                 "nevMom",
                 "iceActual",
-                "iceDelta",
                 "iceMom",
             ],
             "columnMeta": [build_column_calendar_meta(current, previous) for current, previous in zip(current_dates, previous_dates)],
@@ -1527,24 +1500,24 @@ def build_arrival_dashboard(report_date: date, arrival_maps: dict[str, dict[date
         "chart": {
             "labels": [fmt_axis_date(item) for item in current_dates],
             "reportDayIndex": report_index,
-            "dailyAxisMax": nice_axis_max([*previous_daily, *current_target, *chart_actual]),
-            "cumulativeAxisMax": nice_axis_max([*previous_cumulative, *target_cumulative, *current_cumulative]),
+            "dailyAxisMax": nice_axis_max([*previous_period_daily, *current_target, *chart_actual]),
+            "cumulativeAxisMax": nice_axis_max([*previous_period_cumulative, *target_cumulative, *current_cumulative]),
             "hiddenSeriesKeys": ["target", "cumulativeTarget"],
             "series": {
-                "previousActual": [normalize_scalar(item) for item in previous_daily],
+                "previousActual": [normalize_scalar(item) for item in previous_period_daily],
                 "target": [normalize_scalar(item) for item in current_target],
                 "actual": [normalize_scalar(item) for item in chart_actual],
-                "previousCumulative": [normalize_scalar(item) for item in previous_cumulative],
+                "previousCumulative": [normalize_scalar(item) for item in previous_period_cumulative],
                 "cumulativeTarget": [normalize_scalar(item) for item in target_cumulative],
                 "cumulativeActual": [normalize_scalar(item if index <= report_index else None) for index, item in enumerate(current_cumulative)],
             },
             "seriesDefinitions": [
-                {"key": "previousActual", "label": "同期来店", "type": "bar", "color": "#a9c8ff", "fill": "rgba(255,255,255,0.85)", "stroke": "#a9c8ff", "strokeWidth": 1.4},
+                {"key": "previousActual", "label": "上期来店", "type": "bar", "color": "#a9c8ff", "fill": "rgba(255,255,255,0.85)", "stroke": "#a9c8ff", "strokeWidth": 1.4},
                 {"key": "target", "label": "本期目标", "type": "bar", "color": "#d7d7d7", "fill": "#d7d7d7", "opacity": 0.9},
                 {"key": "actual", "label": "本期来店", "type": "bar", "color": "#d40000", "fill": "#d40000"},
                 {"key": "cumulativeTarget", "label": f"{month_prefix}累计目标", "type": "line", "color": "#9f9f9f", "dashed": True, "strokeWidth": "3"},
                 {"key": "cumulativeActual", "label": f"{month_prefix}累计来店", "type": "line", "color": "#d40000", "strokeWidth": "3.5", "markers": True, "markerFill": "#ffffff", "markerStroke": "#d40000", "markerRadius": 4.8},
-                {"key": "previousCumulative", "label": "累计同期来店", "type": "line", "color": "#bfd0ff", "strokeWidth": "3", "markers": False},
+                {"key": "previousCumulative", "label": "累计上期来店", "type": "line", "color": "#bfd0ff", "strokeWidth": "3", "markers": False},
             ],
             "note": "",
         },
@@ -1740,7 +1713,7 @@ def build_payload(
                 "sheetNames": leads.sheetnames,
                 "issues": [
                     {"sheet": "每日NEV早报模板", "summary": "线索简报按底层数据重建，避免继续沿用历史模板文案。"},
-                    {"sheet": "NEV+ICE_ldai", "summary": "全国来店简报与趋势基于本期、上期、同期共 6 张来店底表聚合生成。"},
+                    {"sheet": "NEV+ICE_ldai", "summary": "全国来店简报与趋势基于本期、上期共 4 张来店底表聚合生成。"},
                     {"sheet": "十五代轩逸按日", "summary": "历史底表继续保留，页面与每日简报不再展示。"},
                 ],
             },
