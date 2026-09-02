@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-09-02T15:51:56",
+  "generatedAt": "2026-09-02T16:15:23",
   "reportDate": "2026-09-01",
   "reportDateLabel": "2026-09-01",
   "inputs": {
     "workbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_xsai.xlsm",
     "workbookName": "NEV+ICE_xsai.xlsm",
-    "workbookModifiedAt": "2026-09-02T15:51:54",
+    "workbookModifiedAt": "2026-09-02T16:15:19",
     "arrivalWorkbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_ldai.xlsm",
     "arrivalWorkbookName": "NEV+ICE_ldai.xlsm",
     "arrivalWorkbookModifiedAt": "2026-09-02T15:51:55"
