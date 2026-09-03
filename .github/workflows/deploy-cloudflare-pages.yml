@@ -40,7 +40,7 @@ jobs:
         run: python -m unittest discover -s tests -v
 
       - name: Build dashboard data
-        run: python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsm --out docs/data/dashboard.json --preserve-input-modified-times
+        run: python scripts/build_dashboard.py --workbook data/source/NEV+ICE_xsai.xlsm --arrival-workbook data/source/NEV+ICE_ldai.xlsm --out docs/data/dashboard.json --preserve-input-modified-times --submission-time "$(git show -s --format=%cI HEAD)"
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

@@ -5,7 +5,7 @@ import calendar
 import json
 from collections import defaultdict
 from functools import lru_cache
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +23,7 @@ SUMMARY_JSON = ROOT / "docs" / "data" / "dashboard.summary.json"
 MONTHLY_ARCHIVE_DIR = ROOT / "docs" / "data" / "monthly"
 MONTHLY_ARCHIVE_INDEX = MONTHLY_ARCHIVE_DIR / "index.json"
 DASHBOARD_TARGETS_CONFIG = ROOT / "config" / "dashboard_targets.json"
+CHINA_STANDARD_TIME = timezone(timedelta(hours=8))
 
 NEV_CORE_MODELS = [
     ("nx8", "NX8", "NX8"),
@@ -298,6 +299,24 @@ def write_json_if_changed(
 
 def file_mtime_iso(path: Path) -> str:
     return datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec="seconds")
+
+
+def apply_submission_time(payload: dict[str, Any], value: Any) -> None:
+    if not isinstance(value, str) or not value.strip() or "T" not in value:
+        raise ValueError("数据提交时间不是有效的 ISO 时间。")
+    normalized_value = value.strip()
+    if normalized_value.endswith("Z"):
+        normalized_value = f"{normalized_value[:-1]}+00:00"
+    try:
+        submitted_at = datetime.fromisoformat(normalized_value)
+    except ValueError as exc:
+        raise ValueError("数据提交时间不是有效的 ISO 时间。") from exc
+    if submitted_at.tzinfo is not None:
+        submitted_at = submitted_at.astimezone(CHINA_STANDARD_TIME).replace(tzinfo=None)
+    meta = payload.get("meta")
+    if not isinstance(meta, dict):
+        raise ValueError("Dashboard 缺少 meta 对象，无法写入数据提交时间。")
+    meta["submittedAt"] = submitted_at.isoformat(timespec="seconds")
 
 
 def validate_preserved_local_datetime(value: Any, field_name: str) -> str:
@@ -1880,6 +1899,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out", default=str(OUT_JSON), help="Output JSON path")
     parser.add_argument("--summary-out", default="", help="Optional output summary JSON path")
     parser.add_argument("--report-date", default="", help="Optional report date override in YYYY-MM-DD or YYYYMMDD")
+    parser.add_argument("--submission-time", default="", help="Git submission time in ISO format")
     parser.add_argument(
         "--preserve-input-modified-times",
         action="store_true",
@@ -1905,6 +1925,8 @@ def main() -> int:
         if report_date_override is None:
             raise ValueError(f"Invalid --report-date value: {args.report_date}")
     payload = build_payload(leads_path, arrival_path, report_date_override=report_date_override)
+    if args.submission_time:
+        apply_submission_time(payload, args.submission_time)
     if input_modified_times is not None:
         apply_preserved_input_modified_times(payload, input_modified_times)
     out_path.parent.mkdir(parents=True, exist_ok=True)

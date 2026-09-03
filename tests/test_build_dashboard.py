@@ -21,6 +21,7 @@ from scripts.build_dashboard import (
     SYLPHY_FREEZE_DATE,
     OUT_JSON,
     SUMMARY_JSON,
+    apply_submission_time,
     apply_preserved_input_modified_times,
     build_arrival_dashboard,
     build_arrival_series,
@@ -467,6 +468,13 @@ class BuildDashboardPayloadTests(unittest.TestCase):
     def test_pages_workflow_preserves_committed_input_modified_times(self) -> None:
         workflow = (Path(__file__).parents[1] / ".github/workflows/deploy-pages.yml").read_text(encoding="utf-8")
         self.assertIn("--preserve-input-modified-times", workflow)
+
+    def test_apply_submission_time_normalizes_to_china_standard_time(self) -> None:
+        payload = {"meta": {}}
+
+        apply_submission_time(payload, "2026-09-03T07:43:28Z")
+
+        self.assertEqual(payload["meta"]["submittedAt"], "2026-09-03T15:43:28")
 
     def test_arrival_dashboard_uses_nev_daily_arrivals_for_nev_actual_row(self) -> None:
         if self.previous_month_archive_payload is None:

@@ -1147,6 +1147,7 @@ function renderMeta(meta) {
   const metaItems = [
     `数据范围：${meta.dataRangeStart ?? "-"} 至 ${meta.dataRangeEnd ?? "-"}`,
     `源数据更新时间：${formatDateTime(meta.workbookModifiedAt)}`,
+    `数据提交时间：${formatDateTime(meta.submittedAt)}`,
   ];
   metaItems.forEach((text) => {
     const item = document.createElement("span");

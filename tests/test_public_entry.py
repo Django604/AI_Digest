@@ -61,6 +61,14 @@ class PublicEntryTests(unittest.TestCase):
         self.assertIn('      - "docs/**"', workflow)
         self.assertIn('      - "config/dashboard_targets.json"', workflow)
 
+    def test_pages_workflows_stamp_and_display_the_same_submission_time(self) -> None:
+        expected_argument = '--submission-time "$(git show -s --format=%cI HEAD)"'
+        app_source = APP_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn(expected_argument, PAGES_WORKFLOW.read_text(encoding="utf-8"))
+        self.assertIn(expected_argument, CLOUDFLARE_PAGES_WORKFLOW.read_text(encoding="utf-8"))
+        self.assertIn('`数据提交时间：${formatDateTime(meta.submittedAt)}`', app_source)
+
     def test_batch_capture_skips_sylphy_15(self) -> None:
         source = APP_SCRIPT.read_text(encoding="utf-8")
 
