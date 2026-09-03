@@ -35,6 +35,9 @@ class DashboardPublishTests(unittest.TestCase):
         self.assertEqual(actual["publishStatus"], "no_changes")
         self.assertEqual(actual["publishRemote"], "origin")
         self.assertEqual(actual["publishBranch"], "main")
+        self.assertEqual(actual["publishTarget"], "github_pages_and_cloudflare_pages")
+        self.assertEqual(actual["publishPagesUrl"], dashboard_publish.PAGES_URL)
+        self.assertEqual(actual["publishCloudflarePagesUrl"], dashboard_publish.CLOUDFLARE_PAGES_URL)
 
     def test_publish_dashboard_retries_interrupted_push_once(self) -> None:
         logs: list[str] = []
@@ -65,8 +68,9 @@ class DashboardPublishTests(unittest.TestCase):
             )
 
         self.assertEqual(actual["publishStatus"], "success")
-        self.assertEqual(actual["publishTarget"], "github_pages")
+        self.assertEqual(actual["publishTarget"], "github_pages_and_cloudflare_pages")
         self.assertEqual(actual["publishPagesUrl"], dashboard_publish.PAGES_URL)
+        self.assertEqual(actual["publishCloudflarePagesUrl"], dashboard_publish.CLOUDFLARE_PAGES_URL)
         self.assertEqual(run_command_mock.call_count, 2)
         sleep_mock.assert_called_once_with(2)
         self.assertTrue(any("Push was interrupted once; retrying after a short pause..." in line for line in logs))
@@ -96,8 +100,9 @@ class DashboardPublishTests(unittest.TestCase):
 
         self.assertEqual(actual["publishStatus"], "no_changes")
         self.assertEqual(actual["publishPushAttempted"], "true")
-        self.assertEqual(actual["publishTarget"], "github_pages")
+        self.assertEqual(actual["publishTarget"], "github_pages_and_cloudflare_pages")
         self.assertEqual(actual["publishPagesUrl"], dashboard_publish.PAGES_URL)
+        self.assertEqual(actual["publishCloudflarePagesUrl"], dashboard_publish.CLOUDFLARE_PAGES_URL)
         push_mock.assert_called_once()
         sleep_mock.assert_not_called()
         self.assertEqual(push_mock.call_args.args[0], ["git", "push", "origin", "HEAD:main"])

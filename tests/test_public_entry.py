@@ -6,6 +6,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SVG_ENTRY = PROJECT_ROOT / "docs" / "index.svg"
 PAGES_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "deploy-pages.yml"
+CLOUDFLARE_PAGES_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "deploy-cloudflare-pages.yml"
 APP_SCRIPT = PROJECT_ROOT / "docs" / "assets" / "app.js"
 STYLESHEET = PROJECT_ROOT / "docs" / "assets" / "styles.css"
 FAVICON = PROJECT_ROOT / "docs" / "favicon.ico"
@@ -48,6 +49,17 @@ class PublicEntryTests(unittest.TestCase):
         self.assertLess(configure_position, upload_position)
         self.assertNotIn("jsDelivr", workflow)
         self.assertNotIn("purge_jsdelivr_cache.py", workflow)
+
+    def test_cloudflare_workflow_independently_deploys_the_same_docs_directory(self) -> None:
+        workflow = CLOUDFLARE_PAGES_WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("group: cloudflare-pages", workflow)
+        self.assertIn("cloudflare/wrangler-action@v3", workflow)
+        self.assertIn("secrets.CLOUDFLARE_API_TOKEN", workflow)
+        self.assertIn("secrets.CLOUDFLARE_ACCOUNT_ID", workflow)
+        self.assertIn("pages deploy docs --project-name=django604-ai-digest --branch=main", workflow)
+        self.assertIn('      - "docs/**"', workflow)
+        self.assertIn('      - "config/dashboard_targets.json"', workflow)
 
     def test_batch_capture_skips_sylphy_15(self) -> None:
         source = APP_SCRIPT.read_text(encoding="utf-8")

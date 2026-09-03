@@ -103,7 +103,11 @@ def build_success_message(result: dict[str, object], started_at: datetime, finis
     business_date = str(result.get("businessDate") or "")
     runtime_dir = str(result.get("runtimeDir") or "")
     publish_status = str(result.get("publishStatus") or "disabled")
-    publish_summary = "disabled" if publish_status == "disabled" else publish_status
+    publish_summary = {
+        "disabled": "未启用",
+        "success": "已推送，GitHub Pages 与 Cloudflare Pages 自动部署已触发",
+        "no_changes": "没有新的发布文件，双站保持当前版本",
+    }.get(publish_status, publish_status)
     dashboard_changed = "是" if bool(result.get("dashboardChanged")) else "否"
     summary_changed = "是" if bool(result.get("summaryChanged")) else "否"
     duration_seconds = int((finished_at - started_at).total_seconds())
@@ -115,6 +119,7 @@ def build_success_message(result: dict[str, object], started_at: datetime, finis
         f"耗时：{duration_seconds} 秒\n"
         f"dashboard.json 有变更：{dashboard_changed}\n"
         f"dashboard.summary.json 有变更：{summary_changed}\n"
+        f"发布状态：{publish_summary}\n"
         f"运行目录：{runtime_dir}\n"
         f"日志文件：{log_path}\n\n"
         f"窗口会在 {FINISH_AUTO_CLOSE_SECONDS} 秒后自动关闭。"
@@ -767,6 +772,9 @@ def run_scheduled_update(
                 "publishRemote": result.get("publishRemote", publish_remote if auto_publish else ""),
                 "publishBranch": result.get("publishBranch", publish_branch if auto_publish else ""),
                 "publishCommitMessage": result.get("publishCommitMessage", ""),
+                "publishTarget": result.get("publishTarget", ""),
+                "publishPagesUrl": result.get("publishPagesUrl", ""),
+                "publishCloudflarePagesUrl": result.get("publishCloudflarePagesUrl", ""),
                 "logPath": str(log_path),
             },
         )

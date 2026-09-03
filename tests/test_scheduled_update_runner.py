@@ -65,6 +65,7 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
             "runtimeDir": r"D:\WorkCode\AI_Digest\.runtime\daily_update\20260421_20260422-090000",
             "dashboardChanged": True,
             "summaryChanged": False,
+            "publishStatus": "success",
         }
 
         actual = build_success_message(
@@ -77,6 +78,7 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
         self.assertIn("业务日期：2026-04-21", actual)
         self.assertIn("dashboard.json 有变更：是", actual)
         self.assertIn("dashboard.summary.json 有变更：否", actual)
+        self.assertIn("GitHub Pages 与 Cloudflare Pages 自动部署已触发", actual)
         self.assertIn("耗时：185 秒", actual)
         self.assertIn(f"窗口会在 {FINISH_AUTO_CLOSE_SECONDS} 秒后自动关闭", actual)
 
@@ -202,6 +204,9 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
             "publishRemote": "origin",
             "publishBranch": "main",
             "publishCommitMessage": "Auto publish dashboard data 2026-04-22 (silent)",
+            "publishTarget": "github_pages_and_cloudflare_pages",
+            "publishPagesUrl": "https://django604.github.io/AI_Digest/",
+            "publishCloudflarePagesUrl": "https://django604-ai-digest.pages.dev/",
         }
 
         runtime_root = self.create_repo_temp_dir()
@@ -230,6 +235,8 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
             self.assertEqual(payload["publishStatus"], "success")
             self.assertEqual(payload["publishRemote"], "origin")
             self.assertEqual(payload["publishBranch"], "main")
+            self.assertEqual(payload["publishTarget"], "github_pages_and_cloudflare_pages")
+            self.assertEqual(payload["publishCloudflarePagesUrl"], "https://django604-ai-digest.pages.dev/")
         finally:
             shutil.rmtree(runtime_root, ignore_errors=True)
 

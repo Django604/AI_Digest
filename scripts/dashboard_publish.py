@@ -26,6 +26,7 @@ PUBLISH_TARGETS = (
 INTERRUPTED_EXIT_CODES = {3221225786, 130}
 PUSH_TIMEOUT_SECONDS = 300
 PAGES_URL = "https://django604.github.io/AI_Digest/"
+CLOUDFLARE_PAGES_URL = "https://django604-ai-digest.pages.dev/"
 
 
 @dataclass(frozen=True)
@@ -317,8 +318,9 @@ def publish_dashboard(
             "publishCurrentBranch": current_branch,
             "publishRemoteUrl": remote_url,
             "publishPushAttempted": str(push_if_no_changes).lower(),
-            "publishTarget": "github_pages",
+            "publishTarget": "github_pages_and_cloudflare_pages",
             "publishPagesUrl": PAGES_URL,
+            "publishCloudflarePagesUrl": CLOUDFLARE_PAGES_URL,
         }
 
     log("Step 3/4: committing staged publish files...")
@@ -330,6 +332,7 @@ def publish_dashboard(
     log("")
     log("Dashboard publish completed successfully.")
     log(f"GitHub Pages deployment will continue at: {PAGES_URL}")
+    log(f"Cloudflare Pages deployment will continue at: {CLOUDFLARE_PAGES_URL}")
     log(f"Remote: {remote}")
     log(f"Branch: {branch}")
     log(f"Current branch: {current_branch}")
@@ -345,8 +348,9 @@ def publish_dashboard(
         "publishCommitMessage": resolved_commit_message,
         "publishCurrentBranch": current_branch,
         "publishRemoteUrl": remote_url,
-        "publishTarget": "github_pages",
+        "publishTarget": "github_pages_and_cloudflare_pages",
         "publishPagesUrl": PAGES_URL,
+        "publishCloudflarePagesUrl": CLOUDFLARE_PAGES_URL,
     }
 
 
