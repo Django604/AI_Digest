@@ -9,8 +9,8 @@ from scripts.run_leads_nev_exports import (
     BUSINESS_STATUS_LABEL_PARAMETER_NAME,
     BUSINESS_STATUS_LABEL_TEXT,
     BUSINESS_STATUS_PARAMETER_NAME,
-    SAME_PERIOD_DAY_RULE,
     SAME_PERIOD_FIRST_DAY_RULE,
+    SAME_PERIOD_LAST_DAY_RULE,
     SAME_PERIOD_REPORT_KEY,
     SAME_PERIOD_REPORT_NAME,
     TARGET_REPORT_KEY,
@@ -41,15 +41,15 @@ class RunLeadsNevExportsTests(unittest.TestCase):
                 "2025-07-01",
             )
             self.assertEqual(
-                resolver({"rule": SAME_PERIOD_DAY_RULE}, "fallback", "2026-07-30"),
-                "2025-07-30",
+                resolver({"rule": SAME_PERIOD_LAST_DAY_RULE}, "fallback", "2026-07-30"),
+                "2025-07-31",
             )
             self.assertEqual(
                 resolver({"rule": SAME_PERIOD_FIRST_DAY_RULE}, "fallback", "2024-02-29"),
                 "2023-02-01",
             )
             self.assertEqual(
-                resolver({"rule": SAME_PERIOD_DAY_RULE}, "fallback", "2024-02-29"),
+                resolver({"rule": SAME_PERIOD_LAST_DAY_RULE}, "fallback", "2024-02-29"),
                 "2023-02-28",
             )
             self.assertEqual(resolver({"rule": "yesterday"}, "fallback", "2026-07-30"), "delegated")
@@ -100,7 +100,7 @@ class RunLeadsNevExportsTests(unittest.TestCase):
         )
         self.assertEqual(same_period_config["report_name"], SAME_PERIOD_REPORT_NAME)
         self.assertEqual(same_period_config["start_date"], {"rule": SAME_PERIOD_FIRST_DAY_RULE})
-        self.assertEqual(same_period_config["end_date"], {"rule": SAME_PERIOD_DAY_RULE})
+        self.assertEqual(same_period_config["end_date"], {"rule": SAME_PERIOD_LAST_DAY_RULE})
         self.assertEqual(same_period_parameters["core_filters"][BUSINESS_STATUS_PARAMETER_NAME], [])
         self.assertIsNot(same_period_config, report_configs_module.REPORT_CONFIGS[TARGET_REPORT_KEY])
         self.assertIsNot(same_period_parameters, national_parameters)

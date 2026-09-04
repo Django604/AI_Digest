@@ -21,6 +21,7 @@ from scripts.fetch_daily_data import (
     replace_workbook_sheets,
     resolve_export_path,
     run_fetch_task,
+    run_update,
 )
 
 
@@ -39,8 +40,10 @@ class FetchDailyDataTests(unittest.TestCase):
     def test_daily_fetch_exports_same_period_leads_and_never_refills_sylphy_15(self) -> None:
         nev_task = next(task for task in FETCH_TASKS if task.label == "NEV 全国按日")
         ice_task = next(task for task in FETCH_TASKS if task.label == "ICE 全国按日")
+        arrival_nev_task = next(task for task in FETCH_TASKS if task.label == "NEV 来店本期 + 上期 + 同期")
 
         self.assertEqual(nev_task.extra_args, ("--capture-wait-ms", "30000"))
+        self.assertEqual(arrival_nev_task.extra_args, ("--safe-bootstrap", "--capture-wait-ms", "300000"))
         self.assertEqual(
             ice_task.report_keys,
             ("ice_national_daily", "ice_national_daily_same_period"),
@@ -56,7 +59,10 @@ class FetchDailyDataTests(unittest.TestCase):
         period_suffix_sheets = [
             mapping.target_sheet for mapping in ARRIVAL_SHEET_MAPPINGS if mapping.allow_period_suffix
         ]
-        self.assertEqual(period_suffix_sheets, ["NEV上期来店", "ICE上期来店"])
+        self.assertEqual(
+            period_suffix_sheets,
+            ["NEV上期来店", "NEV同期来店", "ICE上期来店", "ICE同期来店"],
+        )
 
     def test_resolve_export_path_uses_business_date_suffix(self) -> None:
         output_dir = self.temp_root / "exports"
@@ -79,10 +85,12 @@ class FetchDailyDataTests(unittest.TestCase):
 
         self.assertEqual(resolved, expected)
 
-    def test_resolve_export_path_supports_nev_and_ice_previous_period_suffixes(self) -> None:
+    def test_resolve_export_path_supports_nev_and_ice_comparison_period_suffixes(self) -> None:
         cases = (
             (("NEV上期", "专营店上期"), "NEV上期-0630.xlsx"),
+            (("NEV同期", "专营店同期"), "NEV同期-0731.xlsx"),
             (("来店上期",), "来店上期-0630.xlsx"),
+            (("来店同期",), "来店同期-0731.xlsx"),
         )
         for index, (report_names, filename) in enumerate(cases, start=1):
             with self.subTest(filename=filename):
@@ -151,6 +159,82 @@ class FetchDailyDataTests(unittest.TestCase):
 
         self.assertEqual(attempts, 2)
         self.assertEqual(resolved, output_dir)
+
+    def test_run_fetch_task_does_not_retry_when_upstream_date_is_not_ready(self) -> None:
+        task = FetchTask(
+            label="NEV 来店",
+            script_path=self.temp_root / "fake_exporter.py",
+            output_subdir="upstream-date-check",
+            report_keys=("current",),
+        )
+        error = RuntimeError("上游 NEV 来店数据尚未发布目标日期：2026-08-23")
+
+        with (
+            patch("scripts.fetch_daily_data.stream_subprocess", side_effect=error) as stream,
+            patch("scripts.fetch_daily_data.time.sleep") as sleep,
+            self.assertRaisesRegex(RuntimeError, "尚未发布目标日期"),
+        ):
+            run_fetch_task(
+                task,
+                business_date=date(2026, 8, 23),
+                runtime_root=self.temp_root / "runtime",
+                log=lambda _message: None,
+                headless=True,
+                username=None,
+                password=None,
+                chrome_path=None,
+                max_attempts=3,
+            )
+
+        stream.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_run_update_leads_only_fetches_and_replaces_four_leads_sheets(self) -> None:
+        business_date = date(2026, 8, 24)
+        runtime_dir = self.temp_root / "runtime"
+        leads_path = self.temp_root / "NEV+ICE_xsai.xlsm"
+        arrival_path = self.temp_root / "NEV+ICE_ldai.xlsm"
+        fetched_tasks: list[str] = []
+
+        def fake_run_fetch_task(task, **_kwargs):
+            fetched_tasks.append(task.label)
+            output_dir = runtime_dir / task.output_subdir / "exports"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            export_names = {
+                "NEV 全国按日": ("全国按日", "全国按日-同期"),
+                "ICE 全国按日": ("全国按日ICE", "全国按日ICE-同期"),
+            }[task.label]
+            for export_name in export_names:
+                (output_dir / f"{export_name}-0824.xlsx").write_text("export", encoding="utf-8")
+            return output_dir
+
+        with (
+            patch("scripts.fetch_daily_data.build_runtime_dir", return_value=runtime_dir),
+            patch("scripts.fetch_daily_data.run_fetch_task", side_effect=fake_run_fetch_task),
+            patch("scripts.fetch_daily_data.replace_workbook_sheets") as replace_sheets,
+            patch(
+                "scripts.fetch_daily_data.rebuild_dashboard",
+                return_value={"dashboardChanged": True, "summaryChanged": True},
+            ) as rebuild,
+        ):
+            result = run_update(
+                business_date=business_date,
+                leads_path=leads_path,
+                arrival_path=arrival_path,
+                log=lambda _message: None,
+                keep_runtime=True,
+                leads_only=True,
+            )
+
+        self.assertEqual(fetched_tasks, ["NEV 全国按日", "ICE 全国按日"])
+        replace_sheets.assert_called_once()
+        replace_args = replace_sheets.call_args.args
+        self.assertEqual(replace_args[0], leads_path)
+        self.assertEqual(replace_args[2], LEADS_SHEET_MAPPINGS)
+        self.assertEqual(set(replace_args[1]), {mapping.target_sheet for mapping in LEADS_SHEET_MAPPINGS})
+        self.assertEqual(rebuild.call_args.kwargs["arrival_path"], arrival_path)
+        self.assertEqual(result["updateScope"], "leads")
+        self.assertEqual(set(result["exports"]), {mapping.result_label for mapping in LEADS_SHEET_MAPPINGS})
 
     def test_replace_workbook_sheets_overwrites_target_sheets(self) -> None:
         leads_path = self.temp_root / "NEV+ICE_xsai.xlsx"

@@ -628,6 +628,24 @@ class BuildDashboardValidationTests(unittest.TestCase):
         self.assertEqual(trend_items["环比"], "50.1%")
         self.assertIn("环比 50.1%", brief["lines"][0])
 
+    def test_valid_leads_full_same_month_keeps_month_to_date_yoy(self) -> None:
+        report_date = date(2026, 9, 3)
+        current = {date(2026, 9, day): {"validLeads": 20} for day in range(1, 4)}
+        previous_period = {date(2026, 8, day): {"validLeads": 10} for day in range(1, 32)}
+        same_period = {date(2025, 9, day): {"validLeads": 10} for day in range(1, 31)}
+
+        trend = build_valid_leads_control_trend(report_date, current, previous_period, same_period, None)
+        trend_items = {item["label"]: item["displayValue"] for item in trend["summary"]["items"]}
+        brief = build_valid_leads_brief(report_date, current, previous_period, same_period, None)
+        same_cumulative_row = next(
+            row for row in trend["matrix"]["rows"] if row["key"] == "samePeriodCumulative"
+        )
+
+        self.assertEqual(trend_items["同比"], "100.0%")
+        self.assertIn("同比 100.0%", brief["lines"][0])
+        self.assertEqual(same_cumulative_row["displayValues"][2], "30")
+        self.assertEqual(same_cumulative_row["displayValues"][-1], "300")
+
     def test_valid_leads_brief_mom_uses_previous_month_end_for_extra_day(self) -> None:
         report_date = date(2026, 7, 31)
         current = {date(2026, 7, 31): {"validLeads": 120}}
@@ -708,6 +726,33 @@ class BuildDashboardValidationTests(unittest.TestCase):
 
         self.assertEqual(series["previousReportIndex"], 2)
         self.assertEqual(series["previousCumulative"][:6], [100, 300, 600, None, None, None])
+
+    def test_arrival_full_previous_month_extends_chart_but_keeps_report_day_summary(self) -> None:
+        report_date = date(2026, 9, 3)
+        current = {date(2026, 9, day): 10 for day in range(1, 4)}
+        previous_period = {date(2026, 8, day): day for day in range(1, 32)}
+        same_period = {date(2025, 9, day): 5 for day in range(1, 31)}
+        arrival_maps = {
+            "total_current": current,
+            "total_previous_period": previous_period,
+            "total_same_period": same_period,
+            "nev_current": current,
+            "nev_previous_period": previous_period,
+            "nev_same_period": same_period,
+            "ice_current": {},
+            "ice_previous_period": {},
+            "ice_same_period": {},
+        }
+
+        dashboard = build_arrival_dashboard(report_date, arrival_maps)
+        trend = dashboard["sections"][0]["trend"]
+        summary = {item["label"]: item["value"] for item in trend["summary"]["items"]}
+
+        self.assertEqual(trend["chart"]["series"]["previousActual"][:5], [1, 2, 3, 4, 5])
+        self.assertEqual(trend["chart"]["series"]["previousActual"][-1], 30)
+        self.assertEqual(trend["chart"]["series"]["previousCumulative"][-1], sum(range(1, 31)))
+        self.assertEqual(summary["累计上期来店"], 6)
+        self.assertEqual(summary["上期来店"], 3)
 
     def test_arrival_previous_cumulative_stays_empty_when_no_previous_data_exists(self) -> None:
         series = build_arrival_series(

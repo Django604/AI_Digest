@@ -17,6 +17,8 @@ from scripts.run_arrival_ice_exports import (
 @dataclass(frozen=True)
 class FakeReportConfig:
     key: str
+    start_date: str
+    end_date: str
     bi_target_url: str
     crosstab_sheet_name: str
     single_select_parameters: tuple
@@ -38,6 +40,8 @@ class RunArrivalIceExportsTests(unittest.TestCase):
     def test_patch_report_config_builder_targets_daily_thumbnail_and_export_sheet(self) -> None:
         original_config = FakeReportConfig(
             key="store_batch_vehicle_summary_本期_来店",
+            start_date="2026-09-01",
+            end_date="2026-09-03",
             bi_target_url=(
                 "https://e3s-bi.dongfeng-nissan.com.cn/#/views/_0/sheet2"
                 "?3Adisplay_spinner=yes&%3Aembed=y#21"
@@ -55,6 +59,8 @@ class RunArrivalIceExportsTests(unittest.TestCase):
         )
         untouched_config = FakeReportConfig(
             key="store_batch_vehicle_summary_本期_自然",
+            start_date="2026-09-01",
+            end_date="2026-09-03",
             bi_target_url=original_config.bi_target_url,
             crosstab_sheet_name="E3S报表样式",
             single_select_parameters=original_config.single_select_parameters,
@@ -69,7 +75,7 @@ class RunArrivalIceExportsTests(unittest.TestCase):
         module.build_effective_report_configs = builder
 
         patch_report_config_builder(module)
-        patched_configs = module.build_effective_report_configs(None, [])
+        patched_configs = module.build_effective_report_configs(types.SimpleNamespace(end_date=None), [])
 
         self.assertEqual(len(patched_configs), 2)
         patched_target, patched_untouched = patched_configs
@@ -98,6 +104,55 @@ class RunArrivalIceExportsTests(unittest.TestCase):
                 "store_batch_vehicle_summary_同期_来店",
             },
         )
+
+    def test_patch_report_config_builder_fetches_full_previous_and_same_months(self) -> None:
+        def make_config(key: str, start_date: str, end_date: str) -> FakeReportConfig:
+            return FakeReportConfig(
+                key=key,
+                start_date=start_date,
+                end_date=end_date,
+                bi_target_url="https://example.com/#/views/_0/sheet2",
+                crosstab_sheet_name="E3S报表样式",
+                single_select_parameters=(),
+                request_metadata={
+                    "export_crosstab": {
+                        "thumbnail_uris": {TARGET_THUMBNAIL_SHEET: "/thumb/views/_0/_T"}
+                    }
+                },
+            )
+
+        configs = [
+            make_config("store_batch_vehicle_summary_本期_来店", "2026-09-01", "2026-09-03"),
+            make_config("store_batch_vehicle_summary_上期_来店", "2026-08-01", "2026-08-03"),
+            make_config("store_batch_vehicle_summary_同期_来店", "2025-09-01", "2025-09-03"),
+        ]
+        module = types.SimpleNamespace(build_effective_report_configs=lambda _args, _keys: configs)
+
+        patch_report_config_builder(module)
+        actual = module.build_effective_report_configs(types.SimpleNamespace(end_date=None), [])
+
+        self.assertEqual([item.end_date for item in actual], ["2026-09-03", "2026-08-31", "2025-09-30"])
+
+    def test_patch_report_config_builder_respects_explicit_end_date(self) -> None:
+        config = FakeReportConfig(
+            key="store_batch_vehicle_summary_上期_来店",
+            start_date="2026-08-01",
+            end_date="2026-08-15",
+            bi_target_url="https://example.com/#/views/_0/sheet2",
+            crosstab_sheet_name="E3S报表样式",
+            single_select_parameters=(),
+            request_metadata={
+                "export_crosstab": {
+                    "thumbnail_uris": {TARGET_THUMBNAIL_SHEET: "/thumb/views/_0/_T"}
+                }
+            },
+        )
+        module = types.SimpleNamespace(build_effective_report_configs=lambda _args, _keys: [config])
+
+        patch_report_config_builder(module)
+        actual = module.build_effective_report_configs(types.SimpleNamespace(end_date="2026-08-15"), [])
+
+        self.assertEqual(actual[0].end_date, "2026-08-15")
 
 
 if __name__ == "__main__":

@@ -6,8 +6,9 @@ import json
 import re
 import sys
 import time
+from calendar import monthrange
 from datetime import date, datetime, timedelta
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -29,8 +30,15 @@ TARGET_REPORT_KEYS = {
     "store_previous_period",
     "store_same_period",
 }
+FULL_MONTH_REPORT_KEYS = {
+    "store_previous_period",
+    "store_same_period",
+}
 TARGET_REPORT_NAME = "来店批次分车系汇总表_按天"
 QUERY_BUTTON_COORD = (1270, 252)
+CUSTOM_TAB_CANVAS_POSITION = (230, 24)
+MIN_BROWSER_QUERY_WAIT_MS = 600_000
+UPSTREAM_DATE_NOT_READY_MARKER = "上游 NEV 来店数据尚未发布目标日期"
 REPORT2_SEGMENT_WINDOW = 250_000
 REPORT2_PATH_PATTERN = re.compile(r'class="vancharts-series-0 line".*?<path d="([^"]+)"', re.S)
 REPORT2_POINT_PATTERN = re.compile(r"[ML]([0-9.]+),([0-9.]+)")
@@ -97,6 +105,43 @@ def patch_report_configs() -> None:
         config["report_tab"] = None
         config["parameterized_prepare_strategy"] = "interact_then_load"
         config["parameterized_prepare_parameters"] = copy.deepcopy(TARGET_PARAMETER_TEMPLATE)
+
+
+def full_month_end(start_date_text: str) -> str:
+    start_date = date.fromisoformat(start_date_text)
+    return start_date.replace(day=monthrange(start_date.year, start_date.month)[1]).isoformat()
+
+
+def patch_report_config_builder(module) -> None:
+    original_builder = module.build_report_configs
+
+    def patched_builder(args):
+        configs = original_builder(args)
+        if getattr(args, "end_date", None):
+            return configs
+        patched_configs = []
+        for config in configs:
+            if getattr(config, "key", "") not in FULL_MONTH_REPORT_KEYS:
+                patched_configs.append(config)
+                continue
+            end_date = full_month_end(config.start_date)
+            parameters = copy.deepcopy(getattr(config, "parameterized_prepare_parameters", None))
+            if isinstance(parameters, dict):
+                for key in ("结束日期", "结束时间", "END_DATE"):
+                    if key in parameters:
+                        parameters[key] = end_date
+                if "END_TIME" in parameters:
+                    parameters["END_TIME"] = f"{end_date} 23:59:59"
+            patched_configs.append(
+                replace(
+                    config,
+                    end_date=end_date,
+                    parameterized_prepare_parameters=parameters,
+                )
+            )
+        return patched_configs
+
+    module.build_report_configs = patched_builder
 
 
 def daterange(start_date: date, end_date: date) -> list[date]:
@@ -626,39 +671,61 @@ def click_custom_chart_tab(page, frame) -> bool:
             }
             """
         )
-        return bool(clicked)
+        if clicked:
+            return True
     except Exception:
-        return False
+        pass
+
+    try:
+        tab_canvas = frame.locator(f'[widgetname="{TARGET_CHART_TAB_LAYOUT}"] canvas').first
+        if tab_canvas.is_visible(timeout=1_500):
+            tab_canvas.click(
+                position={"x": CUSTOM_TAB_CANVAS_POSITION[0], "y": CUSTOM_TAB_CANVAS_POSITION[1]},
+                timeout=3_000,
+                force=True,
+            )
+            return True
+    except Exception:
+        pass
+    return False
 
 
-def is_custom_chart_html_ready(html_text: str, expected_start: str, expected_end: str) -> bool:
-    return (
-        f'widgetname="{TARGET_CHART_WIDGET}"' in html_text
-        and expected_start in html_text
-        and expected_end in html_text
-        and 'vancharts-series-0 line' in html_text
-    )
-
-
-def wait_for_custom_chart_html(page, frame, start_date: date, end_date: date, *, timeout_ms: int = 120_000) -> str:
-    expected_start = start_date.strftime("%Y-%m-%d")
-    expected_end = end_date.strftime("%Y-%m-%d")
+def wait_for_custom_chart_series(
+    page,
+    frame,
+    start_date: date,
+    end_date: date,
+    *,
+    timeout_ms: int = MIN_BROWSER_QUERY_WAIT_MS,
+) -> list[tuple[date, int]]:
     waited_ms = 0
+    last_error: RuntimeError | None = None
     while waited_ms <= timeout_ms:
         html_text = frame.content()
-        if is_custom_chart_html_ready(html_text, expected_start, expected_end):
-            return html_text
+        try:
+            return parse_report2_daily_series(html_text, start_date, end_date)
+        except RuntimeError as exc:
+            last_error = exc
         if waited_ms in (0, 4_000, 12_000, 24_000):
             click_custom_chart_tab(page, frame)
         frame.wait_for_timeout(2_000)
         waited_ms += 2_000
     raise RuntimeError(
-        f"等待自定义来店图表超时：未在 {timeout_ms / 1000:.0f} 秒内等到 {expected_start} ~ {expected_end} 的 REPORT2。"
+        f"等待自定义来店图表超时：未在 {timeout_ms / 1000:.0f} 秒内解析到 "
+        f"{start_date.isoformat()} ~ {end_date.isoformat()} 的完整 REPORT2。"
+        f"最近状态：{last_error or '图表尚未渲染。'}"
     )
 
 
-def capture_custom_chart_series(module, datetest_module, page, filter_config) -> list[tuple[date, int]]:
-    page.goto(TARGET_REPORT_URL, wait_until="domcontentloaded", timeout=60_000)
+def capture_custom_chart_series(
+    module,
+    datetest_module,
+    page,
+    filter_config,
+    trace_dir: Path,
+    *,
+    timeout_ms: int = MIN_BROWSER_QUERY_WAIT_MS,
+) -> list[tuple[date, int]]:
     module.wait_for_page_ready(page)
     page.wait_for_timeout(3_000)
     datetest_module.set_date_range(page, filter_config.start_date, filter_config.end_date)
@@ -669,22 +736,77 @@ def capture_custom_chart_series(module, datetest_module, page, filter_config) ->
     click_query_button(page, frame)
     page.wait_for_timeout(1_000)
     click_custom_chart_tab(page, frame)
-    html_text = wait_for_custom_chart_html(
-        page,
-        frame,
-        date.fromisoformat(filter_config.start_date),
-        date.fromisoformat(filter_config.end_date),
-    )
-    return parse_report2_daily_series(
-        html_text,
-        date.fromisoformat(filter_config.start_date),
-        date.fromisoformat(filter_config.end_date),
-    )
+    try:
+        return wait_for_custom_chart_series(
+            page,
+            frame,
+            date.fromisoformat(filter_config.start_date),
+            date.fromisoformat(filter_config.end_date),
+            timeout_ms=timeout_ms,
+        )
+    except Exception:
+        trace_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            (trace_dir / "report2_browser_timeout.html").write_text(frame.content(), encoding="utf-8")
+        except Exception:
+            pass
+        try:
+            page.screenshot(path=str(trace_dir / "report2_browser_timeout.png"), full_page=True)
+        except Exception:
+            pass
+        raise
+
+
+def capture_daily_rows(
+    module,
+    datetest_module,
+    page,
+    export_context,
+    filter_config,
+    trace_dir: Path,
+    *,
+    query_wait_ms: int,
+    force_browser_query: bool = False,
+) -> tuple[list[tuple[date, int]], bool]:
+    api_error: RuntimeError | None = None
+    if not force_browser_query:
+        try:
+            return capture_custom_chart_series_via_api(export_context, filter_config, trace_dir), False
+        except RuntimeError as exc:
+            if "缺少日期" not in str(exc):
+                raise
+            api_error = exc
+            module.log(
+                "后台接口尚未返回完整日期，改用网页查询并等待图表完成。"
+                f"最长等待 {query_wait_ms / 1000:.0f} 秒。原因：{exc}"
+            )
+
+    try:
+        daily_rows = capture_custom_chart_series(
+            module,
+            datetest_module,
+            page,
+            filter_config,
+            trace_dir,
+            timeout_ms=query_wait_ms,
+        )
+    except RuntimeError as exc:
+        if api_error is not None and "REPORT2 点位数与目标日期数不一致" in str(exc):
+            raise RuntimeError(
+                f"{UPSTREAM_DATE_NOT_READY_MARKER}：{filter_config.end_date}；"
+                f"后台接口状态：{api_error}；网页查询状态：{exc}"
+            ) from exc
+        raise
+    return daily_rows, True
 
 
 def main() -> int:
     module = load_arrival_nev_module()
     patch_report_configs()
+    patch_report_config_builder(module)
+    datetest_module = sys.modules.get("datetest")
+    if datetest_module is None:
+        raise RuntimeError("未加载日报来店 NEV 页面操作模块。")
 
     args = module.build_parser().parse_args()
     module.apply_business_date_override(args.business_date, module.normalize_business_date_text)
@@ -704,16 +826,24 @@ def main() -> int:
         )
         module.ensure_logged_in_portal(page, args)
         bootstrap_result = bootstrap_export_context(module, args, context, page, output_dir)
+        page = bootstrap_result.page
         export_context = bootstrap_result.export_context
 
         success_count = 0
+        force_browser_query = False
+        query_wait_ms = max(int(args.capture_wait_ms), MIN_BROWSER_QUERY_WAIT_MS)
         try:
             for index, filter_config in enumerate(report_configs, start=1):
                 module.log(f"[{index:04d} {filter_config.report_name}] 开始通过后台接口抓取 REPORT2 自定义来店按日数据。")
-                daily_rows = capture_custom_chart_series_via_api(
+                daily_rows, force_browser_query = capture_daily_rows(
+                    module,
+                    datetest_module,
+                    page,
                     export_context,
                     filter_config,
                     output_dir / "_trace" / filter_config.key,
+                    query_wait_ms=query_wait_ms,
+                    force_browser_query=force_browser_query,
                 )
                 excel_path = write_daily_excel(output_dir, filter_config.report_name, daily_rows)
                 module.log(f"[{index:04d} {filter_config.report_name}] Excel 已保存到：{excel_path}")

@@ -1,12 +1,13 @@
 # AI Digest Dashboard
 
-把 `NEV+ICE` 线索与来店简报做成静态 Web 版，并为 `GitHub Pages` 部署准备好数据抽取脚本和自动发布工作流。
+把 `NEV+ICE` 线索与来店简报做成静态 Web 版，并通过独立工作流并行发布到 `GitHub Pages` 与 `Cloudflare Pages`。
 
 ## 公开访问入口
 
-- 正式入口（公司内外网络）：https://django604.github.io/AI_Digest/
+- 公司网络入口：https://django604-ai-digest.pages.dev/
+- 原 GitHub Pages 入口：https://django604.github.io/AI_Digest/
 
-项目只以 GitHub Pages 作为正式网页入口。每次将 `main` 分支推送到 GitHub 后，`Deploy Dashboard To Pages` workflow 会独立完成测试、数据重建和站点部署；不再依赖 jsDelivr 缓存清理，也不要再向同事分发旧 CDN 地址。
+每次将 `main` 分支推送到 GitHub 后，`Deploy Dashboard To Pages` 与 `Deploy Dashboard To Cloudflare Pages` 会分别完成测试、数据重建和站点部署，任一平台失败都不会关闭或替换另一平台。
 
 ## 为什么不用 Django
 
@@ -15,7 +16,7 @@
 - `Python + openpyxl` 读取本地 Excel 源数据
 - 静态 `HTML/CSS/JavaScript` 渲染页面
 - `GitHub Actions` 在推送后自动生成 `docs/data/dashboard.json`
-- `GitHub Pages` 发布 `docs/` 目录
+- `GitHub Pages` 与 `Cloudflare Pages` 分别发布 `docs/` 目录
 
 这套组合和你的部署目标是对齐的，`Django` 在这里属于用力过猛还跑不起来。
 
@@ -24,16 +25,16 @@
 - `data/source/NEV+ICE_xsai.xlsm`：线索源工作簿
 - `data/source/NEV+ICE_ldai.xlsm`：来店源工作簿
 - `config/dashboard_targets.json`：全车系有效线索月目标配置，由附魔工作台的“手动兜底更新”工具维护
-- `requirements.txt`：Python 依赖清单
+- `requirements.txt`：Python 依赖清单（包含每日取数所需的 Playwright Python 包）
 - `scripts/build_dashboard.py`：从 Excel 抽取页面数据
 - `scripts/purge_jsdelivr_cache.py`：遗留 CDN 诊断工具，不接入正式发布流程
-- `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，抓取线索 + 来店共 10 张日报表并回填两本工作簿；NEV 线索参数上下文最多等待 `30s` 以兼容慢网；兼容 NEV / ICE 上期来店的不同导出日期后缀；十五代轩逸历史数据保留但不再更新或展示
-- `scripts/run_leads_nev_exports.py`：NEV 线索全国按日导出包装器，运行时清空 FineReport 默认 `营业状态` 筛选，并扩展去年同期日期规则生成同期报表
-- `scripts/run_leads_ice_exports.py`：ICE 线索全国按日导出包装器，运行时扩展去年同期日期规则并生成同期报表
-- `scripts/run_arrival_nev_exports.py`：NEV 来店导出包装器，运行时切到 FineReport `自定义` tab 并通过后台 `chart.data` 直接抓取按日序列
-- `scripts/run_arrival_ice_exports.py`：ICE 来店导出包装器，运行时把 Tableau 导出入口锁定到 `来店批次分车系汇总表_按天T`
-- `scripts/scheduled_update_runner.py`：定时自动更新执行入口，支持登录态弹窗执行与未登录静默执行
-- `scripts/register_daily_update_task.ps1`：Windows 计划任务注册脚本，默认注册“登录态弹窗 + 未登录静默兜底”两条计划任务
+- `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，默认抓取线索 + 来店共 10 张日报表并回填两本工作簿；`--leads-only` 只更新 `NEV+ICE_xsai.xlsm` 中 4 张全国按日线索表；NEV 线索参数上下文最多等待 `30s`，NEV 来店安全初始化最多等待 `300s`，缺日后的网页查询最多等待 `600s`；兼容 NEV / ICE 上期来店的不同导出日期后缀；十五代轩逸历史数据保留但不再更新或展示
+- `scripts/run_leads_nev_exports.py`：NEV 线索全国按日导出包装器，运行时清空 FineReport 默认 `营业状态` 筛选，并抓取去年同期完整自然月
+- `scripts/run_leads_ice_exports.py`：ICE 线索全国按日导出包装器，运行时扩展日期规则并抓取去年同期完整自然月
+- `scripts/run_arrival_nev_exports.py`：NEV 来店导出包装器，优先通过 FineReport 后台 `chart.data` 抓取按日序列；本期截止业务日，上期与同期抓取完整自然月；接口缺少目标日期时自动切到网页 `自定义` tab 查询并等待完整图表
+- `scripts/run_arrival_ice_exports.py`：ICE 来店导出包装器，运行时把 Tableau 导出入口锁定到 `来店批次分车系汇总表_按天T`；本期截止业务日，上期与同期抓取完整自然月
+- `scripts/scheduled_update_runner.py`：定时自动更新执行入口，支持登录态弹窗执行与失败后的二次静默更新
+- `scripts/register_daily_update_task.ps1`：Windows 计划任务注册脚本，默认注册“登录态首轮更新 + 未成功时静默兜底”两条计划任务
 - `scripts/rebuild_dashboard.ps1`：Windows 下本地一键重建 `dashboard.json`
 - `scripts/dashboard_publish.py`：统一处理 `rebuild -> git add -> commit -> push` 的发布核心逻辑
 - `start_dashboard_server.bat`：Windows 下双击启动 `serve_dashboard.py` 的快捷入口
@@ -41,6 +42,7 @@
 - `scripts/publish_dashboard.ps1`：Windows 下本地一键重建并推送到 GitHub
 - `docs/`：静态站点
 - `.github/workflows/deploy-pages.yml`：自动发布工作流
+- `.github/workflows/deploy-cloudflare-pages.yml`：独立的 Cloudflare Pages 自动发布工作流
 - `reports/excel_analysis.md`：Excel 结构分析
 
 ## 本地使用
@@ -56,9 +58,9 @@
 7. 如需指定业务日期或保留运行痕迹排查问题，可直接执行 `python scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`
    其中两张线索同期表按去年同月周期抓取；`全国按日` 会通过内部包装器清空 FineReport 默认 `营业状态` 筛选；NEV 来店本期/上期/同期通过 FineReport 后台 `chart.data` 导出链；ICE 来店本期/上期/同期通过 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
 8. 如需让这台电脑每天自动更新，可执行 `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1`
-   默认会注册两条每天自动运行的 Windows 计划任务：`09:00` 的登录态交互任务会弹出流程窗口，`09:01` 的静默兜底任务会以 `SYSTEM` 服务账号在未登录时后台执行；两者共享同一把运行锁，不会重复更新同一批数据
+   默认会注册两条每天自动运行的 Windows 计划任务：`09:00` 的登录态交互任务会弹出流程窗口；如果首轮失败，窗口会提示“已进入二次更新”，`09:20` 的静默兜底任务再以 `SYSTEM` 服务账号执行；首轮已经成功时，`09:20` 只记录“二次更新无需执行”，不会重复抓取数据
 9. 如果你在 `09:00` 左右已经登录 Windows，就会看到启动窗口；2 分钟内没有点击“开始更新”也没事，系统会自动继续执行，执行过程中窗口不会消失，而是显示完成进度条，最终在同一窗口展示更新结果后自动关闭
-10. 如果 `09:00` 时没有登录 Windows，也不需要提前打开网页、VS Code 或手动点任何按钮；`09:01` 的静默任务会直接在后台完成更新，并继续把日志与结果写入 `.runtime/scheduled_update/`
+10. 如果 `09:00` 时没有登录 Windows，也不需要提前打开网页、VS Code 或手动点任何按钮；因当天没有成功记录，`09:20` 的静默任务会直接在后台完成更新，并继续把日志与结果写入 `.runtime/scheduled_update/`
 
 ## GitHub Pages 数据服务
 
@@ -87,6 +89,14 @@
 3. 在 `Build and deployment` 中选择 `GitHub Actions`
 4. 确认仓库的 Actions 权限允许工作流运行
 
+## Cloudflare Pages 自动部署
+
+1. Cloudflare Pages 项目保持为 `django604-ai-digest`
+2. 在 Cloudflare 创建仅具备 Pages 编辑权限的 API Token
+3. 在 GitHub 仓库 `Settings > Secrets and variables > Actions` 新增 `CLOUDFLARE_ACCOUNT_ID` 与 `CLOUDFLARE_API_TOKEN`
+4. `.github/workflows/deploy-cloudflare-pages.yml` 会在 `main` 的发布相关文件变化时重建并部署 `docs/`
+5. 附魔工作台手动兜底与每天 9 点自动更新都通过 `dashboard_publish.py` 推送同一分支，因此会同时触发 GitHub Pages 与 Cloudflare Pages
+
 ## 日常更新方式
 
 1. 本地用 Excel 更新源数据并保存
@@ -98,10 +108,10 @@
    - `docs/data/dashboard.json`
    - `docs/data/dashboard.summary.json`
    - `docs/data/monthly/`
-4. 推送成功后，GitHub Actions 会自动测试、重建并部署 `docs/` 到 GitHub Pages
-5. 别人打开上方 GitHub Pages 正式入口时，就能看到最新部署的数据
+4. 推送成功后，两条 GitHub Actions workflow 会并行测试、重建并分别部署到 GitHub Pages 与 Cloudflare Pages
+5. 两个公开入口都会更新到同一版数据
 
-注意：`GitHub Pages` 不能直接读取你电脑本地文件。你在本地更新完数据后，必须把变更推送到 GitHub，网页才会同步更新。
+注意：两个静态站都不能直接读取你电脑本地文件。你在本地更新完数据后，必须把变更推送到 GitHub，网页才会同步更新。
 
 公开页面首次打开和“回到当前月”会读取 live `docs/data/dashboard.json`；只有明确切换某个年月时才读取 `docs/data/monthly/YYYY-MM/dashboard.json`，避免当前月误读旧归档。
 
@@ -110,6 +120,7 @@
 - 当前方案读取的是 Excel 保存后的缓存结果。你更新完源数据后，必须先让 Excel 完成重算并保存，否则页面会拿到旧结果。
 - 工作流读取当前实际使用的两本源文件：`NEV+ICE_xsai.xlsm` 与 `NEV+ICE_ldai.xlsm`。
 - 每日简报按“全车系有效线索 / NEV新增线索 / 2026款探陆线索 / 来店简报”四块展示；全车系月目标按报表月份读取 `config/dashboard_targets.json`（2026 年 7 月为 `668,262`），可在附魔工作台的“手动兜底更新”工具中填写；线索同比取两张 `全国按日*-同期`，来店环比取两张 `*上期来店`。
+- 历史对照数据按完整自然月抓取，用于补齐趋势表与趋势图后半月；同比、环比摘要卡片和每日简报仍只取与业务日对齐的累计区间，不会用本期月中数据直接比较历史整月。
 - `docs/data/dashboard.summary.json` 提供了报表日期、输入文件修改时间、dashboard 数量和本次是否真的发生内容变更，方便后续定时任务或自动巡检直接读取。
 - 页面不再显示 `数据更新` 按钮；手动兜底入口已迁移到 `附魔工作台`，本页面不会再提示配置 `serviceBaseUrl` 后进行补跑。
 - 趋势明细表现在会根据年度节假日配置直接标出 `节 / 周 / 班`：`节` 为法定节假日，`周` 为普通周末，`班` 为调休补班日；补班不会再被误判成周末或放假。
@@ -118,10 +129,10 @@
 - 即使远端更新服务临时不可达，页面现在也会自动回退到已发布的静态 `docs/data/dashboard.json`，避免整页直接加载失败。
 ## Auto Publish Notes
 
-- To let scheduled updates publish to GitHub Pages automatically, register the tasks with `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -AutoPublish -PublishRemote origin -PublishBranch main`.
+- To let scheduled updates publish to both Pages sites automatically, register the tasks with `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1 -AutoPublish -PublishRemote origin -PublishBranch main`.
 - The scheduled runner now supports `--auto-publish`, `--publish-remote`, `--publish-branch`, and `--publish-commit-message`.
 - `附魔工作台` now owns write actions such as manual fallback and month archive publish; `scripts/serve_dashboard.py` only serves read APIs for the static dashboard.
-- Auto publish reuses `scripts/dashboard_publish.py -SkipRebuild`, so it stages the dashboard target config, two workbook files, current dashboard JSON files, and `docs/data/monthly/`.
+- Auto publish reuses `scripts/dashboard_publish.py -SkipRebuild`, so one push triggers the independent GitHub Pages and Cloudflare Pages workflows.
 - No Codex approval is needed when the scheduled task runs later on this machine. The task uses the local account context configured in Windows Task Scheduler.
 - If the silent fallback task runs as `SYSTEM`, Git credentials must also be available to `SYSTEM`; otherwise data refresh may succeed but `git push` can still fail.
 

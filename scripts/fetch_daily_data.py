@@ -43,6 +43,7 @@ LEADS_ICE_WRAPPER_SCRIPT = PROJECT_ROOT / "scripts" / "run_leads_ice_exports.py"
 ARRIVAL_ICE_SCRIPT = PROJECT_ROOT / "scripts" / "run_arrival_ice_exports.py"
 ARRIVAL_NEV_WRAPPER_SCRIPT = PROJECT_ROOT / "scripts" / "run_arrival_nev_exports.py"
 RUNTIME_ROOT = PROJECT_ROOT / ".runtime" / "daily_update"
+UPSTREAM_DATE_NOT_READY_MARKER = "上游 NEV 来店数据尚未发布目标日期"
 
 
 @dataclass(frozen=True)
@@ -67,7 +68,7 @@ LEADS_WORKBOOK_KIND = "leads"
 ARRIVAL_WORKBOOK_KIND = "arrival"
 
 
-FETCH_TASKS = (
+LEADS_FETCH_TASKS = (
     FetchTask(
         label="NEV 全国按日",
         script_path=LEADS_NEV_WRAPPER_SCRIPT,
@@ -81,12 +82,15 @@ FETCH_TASKS = (
         output_subdir="ice",
         report_keys=("ice_national_daily", "ice_national_daily_same_period"),
     ),
+)
+
+ARRIVAL_FETCH_TASKS = (
     FetchTask(
         label="NEV 来店本期 + 上期 + 同期",
         script_path=ARRIVAL_NEV_WRAPPER_SCRIPT,
         output_subdir="arrival-nev",
         report_keys=("store_current_period", "store_previous_period", "store_same_period"),
-        extra_args=("--safe-bootstrap", "--capture-wait-ms", "30000"),
+        extra_args=("--safe-bootstrap", "--capture-wait-ms", "300000"),
     ),
     FetchTask(
         label="ICE 来店本期 + 上期 + 同期",
@@ -99,6 +103,8 @@ FETCH_TASKS = (
         ),
     ),
 )
+
+FETCH_TASKS = LEADS_FETCH_TASKS + ARRIVAL_FETCH_TASKS
 
 LEADS_SHEET_MAPPINGS = (
     SheetUpdateMapping(export_names=("全国按日",), result_label="全国按日", target_sheet="全国按日NEV", workbook_kind=LEADS_WORKBOOK_KIND),
@@ -126,6 +132,7 @@ ARRIVAL_SHEET_MAPPINGS = (
         result_label="NEV同期来店",
         target_sheet="NEV同期来店",
         workbook_kind=ARRIVAL_WORKBOOK_KIND,
+        allow_period_suffix=True,
     ),
     SheetUpdateMapping(
         export_names=("来店本期",),
@@ -145,6 +152,7 @@ ARRIVAL_SHEET_MAPPINGS = (
         result_label="ICE同期来店",
         target_sheet="ICE同期来店",
         workbook_kind=ARRIVAL_WORKBOOK_KIND,
+        allow_period_suffix=True,
     ),
 )
 
@@ -289,6 +297,8 @@ def run_fetch_task(
                 )
             break
         except RuntimeError as exc:
+            if UPSTREAM_DATE_NOT_READY_MARKER in str(exc):
+                raise
             if attempt_index >= max_attempts:
                 raise
             log(f"{task.label} 本次抓取失败，准备重试。原因：{exc}")
@@ -439,17 +449,21 @@ def run_update(
     chrome_path: str | None = None,
     max_attempts: int = 2,
     keep_runtime: bool = False,
+    leads_only: bool = False,
 ) -> dict[str, object]:
     resolved_business_date = business_date or parse_business_date()
     runtime_dir = build_runtime_dir(resolved_business_date)
     runtime_dir.mkdir(parents=True, exist_ok=True)
     log(f"本次业务日期：{format_business_date(resolved_business_date)}")
+    log("更新范围：仅线索 4 张表" if leads_only else "更新范围：线索与来店共 10 张表")
     log(f"运行目录：{runtime_dir}")
 
+    fetch_tasks = LEADS_FETCH_TASKS if leads_only else FETCH_TASKS
+    sheet_mappings = LEADS_SHEET_MAPPINGS if leads_only else SHEET_MAPPINGS
     export_paths: dict[str, Path] = {}
     succeeded = False
     try:
-        for task in FETCH_TASKS:
+        for task in fetch_tasks:
             output_dir = run_fetch_task(
                 task,
                 business_date=resolved_business_date,
@@ -461,7 +475,7 @@ def run_update(
                 chrome_path=chrome_path,
                 max_attempts=max_attempts,
             )
-            for mapping in SHEET_MAPPINGS:
+            for mapping in sheet_mappings:
                 if mapping.target_sheet in export_paths:
                     continue
                 try:
@@ -474,7 +488,11 @@ def run_update(
                 except FileNotFoundError:
                     continue
 
-        missing_reports = [mapping.result_label for mapping in SHEET_MAPPINGS if mapping.target_sheet not in export_paths]
+        missing_reports = [
+            mapping.result_label
+            for mapping in sheet_mappings
+            if mapping.target_sheet not in export_paths
+        ]
         if missing_reports:
             raise RuntimeError(f"缺少导出结果：{', '.join(missing_reports)}")
 
@@ -485,13 +503,14 @@ def run_update(
             log=log,
             keep_vba=True,
         )
-        replace_workbook_sheets(
-            arrival_path,
-            export_paths,
-            ARRIVAL_SHEET_MAPPINGS,
-            log=log,
-            keep_vba=arrival_path.suffix.lower() == ".xlsm",
-        )
+        if not leads_only:
+            replace_workbook_sheets(
+                arrival_path,
+                export_paths,
+                ARRIVAL_SHEET_MAPPINGS,
+                log=log,
+                keep_vba=arrival_path.suffix.lower() == ".xlsm",
+            )
         rebuild_summary = rebuild_dashboard(
             business_date=resolved_business_date,
             leads_path=leads_path,
@@ -502,10 +521,11 @@ def run_update(
         )
         result = {
             "businessDate": format_business_date(resolved_business_date),
+            "updateScope": "leads" if leads_only else "all",
             "runtimeDir": str(runtime_dir),
             "exports": {
                 mapping.result_label: str(export_paths[mapping.target_sheet])
-                for mapping in SHEET_MAPPINGS
+                for mapping in sheet_mappings
             },
             **rebuild_summary,
         }
@@ -526,6 +546,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-attempts", type=int, default=2, help="每个抓取任务失败后的最大尝试次数，默认 2")
     parser.add_argument("--headed", action="store_true", help="启用有头模式，便于调试")
     parser.add_argument("--keep-runtime", action="store_true", help="保留运行时导出与 trace 目录")
+    parser.add_argument(
+        "--leads-only",
+        action="store_true",
+        help="仅抓取并回填 4 张线索表，不更新来店工作簿",
+    )
     return parser.parse_args()
 
 
@@ -540,6 +565,7 @@ def main() -> int:
         chrome_path=args.chrome_path or None,
         max_attempts=args.max_attempts,
         keep_runtime=args.keep_runtime,
+        leads_only=args.leads_only,
     )
     print(result, flush=True)
     return 0

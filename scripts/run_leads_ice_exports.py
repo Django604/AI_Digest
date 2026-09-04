@@ -18,7 +18,7 @@ TARGET_REPORT_KEY = "ice_national_daily"
 SAME_PERIOD_REPORT_KEY = "ice_national_daily_same_period"
 SAME_PERIOD_REPORT_NAME = "全国按日ICE-同期"
 SAME_PERIOD_FIRST_DAY_RULE = "same_month_last_year_first_day"
-SAME_PERIOD_DAY_RULE = "same_day_last_year"
+SAME_PERIOD_LAST_DAY_RULE = "same_month_last_year_last_day"
 DATE_RESOLVER_PATCH_MARKER = "_ai_digest_same_period_date_rules"
 
 
@@ -53,13 +53,13 @@ def patch_date_resolver() -> None:
 
     def resolve_date_value(config_value, fallback: str, business_date: str | date | None = None) -> str:
         rule = str(config_value.get("rule", "")).strip() if isinstance(config_value, dict) else ""
-        if rule in (SAME_PERIOD_FIRST_DAY_RULE, SAME_PERIOD_DAY_RULE):
+        if rule in (SAME_PERIOD_FIRST_DAY_RULE, SAME_PERIOD_LAST_DAY_RULE):
             current_date = parse_business_date(business_date)
             target_year = current_date.year - 1
             target_day = (
                 1
                 if rule == SAME_PERIOD_FIRST_DAY_RULE
-                else min(current_date.day, monthrange(target_year, current_date.month)[1])
+                else monthrange(target_year, current_date.month)[1]
             )
             return date(target_year, current_date.month, target_day).strftime("%Y-%m-%d")
         return original_resolver(config_value, fallback, business_date)
@@ -87,7 +87,7 @@ def patch_report_configs() -> None:
             "enabled": False,
             "report_name": SAME_PERIOD_REPORT_NAME,
             "start_date": {"rule": SAME_PERIOD_FIRST_DAY_RULE},
-            "end_date": {"rule": SAME_PERIOD_DAY_RULE},
+            "end_date": {"rule": SAME_PERIOD_LAST_DAY_RULE},
         }
     )
     report_configs[SAME_PERIOD_REPORT_KEY] = same_period_config

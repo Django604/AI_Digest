@@ -789,7 +789,7 @@ def build_valid_leads_control_trend(
     ]
     has_same_period = any(isinstance(value, (int, float)) for value in same_daily)
     same_cum = (
-        build_running_totals(same_daily, stop_at=report_index)
+        build_running_totals(same_daily)
         if has_same_period
         else [None] * len(same_daily)
     )
@@ -1221,12 +1221,19 @@ def build_valid_leads_brief(
         (item.get("validLeads") or 0)
         for item in aligned_previous_period_actuals
     )
-    cumulative_same_period = sum((item.get("validLeads") or 0) for item in same_period_actuals.values())
+    same_period_start = date(report_date.year - 1, report_date.month, 1)
+    same_period_end = aligned_previous_year_date(report_date) or month_end(same_period_start)
+    aligned_same_period_actuals = [
+        item
+        for current_date, item in same_period_actuals.items()
+        if same_period_start <= current_date <= same_period_end
+    ]
+    cumulative_same_period = sum((item.get("validLeads") or 0) for item in aligned_same_period_actuals)
     has_previous = any(
         isinstance(item.get("validLeads"), (int, float))
         for item in aligned_previous_period_actuals
     )
-    has_same_period = any(isinstance(item.get("validLeads"), (int, float)) for item in same_period_actuals.values())
+    has_same_period = any(isinstance(item.get("validLeads"), (int, float)) for item in aligned_same_period_actuals)
     yoy = delta_ratio(cumulative_actual, cumulative_same_period if has_same_period else None)
     mom = delta_ratio(cumulative_actual, cumulative_previous if has_previous else None)
     achievement = ratio(cumulative_actual, monthly_target)
@@ -1580,8 +1587,6 @@ def build_payload(
         current_end = month_end(report_date)
         same_period_start = date(report_date.year - 1, report_date.month, 1)
         same_period_end = month_end(same_period_start)
-        same_period_report_date = aligned_previous_year_date(report_date) or same_period_end
-
         nev_targets = load_nev_targets(leads["目标竖版"], current_start, current_end)
         nev_targets[NEW_PATHFINDER_MODEL] = resolve_new_pathfinder_targets(
             report_date,
@@ -1606,7 +1611,7 @@ def build_payload(
             model: {
                 dt: value
                 for dt, value in series.items()
-                if same_period_start <= dt <= same_period_report_date
+                if same_period_start <= dt <= same_period_end
             }
             for model, series in nev_same_period_all.items()
         }
@@ -1615,7 +1620,7 @@ def build_payload(
         ice_same_period = {
             dt: value
             for dt, value in ice_same_period_all.items()
-            if same_period_start <= dt <= same_period_report_date
+            if same_period_start <= dt <= same_period_end
         }
         nev_total_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
         nev_total_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))

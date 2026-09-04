@@ -3,7 +3,9 @@ from __future__ import annotations
 import copy
 import importlib.util
 import sys
+from calendar import monthrange
 from dataclasses import replace
+from datetime import date
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
@@ -15,6 +17,10 @@ ARRIVAL_ICE_DIR = DAILY_SOURCE_ROOT / "日报来店ICE源"
 ARRIVAL_ICE_GETDATA = ARRIVAL_ICE_DIR / "getdata.py"
 TARGET_REPORT_KEYS = {
     "store_batch_vehicle_summary_本期_来店",
+    "store_batch_vehicle_summary_上期_来店",
+    "store_batch_vehicle_summary_同期_来店",
+}
+FULL_MONTH_REPORT_KEYS = {
     "store_batch_vehicle_summary_上期_来店",
     "store_batch_vehicle_summary_同期_来店",
 }
@@ -54,6 +60,11 @@ def switch_tableau_view_to_daily(view_url: str) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, parsed.query, replaced_fragment))
 
 
+def full_month_end(start_date_text: str) -> str:
+    start_date = date.fromisoformat(start_date_text)
+    return start_date.replace(day=monthrange(start_date.year, start_date.month)[1]).isoformat()
+
+
 def patch_report_config_builder(module) -> None:
     original_builder = module.build_effective_report_configs
 
@@ -75,10 +86,14 @@ def patch_report_config_builder(module) -> None:
                 TARGET_THUMBNAIL_SHEET: thumbnail_uris[TARGET_THUMBNAIL_SHEET],
             }
             metadata["export_crosstab"] = export_crosstab
+            end_date = getattr(config, "end_date", "")
+            if getattr(args, "end_date", None) is None and getattr(config, "key", "") in FULL_MONTH_REPORT_KEYS:
+                end_date = full_month_end(getattr(config, "start_date", ""))
 
             patched_configs.append(
                 replace(
                     config,
+                    end_date=end_date,
                     bi_target_url=switch_tableau_view_to_daily(getattr(config, "bi_target_url", "")),
                     crosstab_sheet_name=TARGET_EXPORT_SHEET,
                     single_select_parameters=(),

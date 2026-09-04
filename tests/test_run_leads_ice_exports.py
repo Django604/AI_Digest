@@ -6,8 +6,8 @@ import types
 import unittest
 
 from scripts.run_leads_ice_exports import (
-    SAME_PERIOD_DAY_RULE,
     SAME_PERIOD_FIRST_DAY_RULE,
+    SAME_PERIOD_LAST_DAY_RULE,
     SAME_PERIOD_REPORT_KEY,
     SAME_PERIOD_REPORT_NAME,
     TARGET_REPORT_KEY,
@@ -38,15 +38,15 @@ class RunLeadsIceExportsTests(unittest.TestCase):
                 "2025-07-01",
             )
             self.assertEqual(
-                resolver({"rule": SAME_PERIOD_DAY_RULE}, "fallback", "2026-07-30"),
-                "2025-07-30",
+                resolver({"rule": SAME_PERIOD_LAST_DAY_RULE}, "fallback", "2026-07-30"),
+                "2025-07-31",
             )
             self.assertEqual(
                 resolver({"rule": SAME_PERIOD_FIRST_DAY_RULE}, "fallback", "2024-02-29"),
                 "2023-02-01",
             )
             self.assertEqual(
-                resolver({"rule": SAME_PERIOD_DAY_RULE}, "fallback", "2024-02-29"),
+                resolver({"rule": SAME_PERIOD_LAST_DAY_RULE}, "fallback", "2024-02-29"),
                 "2023-02-28",
             )
             self.assertEqual(resolver({"rule": "yesterday"}, "fallback", "2026-07-30"), "delegated")
@@ -82,7 +82,7 @@ class RunLeadsIceExportsTests(unittest.TestCase):
         same_period_config = report_configs_module.REPORT_CONFIGS[SAME_PERIOD_REPORT_KEY]
         self.assertEqual(same_period_config["report_name"], SAME_PERIOD_REPORT_NAME)
         self.assertEqual(same_period_config["start_date"], {"rule": SAME_PERIOD_FIRST_DAY_RULE})
-        self.assertEqual(same_period_config["end_date"], {"rule": SAME_PERIOD_DAY_RULE})
+        self.assertEqual(same_period_config["end_date"], {"rule": SAME_PERIOD_LAST_DAY_RULE})
         self.assertFalse(same_period_config["enabled"])
         self.assertIsNot(same_period_config, base_config)
         self.assertIsNot(

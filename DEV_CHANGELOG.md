@@ -1237,3 +1237,70 @@
 - 回滚方法：恢复构建器内固定月目标字典和前端旧标题，移除目标配置、发布白名单、工作台目标 API / 表单及对应测试文档。
 - 关联提交（如有）：待补充
 - 备注：工作台保存后的配置会被“开始更新”“仅推送 GitHub”和每日计划任务的统一发布流程提交；当前 2026 年 7 月目标保持 `668,262`。
+
+## 2026-08-24 17:29
+- 需求 / 目标：排查并修复附魔工作台手动兜底更新持续失败，完成最新可用数据更新、GitHub 推送和工作台服务重启。
+- 根因：NEV 来店页面实际初始化需要 240 秒以上，正式链路只等待 `30000ms`；缺日后的网页兜底又依赖不可定位的“自定义”文字，但 FineReport 三个页签实际绘制在 `TABPANE0` canvas 上；修正点击后确认上游 `2026-08-23` 自定义图表最终仅有 `22` 个点，数据真实截至 `2026-08-22`，不是登录权限或本地解析丢数。
+- 改动内容：NEV 来店初始化上限提高到 `300000ms`；`chart.data` 缺目标日期时复用当前报表页，通过 canvas 第三个页签进入“自定义”，网页查询最多等待 `600000ms` 并按折线点数和刻度判断完整；失败时保存 HTML / 截图；接口与网页均确认尾日未发布时输出稳定标记、停止同日重复抓取，供附魔工作台整批回退一天。
+- 涉及文件：`scripts/fetch_daily_data.py`、`scripts/run_arrival_nev_exports.py`、`tests/test_fetch_daily_data.py`、`tests/test_run_arrival_nev_exports.py`、`README.md`、`SCRIPTS.md`、两本源工作簿、live / 2026-08 Dashboard 数据与本日志；附魔工作台同步修改 `scripts/manual_fallback_service.py` 和对应测试。
+- 验证结果：真实 `2026-08-23` 查询等满 `600` 秒后截图确认图表最后日期为 `2026-08-22`、点位 `22/23`；显式按最新完整业务日 `2026-08-22` 执行整批更新成功，10 张报表全部导出并回填，Dashboard 重建完成；AI_Digest 全量测试 `121/121`、附魔工作台全量测试 `50/50` 通过。
+- 发布结果：数据白名单提交 `66ce9e6` 已推送到 `origin/main`，包含两本源工作簿和 5 个 live / 月度 Dashboard 文件；程序修复保持本地未提交，不混入数据发布提交。
+- 回滚方法：恢复 NEV 来店 `30000ms` 固定等待和仅后台接口抓取，移除网页 canvas 兜底与上游日期回退逻辑，并反向提交 `66ce9e6`；这会重新导致慢查询提前失败或上游尾日未发布时持续重试。
+- 关联提交（如有）：`66ce9e6`（数据发布）
+- 备注：未伪造 `2026-08-23` 来店数据；网页和 API 均证明该日尚未发布，因此本次发布采用最新完整业务日 `2026-08-22`。
+
+## 2026-08-25 09:10
+- 需求 / 目标：支持在来店数据延迟发布时只更新线索工作簿的 4 张全国按日表，不访问或改写来店数据。
+- 改动内容：`fetch_daily_data.py` 将线索与来店抓取任务显式分组，`run_update(leads_only=True)` 和 CLI `--leads-only` 只抓取并回填 `全国按日NEV`、`全国按日NEV-同期`、`全国按日ICE`、`全国按日ICE-同期`；Dashboard 继续读取现有 `NEV+ICE_ldai.xlsm`，结果增加 `updateScope=leads` 供调用方识别。
+- 涉及文件：`scripts/fetch_daily_data.py`、`tests/test_fetch_daily_data.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`；附魔工作台同步新增仅线索任务入口和按钮。
+- 验证结果：新增测试确认仅启动两个线索抓取任务、只调用一次线索工作簿回填且导出结果严格为 4 张表；AI_Digest 全量测试 `122/122`、`git diff --check` 通过。
+- 回滚方法：移除 `LEADS_FETCH_TASKS / ARRIVAL_FETCH_TASKS` 分组、`leads_only / --leads-only` 参数和对应测试文档，恢复统一执行 `FETCH_TASKS`。
+- 关联提交（如有）：待补充
+- 备注：未执行真实取数、数据发布或 GitHub 推送；现有未提交的 NEV 来店慢查询修复保持原样。
+
+## 2026-08-30 14:05
+- 需求 / 目标：修复附魔工作台调用每日取数脚本时缺少 `playwright` 导致更新失败的问题。
+- 改动内容：`requirements.txt` 新增固定版本 `playwright==1.58.0`，并同步安装到工作台使用的 `D:\WorkCode\.venv`。
+- 验证结果：NEV / ICE 线索与来店四个 `getdata.py` 入口均可在该环境导入，工作台重启后 API 状态正常；未执行真实取数或发布。
+- 关联提交：待补充
+
+## 2026-08-30 14:20
+- 真实复验：附魔工作台使用修复后的环境完成 `2026-08-29` 全量 10 张日报抓取、两本工作簿回填和 Dashboard 重建。
+- 发布结果：数据已由工作台成功推送至 `origin/main`，提交为 `83f6547`；未将本次依赖与文档修改混入数据发布提交。
+
+## 2026-08-30 14:25
+- 最终验收：`2026-08-29` 线索 / 来店提交版生成成功，工作台 Outlook 接口识别业务日期 `8 月 29 日`，读取 NEV 当日来店实绩 `2,207`。
+
+## 2026-09-03 15:55 Cloudflare Pages 并行自动部署
+- 需求 / 目标：在保留现有 GitHub Pages 的前提下，新增独立、免费的 Cloudflare Pages 自动部署，并同步附魔工作台手动兜底与每日计划任务的发布提示。
+- 改动内容：新增 `Deploy Dashboard To Cloudflare Pages` workflow，使用 GitHub Actions Secrets 中的 Cloudflare Account ID 与最小权限 API Token 发布同一 `docs/` 目录；发布入口与定时任务结果增加 GitHub Pages、Cloudflare Pages 双站状态和地址。
+- 调度确认：`AI_Digest_Daily_Update_Interactive` 每天 `09:00`、`AI_Digest_Daily_Update_Silent` 每天 `09:20`，均带 `--auto-publish --publish-remote origin --publish-branch main`，一次 Git push 会并行触发两条 Pages workflow。
+- 验证结果：AI_Digest 定向测试 `32/32`、附魔工作台全量测试 `56/56`、Node 语法检查通过；提交 `0d0dacc` 的 GitHub Pages 与 Cloudflare Pages 工作流均成功；两站首页、JS、CSS 完全一致，Dashboard 业务字段完全一致，仅并行构建的 `generatedAt` 相差 1 秒。
+- 运行状态：Cloudflare 生产地址为 `https://django604-ai-digest.pages.dev/`；原 GitHub Pages 地址 `https://django604.github.io/AI_Digest/` 保持不变；附魔工作台已重启并在 `127.0.0.1:54174` 返回新版双站文案。
+- 关联提交（如有）：`0d0dacc`
+- 备注：API Token 只保存在 GitHub Actions Secret 中；首次截图暴露的旧 Token 已要求撤销，自动部署使用重新创建的新 Token。
+
+## 2026-09-03 16:10 Dashboard 数据提交时间
+- 需求 / 目标：在页头数据范围和源数据更新时间后增加“数据提交时间”，显示最近一次触发部署的 Git 提交时间。
+- 改动内容：构建器新增 `--submission-time`，将 Git 提交时间统一转换为北京时间并写入 `dashboard.meta.submittedAt`；GitHub Pages 与 Cloudflare Pages workflow 均传入同一提交的 committer 时间；前端页头新增对应展示。
+- 验证结果：AI_Digest 全量测试 `125/125`、Python / Node / diff 检查通过；提交 `9796546` 的两条 Pages workflow 均成功；两个生产站的 `submittedAt` 均为 `2026-09-03T16:07:26` 且业务 payload 一致；Cloudflare 桌面页头无溢出、换行或日期卡片重叠。
+- 关联提交（如有）：`9796546`
+- 备注：后续附魔工作台手动更新或计划任务产生新提交后，两站会自动显示该次提交的北京时间。
+
+## 2026-09-04 09:40 定时更新二次兜底提示
+- 需求 / 目标：首轮 `09:00` 自动更新失败后明确提示已进入二次更新，并避免首轮成功后 `09:20` 静默任务重复抓取。
+- 改动内容：交互任务失败窗口新增“首次自动更新失败，已进入二次更新流程”及 `AI_Digest_Daily_Update_Silent` 提示；静默任务新增 `--fallback-only`，当天已有成功结果时登记 `successful-run-already-completed` 并跳过，首轮失败时将结果标记为 `secondary / interactive-run-failed`。
+- 本机配置：重新注册两条计划任务；`Interactive` 保持每天 `09:00`，`Silent` 保持每天 `09:20` 并已带 `--fallback-only --auto-publish`。
+- 验证结果：定时任务专项测试 `21/21`、AI_Digest 全量测试 `128/128` 通过；使用当天已有成功记录真实演练时，静默任务立即跳过且未执行抓取。
+- 涉及文件：`scripts/scheduled_update_runner.py`、`scripts/register_daily_update_task.ps1`、`tests/test_scheduled_update_runner.py`、`README.md`、`SCRIPTS.md`、`DEV_CHANGELOG.md`。
+- 关联提交（如有）：待补充
+
+## 2026-09-04 12:05 历史趋势完整自然月
+- 需求 / 目标：修复来店趋势图上期数据只显示到业务日的问题，并审查其他趋势图是否存在同类的上期 / 同期截断。
+- 审查结论：NEV、ICE 和全车系有效线索的上期源表已经包含完整上月；不完整项为来店上期 / 同期及全车系有效线索同期，原来均只抓到与业务日同日。
+- 改动内容：NEV / ICE 来店默认保持本期截止业务日，上期与同期扩展到各自自然月月末；NEV / ICE 线索同期扩展到去年同月月末；同期累计明细展示完整月，但摘要卡片与每日简报仍按业务日对齐累计；来店同期导出兼容月末文件名后缀。
+- 根因修复：NEV 来店初版只替换 `ReportFilterConfig.end_date`，未同步已生成的 FineReport `结束时间` 参数，导致服务端仍返回 3 天缓存；现同步更新配置字段和请求参数，完整月直接通过后台接口导出，不再进入超慢网页兜底。
+- 真实验证：按业务日 `2026-09-03` 抓取 10 张表成功；NEV / ICE 上期均为 `2026-08-01 ~ 2026-08-31`，同期均为 `2025-09-01 ~ 2025-09-30`；来店趋势上期日线覆盖 9 月横轴 30 天、累计线末值 `83,460`，业务日摘要仍为累计上期 `8,506`、上期当日 `2,164`、累计环比 `-49.0%`、当日环比 `-35.7%`。
+- 验证结果：真实参数检查、真实 10 表抓取与本地回填成功；AI_Digest 全量测试 `134/134`、Python 编译、Node 语法及 `git diff --check` 通过。
+- 涉及文件：两本源工作簿、live / 2026-09 Dashboard 数据、`scripts/build_dashboard.py`、`scripts/fetch_daily_data.py`、4 个线索 / 来店导出包装器、对应测试与文档。
+- 关联提交（如有）：待补充

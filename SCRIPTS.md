@@ -1,6 +1,6 @@
 # 脚本使用手册
 
-最后更新：2026-07-31 00:00
+最后更新：2026-09-04
 
 ## scripts/build_dashboard.py
 
@@ -59,10 +59,12 @@
 - 使用方法：
   - `python scripts/fetch_daily_data.py`
   - 指定业务日期：`python scripts/fetch_daily_data.py --business-date 2026-04-20`
+  - 仅更新 4 张线索表：`python scripts/fetch_daily_data.py --business-date 2026-04-20 --leads-only`
   - 调试浏览器流程：`python scripts/fetch_daily_data.py --business-date 2026-04-20 --headed --keep-runtime`
 - 运行前提：
   - 本机可用 `Python`
   - 已执行 `pip install -r requirements.txt`
+  - 每日取数使用的 Python 环境必须能导入 `playwright`；附魔工作台启动器使用 `D:\WorkCode\.venv` 时，请在该环境安装本文件中的依赖
   - 同级目录存在 `../日报取数平台/日报线索NEV源/getdata.py` 与 `../日报取数平台/日报线索ICE源/getdata.py`
   - 运行环境可以正常打开本地 Chrome 并访问目标系统
 - 输出结果：
@@ -72,14 +74,16 @@
   - 更新 `docs/data/dashboard.summary.json`
 - 备注：
   - 默认按当天的 `N-1` 作为业务日期，也可通过 `--business-date` 显式覆盖
+  - `--leads-only` 仅运行 NEV / ICE 两个线索抓取任务，只回填 `全国按日NEV`、`全国按日NEV-同期`、`全国按日ICE`、`全国按日ICE-同期`；来店抓取和来店工作簿写入会跳过，Dashboard 继续读取现有 `NEV+ICE_ldai.xlsm`
   - 十五代轩逸已于 `2026-07-15` 停更：不再抓取或回填 `十五代轩逸按日`，历史数据保留但页面不再展示
   - 脚本运行成功后会自动清理 `.runtime/daily_update/` 临时目录；若带 `--keep-runtime`，会保留导出文件与日志便于排查
   - NEV 线索中的 `全国按日` 会通过 `scripts/run_leads_nev_exports.py` 内部包装器复用 `日报线索NEV源`，并在运行时显式清空 FineReport 平台默认的 `营业状态` 筛选，避免只取 `营业店`
   - NEV 线索共享初始化的参数上下文等待上限为 `30000ms`；上下文稳定后会提前继续，用于兼容网络较慢时 `load/content` 晚于默认 `10000ms` 到达的情况
-  - NEV 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_nev_exports.py` 内部包装器复用 `日报来店NEV源` 的登录态与参数模板，并在后台执行 `tab/execute -> REPORT2 -> chart.data` 直接抓取自定义按日序列
-  - ICE 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_ice_exports.py` 内部包装器强制把 Tableau 交叉表缩略图入口锁定到 `来店批次分车系汇总表_按天T`
+  - NEV 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_nev_exports.py` 内部包装器复用 `日报来店NEV源` 的登录态与参数模板，并优先执行 `tab/execute -> REPORT2 -> chart.data` 抓取自定义按日序列；本期结束日保持业务日，上期和同期自动扩展到各自自然月月末；接口缺少目标日期时自动切换到真实网页查询，初始化等待上限为 `300000ms`，网页图表等待上限为 `600000ms`，适配实际查询需要 240 秒以上的慢加载场景；图表按目标日期数对应的折线点和刻度是否可解析判断完成，不再依赖首尾日期文本是否出现在 HTML；切换后其余来店报表继续沿用网页模式，避免混用旧接口会话
+  - ICE 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_ice_exports.py` 内部包装器强制把 Tableau 交叉表缩略图入口锁定到 `来店批次分车系汇总表_按天T`；本期结束日保持业务日，上期和同期自动扩展到各自自然月月末
   - NEV / ICE 上期来店在汇总时兼容导出器的两种命名方式：可使用本次业务日后缀，也可使用上期实际结束日后缀；非上期报表仍严格匹配本次业务日
   - 每项抓取任务结束后会校验预期 Excel 数量；即使底层导出器跳过失败报表但返回成功退出码，仍会触发现有任务级重试
+  - 当 NEV 来店后台接口缺少目标结束日，且等待完整网页查询后 `REPORT2` 点位仍只到前一天时，会输出“上游 NEV 来店数据尚未发布目标日期”并停止当前日期的重复抓取；附魔工作台据此整批回退一天，避免两本工作簿混用不同业务日
   - 该脚本只负责本地更新；静态部署到 `GitHub Pages` 后不会自动具备浏览器取数能力
 
 ## scripts/run_leads_nev_exports.py
@@ -91,7 +95,7 @@
   - 需要单独验证时可执行：`python scripts/run_leads_nev_exports.py --business-date 2026-06-09 --report-keys national_daily,national_daily_same_period`
 - 备注：
   - 该包装器不会改动兄弟项目源码，只在运行时 monkey-patch `report_fetcher.report_configs.REPORT_CONFIGS` 与日期 resolver
-  - 同期周期固定为去年同月首日至去年同日；遇到闰年 `2 月 29 日` 时，去年同期结束日自动压到合法的 `2 月 28 日`
+  - 同期周期固定为去年同月首日至月末；完整月用于趋势明细，Dashboard 同比卡片仍按当前业务日对齐计算
   - 空列表 `[]` 表示该筛选条件不选任何营业状态，用来覆盖平台新增的默认 `营业店`
 
 ## scripts/run_leads_ice_exports.py
@@ -103,7 +107,7 @@
   - 需要单独验证时可执行：`python scripts/run_leads_ice_exports.py --business-date 2026-06-09 --report-keys ice_national_daily,ice_national_daily_same_period`
 - 备注：
   - 该包装器不会改动兄弟项目源码，只在运行时深拷贝并扩展 `report_fetcher.report_configs.REPORT_CONFIGS` 与日期 resolver
-  - 同期周期固定为去年同月首日至去年同日，与本期业务日对齐；遇到闰年 `2 月 29 日` 时，去年同期结束日自动压到合法的 `2 月 28 日`
+  - 同期周期固定为去年同月首日至月末；完整月用于趋势明细，Dashboard 同比卡片仍按当前业务日对齐计算
 
 ## scripts/run_arrival_nev_exports.py
 
@@ -111,10 +115,12 @@
 - 作用：作为 `日报来店NEV源/getdata.py` 的轻量包装器，对 `NEV本期/上期/同期来店` 切换到 `自定义` tab，并通过后台 `chart.data` 接口提取按日数据
 - 使用方法：
   - 一般不单独调用，由 `python scripts/fetch_daily_data.py ...` 自动串联
-  - 需要单独验证时可执行：`python scripts/run_arrival_nev_exports.py --business-date 2026-04-21 --report-keys store_current_period,store_previous_period,store_same_period --safe-bootstrap --capture-wait-ms 30000`
+  - 需要单独验证时可执行：`python scripts/run_arrival_nev_exports.py --business-date 2026-04-21 --report-keys store_current_period,store_previous_period,store_same_period --safe-bootstrap --capture-wait-ms 300000`
 - 备注：
   - 该包装器不会改动兄弟项目源码，只在运行时修正目标报表 URL、参数模板和导出策略
+  - 默认更新时，本期仍取月初至业务日，上期与同期取各自完整自然月；显式传入 `--end-date` 时尊重人工结束日
   - 若 `REPORT2 load/content` 直接返回的不是按日两列表，而是“合计值 + simplechart”，包装器会继续从 `simplechart` 里提取 `chartID` 与 `ecName`，再请求 `chart.data` 还原每日来店量
+  - 若 `chart.data` 尚未包含目标结束日期，包装器会复用已经完成初始化的当前报表页，改用页面日期控件和“查询”按钮，并最多等待 `600000ms` 取得可完整解析的 `REPORT2` 图表；“近一年 / 近一周 / 自定义”页签由 FineReport 绘制在 `TABPANE0` canvas 上，文本定位不可用时会按画布内第三个页签坐标点击“自定义”；后续报表保持网页查询模式，不会重新导航并丢失已建立的报表会话；超时时会在对应 `_trace` 目录保存页面 HTML 和截图
 
 ## scripts/run_arrival_ice_exports.py
 
@@ -125,6 +131,7 @@
   - 需要单独验证时可执行：`python scripts/run_arrival_ice_exports.py --business-date 2026-04-20 --report-keys store_batch_vehicle_summary_本期_来店,store_batch_vehicle_summary_上期_来店,store_batch_vehicle_summary_同期_来店`
 - 备注：
   - 该包装器不会改动兄弟项目源码，只在运行时 monkey-patch `build_effective_report_configs`
+  - 默认更新时，本期仍取月初至业务日，上期与同期取各自完整自然月；显式传入 `--end-date` 时尊重人工结束日
   - 这里不能把 `crosstab_sheet_name` 直接改成 `来店批次分车系汇总表_按天T`，否则 Tableau 导出响应里会因为拿不到真实的 `sheetdocId` 而失败
 
 ## scripts/rebuild_dashboard.ps1
@@ -142,7 +149,7 @@
   - 更新 `docs/data/dashboard.json`
   - 更新 `docs/data/dashboard.summary.json`
 - 备注：
-  - 这个脚本只负责本地重建数据；要让 GitHub Pages 同步更新，仍然需要把变更提交并推送到 GitHub
+  - 这个脚本只负责本地重建数据；要让 GitHub Pages 与 Cloudflare Pages 同步更新，仍然需要把变更提交并推送到 GitHub
   - 脚本会优先使用 `python`，找不到时自动回退到 `py -3`
 
 ## scripts/scheduled_update_runner.py
@@ -163,7 +170,9 @@
   - 一旦开始执行，窗口不会中途消失，而是切换为进度条视图，并根据日志阶段持续推进完成进度
   - 更新完成或失败后，结果会在同一个窗口里展示，随后自动关闭
   - 无论是 `interactive` 还是 `silent`，都会写同一套日志 / 结果文件；若发现已有任务持锁，当前任务会记一次 `skipped` 并直接退出
+  - `09:00` 交互任务失败时，结果窗口会明确提示“已进入二次更新”；`09:20` 静默任务带 `--fallback-only`，只有当天没有成功更新记录时才执行，首轮已经成功则登记 `successful-run-already-completed` 并跳过抓取
   - 每次重建都会读取 `config/dashboard_targets.json`，因此附魔工作台保存的全车系有效线索月目标同样适用于每日自动更新
+  - 当前 09:00 交互任务与 09:20 静默兜底任务均带 `--auto-publish`；发布成功后同一 Git push 会触发 GitHub Pages 与 Cloudflare Pages 两条独立 workflow
 
 ## scripts/register_daily_update_task.ps1
 
@@ -183,7 +192,7 @@
 ## scripts/publish_dashboard.ps1
 
 - 路径：`./scripts/publish_dashboard.ps1`
-- 作用：一键重建 `dashboard.json`，把发布所需文件提交并推送到 GitHub；随后由 GitHub Actions 自动部署 Pages
+- 作用：一键重建 `dashboard.json`，把发布所需文件提交并推送到 GitHub；随后由两条独立 GitHub Actions workflow 并行部署 GitHub Pages 与 Cloudflare Pages
 - 使用方法：
   - `powershell -ExecutionPolicy Bypass -File scripts/publish_dashboard.ps1`
   - 指定提交信息：`powershell -ExecutionPolicy Bypass -File scripts/publish_dashboard.ps1 -CommitMessage "Update dashboard data"`
@@ -198,7 +207,7 @@
   - 更新 `docs/data/dashboard.json`
   - 更新 `docs/data/dashboard.summary.json`
   - 自动提交并推送发布相关文件
-  - 推送成功后触发 GitHub Pages workflow
+  - 推送成功后同时触发 GitHub Pages 与 Cloudflare Pages workflow
 - 备注：
   - 这个脚本现在只是薄封装，实际的 rebuild / stage / commit / push 逻辑在 `./scripts/dashboard_publish.py`
   - 默认只会提交这 4 个文件：两本 Excel 源文件、`docs/data/dashboard.json` 和 `docs/data/dashboard.summary.json`
@@ -207,7 +216,7 @@
 ## scripts/dashboard_publish.py
 
 - 路径：`./scripts/dashboard_publish.py`
-- 作用：统一承担发布前检查、重建、`git add`、`git commit` 与 `git push`；Pages 部署由 GitHub Actions 独立完成
+- 作用：统一承担发布前检查、重建、`git add`、`git commit` 与 `git push`；GitHub Pages 和 Cloudflare Pages 部署由两条 GitHub Actions workflow 独立完成
 - 使用方法：
   - `python scripts/dashboard_publish.py --remote origin --branch main`
   - 跳过重建：`python scripts/dashboard_publish.py --skip-rebuild`
@@ -217,7 +226,7 @@
   - 独立 GitHub 推送会比较 `config/dashboard_targets.json` 与 live / 当前月归档中的全车系有效线索目标；发现目标尚未写入页面时先自动重建，再提交推送。每日更新已生成一致页面时继续跳过重复重建
   - `git push` 带 300 秒超时，若被中断会自动重试一次，并在失败时保留完整的阶段与命令信息
   - Python 调用方可传入 `push_if_no_changes=True`，在没有新的发布文件可提交时仍执行 `git push`；默认值为 `False`，原定时更新与更新后自动发布行为不变
-  - `git push` 成功即视为本地发布完成，不再等待或调用任何 CDN；远端 workflow 继续完成 GitHub Pages 部署
+  - `git push` 成功即视为本地发布完成；远端两条 workflow 继续并行完成 GitHub Pages 与 Cloudflare Pages 部署
 
 ## scripts/serve_dashboard.py
 

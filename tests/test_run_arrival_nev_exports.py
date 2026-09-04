@@ -4,7 +4,10 @@ import copy
 import sys
 import types
 import unittest
+from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 from scripts.run_arrival_nev_exports import (
     TARGET_PARAMETER_TEMPLATE,
@@ -12,15 +15,50 @@ from scripts.run_arrival_nev_exports import (
     TARGET_REPORT_NAME,
     TARGET_REPORT_URL,
     build_chart_data_url,
+    capture_daily_rows,
     extract_daily_rows_from_chart_payload,
     extract_simplechart_meta_from_page_result,
-    is_custom_chart_html_ready,
     parse_report2_daily_series,
+    patch_report_config_builder,
     patch_report_configs,
 )
 
 
+@dataclass(frozen=True)
+class FakeReportConfig:
+    key: str
+    start_date: str
+    end_date: str
+    parameterized_prepare_parameters: dict | None = None
+
+
 class RunArrivalNevExportsTests(unittest.TestCase):
+    def test_patch_report_config_builder_fetches_full_previous_and_same_months(self) -> None:
+        configs = [
+            FakeReportConfig("store_current_period", "2026-09-01", "2026-09-03", {"结束时间": "2026-09-03"}),
+            FakeReportConfig("store_previous_period", "2026-08-01", "2026-08-03", {"结束时间": "2026-08-03"}),
+            FakeReportConfig("store_same_period", "2025-09-01", "2025-09-03", {"结束时间": "2025-09-03"}),
+        ]
+        module = types.SimpleNamespace(build_report_configs=lambda _args: configs)
+
+        patch_report_config_builder(module)
+        actual = module.build_report_configs(types.SimpleNamespace(end_date=None))
+
+        self.assertEqual([item.end_date for item in actual], ["2026-09-03", "2026-08-31", "2025-09-30"])
+        self.assertEqual(
+            [item.parameterized_prepare_parameters["结束时间"] for item in actual],
+            ["2026-09-03", "2026-08-31", "2025-09-30"],
+        )
+
+    def test_patch_report_config_builder_respects_explicit_end_date(self) -> None:
+        config = FakeReportConfig("store_previous_period", "2026-08-01", "2026-08-15")
+        module = types.SimpleNamespace(build_report_configs=lambda _args: [config])
+
+        patch_report_config_builder(module)
+        actual = module.build_report_configs(types.SimpleNamespace(end_date="2026-08-15"))
+
+        self.assertEqual(actual, [config])
+
     def test_patch_report_configs_switches_target_route_and_parameter_template(self) -> None:
         report_configs_module = types.SimpleNamespace(
             REPORT_URL="https://example.com/old",
@@ -142,19 +180,6 @@ class RunArrivalNevExportsTests(unittest.TestCase):
             ],
         )
 
-    def test_is_custom_chart_html_ready_requires_target_widget_dates_and_line(self) -> None:
-        html = """
-        <div widgetname="REPORT2">
-          <g class="vancharts-series-0 line"></g>
-          <text>2026-04-01</text>
-          <text>2026-04-21</text>
-        </div>
-        """
-        self.assertTrue(is_custom_chart_html_ready(html, "2026-04-01", "2026-04-21"))
-        self.assertFalse(is_custom_chart_html_ready(html.replace("REPORT2", "REPORT0"), "2026-04-01", "2026-04-21"))
-        self.assertFalse(is_custom_chart_html_ready(html.replace("2026-04-21", "2026-04-20"), "2026-04-01", "2026-04-21"))
-        self.assertFalse(is_custom_chart_html_ready(html.replace("vancharts-series-0 line", "bar"), "2026-04-01", "2026-04-21"))
-
     def test_extract_simplechart_meta_from_page_result_reads_chart_id_and_ec_name(self) -> None:
         page_result = [
             [
@@ -220,6 +245,58 @@ class RunArrivalNevExportsTests(unittest.TestCase):
         self.assertIn("sessionID=session-1", actual)
         self.assertIn("chartID=Cells__A2__A2__abc__index__0", actual)
         self.assertIn("ecName=REPORT2", actual)
+
+    @patch("scripts.run_arrival_nev_exports.capture_custom_chart_series")
+    @patch("scripts.run_arrival_nev_exports.capture_custom_chart_series_via_api")
+    def test_capture_daily_rows_switches_to_slow_browser_query_after_missing_dates(
+        self,
+        capture_via_api: Mock,
+        capture_via_browser: Mock,
+    ) -> None:
+        expected = [(date(2026, 8, 23), 123)]
+        capture_via_api.side_effect = RuntimeError("chart.data 返回的自定义来店按日数据缺少日期：2026-08-23")
+        capture_via_browser.return_value = expected
+        module = types.SimpleNamespace(log=Mock())
+        datetest_module = object()
+        page = object()
+        export_context = object()
+        filter_config = object()
+        trace_dir = Path("trace")
+
+        actual, browser_query = capture_daily_rows(
+            module,
+            datetest_module,
+            page,
+            export_context,
+            filter_config,
+            trace_dir,
+            query_wait_ms=300_000,
+        )
+        repeated, repeated_browser_query = capture_daily_rows(
+            module,
+            datetest_module,
+            page,
+            export_context,
+            filter_config,
+            trace_dir,
+            query_wait_ms=300_000,
+            force_browser_query=browser_query,
+        )
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(repeated, expected)
+        self.assertTrue(browser_query)
+        self.assertTrue(repeated_browser_query)
+        capture_via_api.assert_called_once_with(export_context, filter_config, trace_dir)
+        self.assertEqual(capture_via_browser.call_count, 2)
+        capture_via_browser.assert_called_with(
+            module,
+            datetest_module,
+            page,
+            filter_config,
+            trace_dir,
+            timeout_ms=300_000,
+        )
 
 
 def json_dumps(value: dict) -> str:
