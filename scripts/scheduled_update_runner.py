@@ -126,14 +126,32 @@ def build_success_message(result: dict[str, object], started_at: datetime, finis
     )
 
 
-def build_failure_message(started_at: datetime, finished_at: datetime, log_path: Path, error_text: str) -> str:
+def build_failure_message(
+    started_at: datetime,
+    finished_at: datetime,
+    log_path: Path,
+    error_text: str,
+    *,
+    secondary_update_pending: bool = False,
+) -> str:
     duration_seconds = int((finished_at - started_at).total_seconds())
+    headline = (
+        "AI Digest 首次自动更新失败，已进入二次更新流程。"
+        if secondary_update_pending
+        else "AI Digest 每日自动更新失败。"
+    )
+    secondary_update_line = (
+        "二次更新：09:20 将由 AI_Digest_Daily_Update_Silent 在后台自动执行。\n"
+        if secondary_update_pending
+        else ""
+    )
     return (
-        "AI Digest 每日自动更新失败。\n\n"
+        f"{headline}\n\n"
         f"开始时间：{started_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
         f"结束时间：{finished_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
         f"耗时：{duration_seconds} 秒\n"
         f"错误信息：{error_text}\n"
+        f"{secondary_update_line}"
         f"日志文件：{log_path}\n\n"
         f"窗口会在 {FINISH_AUTO_CLOSE_SECONDS} 秒后自动关闭。"
     )
@@ -177,6 +195,30 @@ def build_lock_path() -> Path:
 def write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n")
+
+
+def completed_run_results(started_at: datetime, business_date: str) -> list[tuple[Path, dict[str, object]]]:
+    run_date = started_at.date().isoformat()
+    results: list[tuple[Path, dict[str, object]]] = []
+    if not SCHEDULED_RUNTIME_ROOT.exists():
+        return results
+    for result_path in SCHEDULED_RUNTIME_ROOT.glob("*/result.json"):
+        try:
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if str(payload.get("businessDate") or "") != business_date:
+            continue
+        if str(payload.get("startedAt") or "")[:10] != run_date:
+            continue
+        results.append((result_path, payload))
+    results.sort(
+        key=lambda item: str(item[1].get("finishedAt") or item[1].get("startedAt") or ""),
+        reverse=True,
+    )
+    return results
 
 
 def lock_file_handle(handle) -> None:
@@ -504,6 +546,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--publish-remote", default="origin", help="Git remote name used by auto publish.")
     parser.add_argument("--publish-branch", default="main", help="Git branch name used by auto publish.")
     parser.add_argument("--publish-commit-message", default="", help="Optional git commit message used by auto publish.")
+    parser.add_argument(
+        "--fallback-only",
+        action="store_true",
+        help="Only run the silent task when no successful scheduled update exists for today.",
+    )
     return parser.parse_args(argv)
 
 
@@ -613,6 +660,7 @@ def run_scheduled_update(
     publish_remote: str = "origin",
     publish_branch: str = "main",
     publish_commit_message: str = "",
+    fallback_only: bool = False,
 ) -> int:
     started_at = datetime.now()
     run_dir = build_run_dir(started_at)
@@ -640,8 +688,64 @@ def run_scheduled_update(
             "autoPublish": auto_publish,
             "publishRemote": publish_remote,
             "publishBranch": publish_branch,
+            "fallbackOnly": fallback_only,
         },
     )
+
+    fallback_payload: dict[str, object] = {}
+    if mode == SILENT_MODE and fallback_only:
+        previous_results = completed_run_results(started_at, format_business_date(business_date))
+        successful_run = next(
+            ((path, payload) for path, payload in previous_results if payload.get("status") == "success"),
+            None,
+        )
+        if successful_run is not None:
+            finished_at = datetime.now()
+            source_path, source_payload = successful_run
+            logger("检测到今天已有成功的自动更新，二次更新无需执行。")
+            write_json(
+                run_dir / "result.json",
+                {
+                    "status": "skipped",
+                    "reason": "successful-run-already-completed",
+                    "mode": mode,
+                    "startedAt": started_at.isoformat(timespec="seconds"),
+                    "finishedAt": finished_at.isoformat(timespec="seconds"),
+                    "businessDate": format_business_date(business_date),
+                    "fallbackOnly": True,
+                    "successfulRunMode": source_payload.get("mode", ""),
+                    "successfulRunResult": str(source_path),
+                    "autoPublish": auto_publish,
+                    "publishRemote": publish_remote,
+                    "publishBranch": publish_branch,
+                    "logPath": str(log_path),
+                },
+            )
+            return 0
+
+        failed_interactive_run = next(
+            (
+                (path, payload)
+                for path, payload in previous_results
+                if payload.get("mode") == INTERACTIVE_MODE and payload.get("status") == "error"
+            ),
+            None,
+        )
+        if failed_interactive_run is not None:
+            logger("检测到首次自动更新失败，已进入二次更新（静默兜底）。")
+            fallback_payload = {
+                "fallbackOnly": True,
+                "fallbackStage": "secondary",
+                "fallbackReason": "interactive-run-failed",
+                "primaryRunResult": str(failed_interactive_run[0]),
+            }
+        else:
+            logger("未检测到今天成功的交互更新，静默兜底开始执行。")
+            fallback_payload = {
+                "fallbackOnly": True,
+                "fallbackStage": "unattended",
+                "fallbackReason": "successful-run-missing",
+            }
 
     lock_metadata = {
         "mode": mode,
@@ -669,6 +773,7 @@ def run_scheduled_update(
                 "autoPublish": auto_publish,
                 "publishRemote": publish_remote,
                 "publishBranch": publish_branch,
+                **fallback_payload,
                 "logPath": str(log_path),
             },
         )
@@ -748,10 +853,18 @@ def run_scheduled_update(
                     "publishRemote": publish_remote,
                     "publishBranch": publish_branch,
                     **publish_error_payload,
+                    **fallback_payload,
                     "logPath": str(log_path),
                 },
             )
-            progress_window.finish_error(build_failure_message(started_at, finished_at, log_path, error_text))
+            failure_message = build_failure_message(
+                started_at,
+                finished_at,
+                log_path,
+                error_text,
+                secondary_update_pending=mode == INTERACTIVE_MODE,
+            )
+            progress_window.finish_error(failure_message)
             result_holder["exit_code"] = 1
             return
 
@@ -775,6 +888,7 @@ def run_scheduled_update(
                 "publishTarget": result.get("publishTarget", ""),
                 "publishPagesUrl": result.get("publishPagesUrl", ""),
                 "publishCloudflarePagesUrl": result.get("publishCloudflarePagesUrl", ""),
+                **fallback_payload,
                 "logPath": str(log_path),
             },
         )
@@ -809,6 +923,7 @@ def main(argv: list[str] | None = None) -> int:
         publish_remote=args.publish_remote,
         publish_branch=args.publish_branch,
         publish_commit_message=args.publish_commit_message,
+        fallback_only=args.fallback_only,
     )
 
 

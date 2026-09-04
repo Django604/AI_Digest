@@ -71,7 +71,7 @@ if ($AutoPublish) {
   $publishArgs = (' --auto-publish --publish-remote "{0}" --publish-branch "{1}"' -f $PublishRemote, $PublishBranch)
 }
 $interactiveAction = New-ScheduledTaskAction -Execute $pythonExe -Argument ('"{0}" --mode interactive{1}' -f $runnerScript, $publishArgs) -WorkingDirectory $projectRoot
-$silentAction = New-ScheduledTaskAction -Execute $pythonExe -Argument ('"{0}" --mode silent{1}' -f $runnerScript, $publishArgs) -WorkingDirectory $projectRoot
+$silentAction = New-ScheduledTaskAction -Execute $pythonExe -Argument ('"{0}" --mode silent --fallback-only{1}' -f $runnerScript, $publishArgs) -WorkingDirectory $projectRoot
 $interactiveTrigger = New-ScheduledTaskTrigger -Daily -At $interactiveRunTime.ToString("HH:mm")
 $silentTrigger = New-ScheduledTaskTrigger -Daily -At $silentRunTime.ToString("HH:mm")
 $interactivePrincipal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
@@ -89,7 +89,7 @@ Register-ScheduledTask -TaskName $silentTaskName -Action $silentAction -Trigger 
 Write-Host "Scheduled tasks registered successfully." -ForegroundColor Green
 Write-Host "Interactive task: $interactiveTaskName"
 Write-Host "Interactive time: daily at $($interactiveRunTime.ToString("HH:mm"))"
-Write-Host "Silent fallback task: $silentTaskName"
+Write-Host "Silent fallback task: $silentTaskName (runs only when today's update has not succeeded)"
 Write-Host "Silent time: daily at $($silentRunTime.ToString("HH:mm"))"
 Write-Host "Silent delay minutes: $SilentDelayMinutes"
 Write-Host "Auto publish: $AutoPublish"

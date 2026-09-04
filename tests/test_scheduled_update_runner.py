@@ -95,6 +95,18 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
         self.assertIn("耗时：90 秒", actual)
         self.assertIn(f"窗口会在 {FINISH_AUTO_CLOSE_SECONDS} 秒后自动关闭", actual)
 
+    def test_secondary_update_failure_message_announces_fallback(self) -> None:
+        actual = build_failure_message(
+            datetime(2026, 4, 22, 9, 0, 0),
+            datetime(2026, 4, 22, 9, 1, 30),
+            Path(r"D:\WorkCode\AI_Digest\.runtime\scheduled_update\20260422_090000\scheduled_update.log"),
+            "Chrome 启动失败",
+            secondary_update_pending=True,
+        )
+
+        self.assertIn("首次自动更新失败，已进入二次更新流程", actual)
+        self.assertIn("09:20 将由 AI_Digest_Daily_Update_Silent", actual)
+
     def test_infer_progress_update_advances_by_known_log_rule(self) -> None:
         actual = infer_progress_update("开始抓取：NEV 来店本期 + 上期 + 同期", 20)
 
@@ -189,6 +201,92 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
             payload = json.loads(result_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(payload["status"], "success")
             self.assertEqual(payload["mode"], SILENT_MODE)
+        finally:
+            shutil.rmtree(runtime_root, ignore_errors=True)
+
+    def test_fallback_only_silent_run_skips_after_today_success(self) -> None:
+        runtime_root = self.create_repo_temp_dir()
+        prior_dir = runtime_root / "prior-success"
+        prior_dir.mkdir()
+        today = datetime.now().date().isoformat()
+        (prior_dir / "result.json").write_text(
+            json.dumps(
+                {
+                    "status": "success",
+                    "mode": INTERACTIVE_MODE,
+                    "startedAt": f"{today}T09:00:00",
+                    "finishedAt": f"{today}T09:10:00",
+                    "businessDate": "2026-04-22",
+                }
+            ),
+            encoding="utf-8",
+        )
+        try:
+            with mock.patch("scripts.scheduled_update_runner.SCHEDULED_RUNTIME_ROOT", runtime_root), mock.patch(
+                "scripts.scheduled_update_runner.run_update"
+            ) as run_update_mock:
+                exit_code = run_scheduled_update(
+                    mode=SILENT_MODE,
+                    business_date_text="2026-04-22",
+                    show_start_message=False,
+                    show_finish_message=False,
+                    fallback_only=True,
+                )
+
+            self.assertEqual(exit_code, 0)
+            run_update_mock.assert_not_called()
+            generated_results = [path for path in runtime_root.glob("*/result.json") if path.parent != prior_dir]
+            self.assertEqual(len(generated_results), 1)
+            payload = json.loads(generated_results[0].read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "skipped")
+            self.assertEqual(payload["reason"], "successful-run-already-completed")
+        finally:
+            shutil.rmtree(runtime_root, ignore_errors=True)
+
+    def test_fallback_only_silent_run_marks_secondary_after_interactive_failure(self) -> None:
+        runtime_root = self.create_repo_temp_dir()
+        prior_dir = runtime_root / "prior-failure"
+        prior_dir.mkdir()
+        today = datetime.now().date().isoformat()
+        (prior_dir / "result.json").write_text(
+            json.dumps(
+                {
+                    "status": "error",
+                    "mode": INTERACTIVE_MODE,
+                    "startedAt": f"{today}T09:00:00",
+                    "finishedAt": f"{today}T09:10:00",
+                    "businessDate": "2026-04-22",
+                }
+            ),
+            encoding="utf-8",
+        )
+        fake_result = {
+            "businessDate": "2026-04-22",
+            "runtimeDir": r"D:\WorkCode\AI_Digest\.runtime\daily_update\fake-run",
+            "dashboardChanged": True,
+            "summaryChanged": True,
+        }
+        try:
+            with mock.patch("scripts.scheduled_update_runner.SCHEDULED_RUNTIME_ROOT", runtime_root), mock.patch(
+                "scripts.scheduled_update_runner.run_update",
+                return_value=fake_result,
+            ) as run_update_mock:
+                exit_code = run_scheduled_update(
+                    mode=SILENT_MODE,
+                    business_date_text="2026-04-22",
+                    show_start_message=False,
+                    show_finish_message=False,
+                    fallback_only=True,
+                )
+
+            self.assertEqual(exit_code, 0)
+            run_update_mock.assert_called_once()
+            generated_results = [path for path in runtime_root.glob("*/result.json") if path.parent != prior_dir]
+            self.assertEqual(len(generated_results), 1)
+            payload = json.loads(generated_results[0].read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "success")
+            self.assertEqual(payload["fallbackStage"], "secondary")
+            self.assertEqual(payload["fallbackReason"], "interactive-run-failed")
         finally:
             shutil.rmtree(runtime_root, ignore_errors=True)
 
