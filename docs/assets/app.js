@@ -580,7 +580,7 @@ function updateCaptureTools(options = {}) {
     return;
   }
 
-  setCaptureStatus("将保存所有板块的趋势图截图，并自动跳过 ICE 总盘趋势图。");
+  setCaptureStatus("将保存所有板块的趋势图截图，并自动跳过 ICE 总盘和 2026款探陆趋势图。");
 }
 
 function setCaptureStatus(message, stateName = "") {
@@ -844,7 +844,7 @@ async function handleGlobalTrendCapture() {
     }
 
     updateCaptureTools({
-      message: `截图完成，已保存 ${savedCount} 张趋势图到所选文件夹，已跳过 ICE 总盘趋势图。`,
+      message: `截图完成，已保存 ${savedCount} 张趋势图到所选文件夹，已跳过 ICE 总盘和 2026款探陆趋势图。`,
       stateName: "success",
     });
   } catch (error) {
@@ -884,6 +884,9 @@ function buildTrendCaptureJobs() {
 }
 
 function shouldSkipTrendCapture(dashboard, section, chartTitle) {
+  if (section?.id === "new-pathfinder") {
+    return true;
+  }
   return dashboard?.id === "ice" && (
     section?.id === "ice-total"
     || section?.id === "sylphy-15"

@@ -32,6 +32,7 @@ NEV_CORE_MODELS = [
     ("TEANA-harmony", "天籁·鸿蒙座舱", "天籁·鸿蒙座舱"),
 ]
 NEW_PATHFINDER_MODEL = "2026款探陆"
+NEW_PATHFINDER_FREEZE_DATE = date(2026, 9, 9)
 NEV_DETAIL_MODELS = [
     *NEV_CORE_MODELS,
     ("new-pathfinder", NEW_PATHFINDER_MODEL, NEW_PATHFINDER_MODEL),
@@ -587,6 +588,23 @@ def load_optional_nev_daily(
     return load_nev_daily(ws, start_date, end_date)
 
 
+def freeze_new_pathfinder_daily(
+    model_daily: dict[str, dict[date, dict[str, int | float | None]]],
+) -> dict[str, dict[date, dict[str, int | float | None]]]:
+    return {
+        model_name: (
+            {
+                current_date: values
+                for current_date, values in series.items()
+                if current_date <= NEW_PATHFINDER_FREEZE_DATE
+            }
+            if model_name == NEW_PATHFINDER_MODEL
+            else series
+        )
+        for model_name, series in model_daily.items()
+    }
+
+
 def load_ice_daily(ws, start_date: date, end_date: date) -> dict[date, dict[str, int | float | None]]:
     headers = header_map(ws, 1)
     result: dict[date, dict[str, int | float | None]] = {}
@@ -1116,37 +1134,10 @@ def resolve_new_pathfinder_targets(
     return {current_date: values[index] for index, current_date in enumerate(dates)}
 
 
-def build_single_model_brief_line(
-    model_name: str,
-    report_date: date,
-    actuals: dict[date, dict[str, int | float | None]],
-    targets: dict[date, int | float | None],
-    *,
-    actual_key: str,
-) -> str:
-    cumulative_actual = sum((item.get(actual_key) or 0) for item in actuals.values())
-    daily_actual = actuals.get(report_date, {}).get(actual_key)
-    has_target = bool(targets) and any(value is not None for value in targets.values())
-    cumulative_target = (
-        sum(targets.get(current_date, 0) or 0 for current_date in month_dates(report_date) if current_date <= report_date)
-        if has_target
-        else None
-    )
-    daily_target = targets.get(report_date) if has_target else None
-    return (
-        f"{model_name}累计实绩 {fmt_count(cumulative_actual)}，"
-        f"累计达成率 {fmt_percent(ratio(cumulative_actual, cumulative_target))}；"
-        f"当日实绩 {fmt_count(daily_actual)}，"
-        f"当日达成率 {fmt_percent(ratio(daily_actual, daily_target))}"
-    )
-
-
 def build_line_brief(
     report_date: date,
     nev_daily,
     nev_targets,
-    new_pathfinder_daily,
-    new_pathfinder_targets,
 ) -> dict[str, Any]:
     total_cum_actual = total_day_actual = total_cum_target = total_day_target = 0
     nev_lines: list[str] = []
@@ -1164,13 +1155,6 @@ def build_line_brief(
         marker = BRIEF_MARKERS[index]
         nev_lines.append(f"{marker}{model_name}累计实绩{fmt_count(cum_actual)}，累计达成率{fmt_percent(ratio(cum_actual, cum_target))}；当日实绩{fmt_count(day_actual)}，当日达成率{fmt_percent(ratio(day_actual, day_target))}")
     nev_summary = f"四车累计实绩{fmt_count(total_cum_actual)}，累计达成率{fmt_percent(ratio(total_cum_actual, total_cum_target))}；当日实绩{fmt_count(total_day_actual)}，当日达成率{fmt_percent(ratio(total_day_actual, total_day_target))}"
-    new_pathfinder_line = build_single_model_brief_line(
-        NEW_PATHFINDER_MODEL,
-        report_date,
-        new_pathfinder_daily,
-        new_pathfinder_targets,
-        actual_key="newLeads",
-    )
     headline = f"请查收{report_date.strftime('%m.%d')}线索&来店日报"
     sections = [
         {"kind": "intro", "title": "开场", "lines": ["各位领导：", headline]},
@@ -1180,7 +1164,6 @@ def build_line_brief(
             "lines": [nev_summary, *nev_lines],
             "note": f"（目标取值为GTM输入的管控目标{report_date.month}月值）",
         },
-        {"kind": "new-pathfinder", "title": f"{NEW_PATHFINDER_MODEL}线索", "lines": [new_pathfinder_line]},
     ]
     return {
         "id": "daily-brief",
@@ -1592,11 +1575,15 @@ def build_payload(
             report_date,
             nev_targets.get(NEW_PATHFINDER_MODEL, {}),
         )
-        nev_daily_all = load_nev_daily(leads["全国按日NEV"], previous_start, current_end)
-        nev_same_period_all = load_optional_nev_daily(
-            leads["全国按日NEV-同期"],
-            same_period_start,
-            same_period_end,
+        nev_daily_all = freeze_new_pathfinder_daily(
+            load_nev_daily(leads["全国按日NEV"], previous_start, current_end)
+        )
+        nev_same_period_all = freeze_new_pathfinder_daily(
+            load_optional_nev_daily(
+                leads["全国按日NEV-同期"],
+                same_period_start,
+                same_period_end,
+            )
         )
         ice_daily_all = load_ice_daily(leads["全国按日ICE"], previous_start, current_end)
         ice_same_period_all = load_optional_ice_daily(
@@ -1633,8 +1620,6 @@ def build_payload(
             report_date,
             nev_current,
             nev_targets,
-            nev_current.get(NEW_PATHFINDER_MODEL, {}),
-            nev_targets.get(NEW_PATHFINDER_MODEL, {}),
         )
         arrival_brief = build_arrival_brief(report_date, arrival_maps)
         arrival_dashboard = build_arrival_dashboard(report_date, arrival_maps)
@@ -1664,6 +1649,34 @@ def build_payload(
             for item in brief_sections
         )
         data_dates = sorted({*nev_total_current.keys(), *ice_current.keys(), *valid_leads_total_current.keys()})
+
+        nev_sections = [
+            build_nev_section(
+                "nev-total",
+                "NEV 总盘",
+                report_date,
+                nev_total_current,
+                nev_total_previous,
+                nev_total_targets,
+            )
+        ]
+        for section_id, title, model_name in NEV_DETAIL_MODELS:
+            if section_id == "new-pathfinder":
+                if report_date > month_end(NEW_PATHFINDER_FREEZE_DATE):
+                    continue
+                section_report_date = min(report_date, NEW_PATHFINDER_FREEZE_DATE)
+            else:
+                section_report_date = report_date
+            nev_sections.append(
+                build_nev_section(
+                    section_id,
+                    title,
+                    section_report_date,
+                    nev_current.get(model_name, {}),
+                    nev_previous.get(model_name, {}),
+                    nev_targets.get(model_name, {}),
+                )
+            )
 
         dashboards = {
             "brief": {
@@ -1699,13 +1712,7 @@ def build_payload(
                 "pageType": "dashboard",
                 "title": "NEV 线索趋势",
                 "headline": "",
-                "sections": [
-                    build_nev_section("nev-total", "NEV 总盘", report_date, nev_total_current, nev_total_previous, nev_total_targets),
-                    *[
-                        build_nev_section(section_id, title, report_date, nev_current.get(model_name, {}), nev_previous.get(model_name, {}), nev_targets.get(model_name, {}))
-                        for section_id, title, model_name in NEV_DETAIL_MODELS
-                    ],
-                ],
+                "sections": nev_sections,
             },
             "ice": {
                 "id": "ice",
@@ -1739,6 +1746,7 @@ def build_payload(
                     {"sheet": "每日NEV早报模板", "summary": "线索简报按底层数据重建，避免继续沿用历史模板文案。"},
                     {"sheet": "NEV+ICE_ldai", "summary": "全国来店简报与趋势基于本期、上期共 4 张来店底表聚合生成。"},
                     {"sheet": "十五代轩逸按日", "summary": "历史底表继续保留，页面与每日简报不再展示。"},
+                    {"sheet": "全国按日NEV", "summary": "2026款探陆保留截至 2026-09-09 的历史趋势，后续数据停止更新且 2026-10 起不再展示板块。"},
                 ],
             },
             "dashboards": dashboards,

@@ -17,6 +17,7 @@ from scripts.build_dashboard import (
     MONTHLY_ARCHIVE_DIR,
     NEV_CORE_MODELS,
     NEV_DETAIL_MODELS,
+    NEW_PATHFINDER_FREEZE_DATE,
     NEW_PATHFINDER_TARGET_OVERRIDES,
     SYLPHY_FREEZE_DATE,
     OUT_JSON,
@@ -278,13 +279,13 @@ class BuildDashboardPayloadTests(unittest.TestCase):
 
         self.assertEqual(actual_all_vehicle_valid - actual_without_new_pathfinder, 1)
 
-    def test_daily_brief_uses_separate_new_pathfinder_section(self) -> None:
+    def test_daily_brief_excludes_new_pathfinder_section(self) -> None:
         sections = self.synthetic_payload["dashboards"]["brief"]["briefing"]["sections"]
         sections_by_kind = {section["kind"]: section for section in sections}
 
         self.assertEqual(
             [section["kind"] for section in sections],
-            ["intro", "valid-leads", "nev", "new-pathfinder", "arrival"],
+            ["intro", "valid-leads", "nev", "arrival"],
         )
         self.assertEqual(sections_by_kind["valid-leads"]["title"], "全车系有效线索")
         self.assertEqual(sections_by_kind["nev"]["title"], "NEV新增线索")
@@ -298,10 +299,64 @@ class BuildDashboardPayloadTests(unittest.TestCase):
             sections_by_kind["nev"]["note"],
             "（目标取值为GTM输入的管控目标7月值）",
         )
-        self.assertEqual(sections_by_kind["new-pathfinder"]["title"], "2026款探陆线索")
-        self.assertIn("2026款探陆累计实绩 2", sections_by_kind["new-pathfinder"]["lines"][0])
-        self.assertIn("累计达成率 -", sections_by_kind["new-pathfinder"]["lines"][0])
+        self.assertNotIn("new-pathfinder", sections_by_kind)
+        self.assertNotIn("2026款探陆", self.synthetic_payload["dashboards"]["brief"]["briefing"]["generatedText"])
         self.assertFalse(any("2026款探陆" in line for line in sections_by_kind["nev"]["lines"]))
+
+    def test_new_pathfinder_freezes_after_september_9(self) -> None:
+        after_freeze = NEW_PATHFINDER_FREEZE_DATE.replace(day=10)
+        synthetic_nev_daily = {
+            "2026款探陆": {
+                NEW_PATHFINDER_FREEZE_DATE: {
+                    "newLeads": 9,
+                    "validLeads": 4,
+                    "storeLeads": 5,
+                    "arrivals": 1,
+                },
+                after_freeze: {
+                    "newLeads": 100,
+                    "validLeads": 50,
+                    "storeLeads": 60,
+                    "arrivals": 10,
+                },
+            },
+        }
+        with (
+            patch("scripts.build_dashboard.load_nev_daily", return_value=synthetic_nev_daily),
+            patch("scripts.build_dashboard.load_nev_targets", return_value={}),
+            patch("scripts.build_dashboard.NEW_PATHFINDER_TARGET_OVERRIDES", {}),
+        ):
+            payload = build_payload(
+                LEADS_BOOK,
+                ARRIVAL_BOOK,
+                report_date_override=after_freeze,
+            )
+
+        section = next(
+            item for item in payload["dashboards"]["nev"]["sections"]
+            if item["id"] == "new-pathfinder"
+        )
+        cards = {card["label"]: card for card in section["summary"]["cards"]}
+
+        self.assertEqual(cards["累计新增线索"]["value"], 9)
+        self.assertEqual(cards["当日新增线索"]["value"], 9)
+        self.assertEqual(cards["当日新增线索"]["note"], "2026-09-09")
+        self.assertEqual(section["trend"]["chart"]["reportDayIndex"], 8)
+
+    def test_new_pathfinder_section_is_hidden_after_september(self) -> None:
+        with (
+            patch("scripts.build_dashboard.load_nev_daily", return_value={}),
+            patch("scripts.build_dashboard.load_nev_targets", return_value={}),
+            patch("scripts.build_dashboard.NEW_PATHFINDER_TARGET_OVERRIDES", {}),
+        ):
+            payload = build_payload(
+                LEADS_BOOK,
+                ARRIVAL_BOOK,
+                report_date_override=date(2026, 10, 1),
+            )
+
+        section_ids = [section["id"] for section in payload["dashboards"]["nev"]["sections"]]
+        self.assertNotIn("new-pathfinder", section_ids)
 
     def test_lead_control_row_order_is_stable(self) -> None:
         trend = self.payload["dashboards"]["lead-control"]["sections"][0]["trend"]

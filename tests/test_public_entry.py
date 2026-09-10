@@ -69,11 +69,12 @@ class PublicEntryTests(unittest.TestCase):
         self.assertIn(expected_argument, CLOUDFLARE_PAGES_WORKFLOW.read_text(encoding="utf-8"))
         self.assertIn('`数据提交时间：${formatDateTime(meta.submittedAt)}`', app_source)
 
-    def test_batch_capture_skips_sylphy_15(self) -> None:
+    def test_batch_capture_skips_retired_sections(self) -> None:
         source = APP_SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn('section?.id === "sylphy-15"', source)
-        self.assertIn("已跳过 ICE 总盘趋势图", source)
+        self.assertIn('section?.id === "new-pathfinder"', source)
+        self.assertIn("已跳过 ICE 总盘和 2026款探陆趋势图", source)
         self.assertIn('section.kind !== "sylphy15"', source)
         self.assertIn('section?.id !== "sylphy-15"', source)
 
@@ -88,7 +89,6 @@ class PublicEntryTests(unittest.TestCase):
         styles = STYLESHEET.read_text(encoding="utf-8")
 
         self.assertIn('["valid-leads", "；同比"]', source)
-        self.assertIn('["new-pathfinder", "；当日"]', source)
         self.assertIn('class="brief-page-secondary-line"', source)
         self.assertIn(".brief-page-secondary-line", styles)
         self.assertIn("white-space: nowrap;", styles)
