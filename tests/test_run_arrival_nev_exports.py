@@ -1,91 +1,78 @@
 from __future__ import annotations
 
-import copy
 import sys
 import types
 import unittest
-from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from unittest.mock import Mock, patch
+
+from openpyxl import Workbook
 
 from scripts.run_arrival_nev_exports import (
-    TARGET_PARAMETER_TEMPLATE,
+    BASE_REPORT_KEY,
+    CUSTOM_DISPLAY_FIELDS,
+    CUSTOM_DISPLAY_TYPE,
+    LEADS_NEV_DIR,
+    LEADS_NEV_GETDATA,
+    PREVIOUS_MONTH_LAST_DAY_RULE,
+    TARGET_REPORT_DEFINITIONS,
     TARGET_REPORT_KEYS,
-    TARGET_REPORT_NAME,
-    TARGET_REPORT_URL,
-    build_chart_data_url,
-    capture_daily_rows,
-    extract_daily_rows_from_chart_payload,
-    extract_simplechart_meta_from_page_result,
-    parse_report2_daily_series,
-    patch_report_config_builder,
+    UPSTREAM_DATE_NOT_READY_MARKER,
+    patch_date_resolver,
     patch_report_configs,
+    validate_export_date_range,
 )
 
 
-@dataclass(frozen=True)
-class FakeReportConfig:
-    key: str
-    start_date: str
-    end_date: str
-    parameterized_prepare_parameters: dict | None = None
+def build_base_config() -> dict:
+    return {
+        "enabled": True,
+        "report_name": "全国按日",
+        "report_url": "https://example.com/national-daily",
+        "start_date": {"rule": "previous_month_first_day"},
+        "end_date": {"rule": "yesterday"},
+        "parameterized_prepare_parameters": {
+            "core_filters": {
+                "区域显示": "3",
+                "营业状态": ["营业"],
+            },
+            "display_options": {
+                "时间统计方式": "0",
+                "展示类型": "全量展示",
+                "展示字段": "",
+            },
+            "summary_flags": {
+                "车系汇总": True,
+            },
+            "static_labels": {},
+        },
+        "combo_parameters": [
+            {"label": "时间统计方式：", "value": "全部"},
+            {"label": "区域显示：", "value": "小区"},
+            {"label": "指标展示：", "value": "全量展示"},
+        ],
+        "tag_combo_parameters": [],
+        "checkbox_parameters": [
+            {"label": "基准车系汇总", "checked": True},
+        ],
+    }
 
 
 class RunArrivalNevExportsTests(unittest.TestCase):
-    def test_patch_report_config_builder_fetches_full_previous_and_same_months(self) -> None:
-        configs = [
-            FakeReportConfig("store_current_period", "2026-09-01", "2026-09-03", {"结束时间": "2026-09-03"}),
-            FakeReportConfig("store_previous_period", "2026-08-01", "2026-08-03", {"结束时间": "2026-08-03"}),
-            FakeReportConfig("store_same_period", "2025-09-01", "2025-09-03", {"结束时间": "2025-09-03"}),
-        ]
-        module = types.SimpleNamespace(build_report_configs=lambda _args: configs)
+    def setUp(self) -> None:
+        self.temp_path = Path("tests/.tmp/nev-arrival-export.xlsx")
+        self.temp_path.parent.mkdir(parents=True, exist_ok=True)
 
-        patch_report_config_builder(module)
-        actual = module.build_report_configs(types.SimpleNamespace(end_date=None))
+    def tearDown(self) -> None:
+        self.temp_path.unlink(missing_ok=True)
 
-        self.assertEqual([item.end_date for item in actual], ["2026-09-03", "2026-08-31", "2025-09-30"])
-        self.assertEqual(
-            [item.parameterized_prepare_parameters["结束时间"] for item in actual],
-            ["2026-09-03", "2026-08-31", "2025-09-30"],
-        )
+    def test_arrival_exports_reuse_leads_nev_source(self) -> None:
+        self.assertEqual(LEADS_NEV_DIR.name, "日报线索NEV源")
+        self.assertEqual(LEADS_NEV_GETDATA, LEADS_NEV_DIR / "getdata.py")
 
-    def test_patch_report_config_builder_respects_explicit_end_date(self) -> None:
-        config = FakeReportConfig("store_previous_period", "2026-08-01", "2026-08-15")
-        module = types.SimpleNamespace(build_report_configs=lambda _args: [config])
-
-        patch_report_config_builder(module)
-        actual = module.build_report_configs(types.SimpleNamespace(end_date="2026-08-15"))
-
-        self.assertEqual(actual, [config])
-
-    def test_patch_report_configs_switches_target_route_and_parameter_template(self) -> None:
-        report_configs_module = types.SimpleNamespace(
-            REPORT_URL="https://example.com/old",
-            REPORT_CONFIGS={
-                "store_current_period": {
-                    "report_name": "NEV本期",
-                    "report_url": "https://example.com/old",
-                    "parameterized_prepare_parameters": {"区域显示": "2"},
-                },
-                "store_same_period": {
-                    "report_name": "NEV同期",
-                    "report_url": "https://example.com/old",
-                    "parameterized_prepare_parameters": {"区域显示": "2"},
-                },
-                "store_previous_period": {
-                    "report_name": "NEV上期",
-                    "report_url": "https://example.com/old",
-                    "parameterized_prepare_parameters": {"区域显示": "2"},
-                },
-                "unrelated": {
-                    "report_name": "不相关报表",
-                    "report_url": "https://example.com/keep",
-                    "parameterized_prepare_parameters": {"keep": "1"},
-                },
-            },
-        )
-
+    def test_patch_report_configs_clones_national_daily_with_requested_filters(self) -> None:
+        base_config = build_base_config()
+        report_configs_module = types.SimpleNamespace(REPORT_CONFIGS={BASE_REPORT_KEY: base_config})
         original_module = sys.modules.get("report_fetcher.report_configs")
         sys.modules["report_fetcher.report_configs"] = report_configs_module
         try:
@@ -96,213 +83,78 @@ class RunArrivalNevExportsTests(unittest.TestCase):
             else:
                 sys.modules["report_fetcher.report_configs"] = original_module
 
-        self.assertEqual(report_configs_module.REPORT_URL, TARGET_REPORT_URL)
-        for report_key in TARGET_REPORT_KEYS:
-            config = report_configs_module.REPORT_CONFIGS[report_key]
-            self.assertEqual(config["report_url"], TARGET_REPORT_URL)
-            self.assertIsNone(config["report_tab"])
-            self.assertEqual(config["parameterized_prepare_strategy"], "interact_then_load")
-            self.assertEqual(config["parameterized_prepare_parameters"], TARGET_PARAMETER_TEMPLATE)
-            self.assertIsNot(config["parameterized_prepare_parameters"], TARGET_PARAMETER_TEMPLATE)
+        self.assertEqual(TARGET_REPORT_KEYS, tuple(item[0] for item in TARGET_REPORT_DEFINITIONS))
+        self.assertEqual(report_configs_module.REPORT_CONFIGS[BASE_REPORT_KEY], base_config)
+        for report_key, report_name, start_date, end_date in TARGET_REPORT_DEFINITIONS:
+            with self.subTest(report_key=report_key):
+                config = report_configs_module.REPORT_CONFIGS[report_key]
+                parameters = config["parameterized_prepare_parameters"]
+                combo_values = {item["label"]: item["value"] for item in config["combo_parameters"]}
+                tag_values = {item["label"]: item["value"] for item in config["tag_combo_parameters"]}
+                checkbox_values = {
+                    item["label"]: item["checked"] for item in config["checkbox_parameters"]
+                }
 
-        self.assertEqual(
-            report_configs_module.REPORT_CONFIGS["store_current_period"]["report_name"],
-            "NEV本期",
-        )
-        self.assertEqual(
-            report_configs_module.REPORT_CONFIGS["unrelated"],
-            {
-                "report_name": "不相关报表",
-                "report_url": "https://example.com/keep",
-                "parameterized_prepare_parameters": {"keep": "1"},
-            },
-        )
-        self.assertEqual(TARGET_REPORT_NAME, "来店批次分车系汇总表_按天")
+                self.assertEqual(config["report_name"], report_name)
+                self.assertEqual(config["report_url"], base_config["report_url"])
+                self.assertEqual(config["start_date"], start_date)
+                self.assertEqual(config["end_date"], end_date)
+                self.assertEqual(parameters["core_filters"]["区域显示"], "0")
+                self.assertEqual(parameters["core_filters"]["营业状态"], [])
+                self.assertEqual(parameters["display_options"]["时间统计方式"], "3")
+                self.assertEqual(parameters["display_options"]["展示类型"], CUSTOM_DISPLAY_TYPE)
+                self.assertEqual(parameters["display_options"]["展示字段"], CUSTOM_DISPLAY_FIELDS)
+                self.assertFalse(parameters["summary_flags"]["车系汇总"])
+                self.assertEqual(combo_values["时间统计方式："], "日")
+                self.assertEqual(combo_values["区域显示："], "全国")
+                self.assertEqual(combo_values["指标展示："], CUSTOM_DISPLAY_TYPE)
+                self.assertEqual(tag_values["指标筛选："], CUSTOM_DISPLAY_FIELDS)
+                self.assertFalse(checkbox_values["基准车系汇总"])
 
-    def test_patch_report_configs_requires_all_target_keys(self) -> None:
-        report_configs_module = types.SimpleNamespace(
-            REPORT_URL="https://example.com/old",
-            REPORT_CONFIGS={"store_current_period": copy.deepcopy(TARGET_PARAMETER_TEMPLATE)},
-        )
+    def test_patch_date_resolver_adds_previous_month_last_day(self) -> None:
+        def original_resolver(config_value, fallback, _business_date=None):
+            return fallback if not isinstance(config_value, dict) else str(config_value.get("rule") or fallback)
 
-        original_module = sys.modules.get("report_fetcher.report_configs")
-        sys.modules["report_fetcher.report_configs"] = report_configs_module
+        models_module = types.SimpleNamespace(
+            _resolve_date_value=original_resolver,
+            parse_business_date=lambda value=None: value if isinstance(value, date) else date.fromisoformat(value),
+        )
+        original_module = sys.modules.get("report_fetcher.models")
+        sys.modules["report_fetcher.models"] = models_module
         try:
-            with self.assertRaisesRegex(RuntimeError, "NEV 来店导出配置缺少报表 key"):
-                patch_report_configs()
+            patch_date_resolver()
+            actual = models_module._resolve_date_value(
+                {"rule": PREVIOUS_MONTH_LAST_DAY_RULE},
+                "fallback",
+                date(2026, 9, 10),
+            )
         finally:
             if original_module is None:
-                sys.modules.pop("report_fetcher.report_configs", None)
+                sys.modules.pop("report_fetcher.models", None)
             else:
-                sys.modules["report_fetcher.report_configs"] = original_module
+                sys.modules["report_fetcher.models"] = original_module
 
-    def test_parse_report2_daily_series_decodes_dates_from_custom_chart_html(self) -> None:
-        html = """
-        <div widgetname="REPORT2">
-          <svg>
-            <g clip-path="url(#plot)">
-              <g transform="translate(41,11)">
-                <line y1="434.5" y2="434.5" x1="0" x2="1443"></line>
-                <line y1="347.5" y2="347.5" x1="0" x2="1443"></line>
-                <line y1="260.5" y2="260.5" x1="0" x2="1443"></line>
-                <line y1="173.5" y2="173.5" x1="0" x2="1443"></line>
-                <line y1="86.5" y2="86.5" x1="0" x2="1443"></line>
-                <line y1="0.5" y2="0.5" x1="0" x2="1443"></line>
-              </g>
-              <g class="clipSeriesGroup">
-                <g transform="translate(41,11)" class="vancharts-series-0 line">
-                  <path d="M0,347.7L10,260.9L20,174.1" />
-                </g>
-              </g>
-              <g>
-                <text _x="29.67" _y="437.66">0</text>
-                <text _x="7.68" _y="350.86">1000</text>
-                <text _x="7.68" _y="264.06">2000</text>
-                <text _x="7.68" _y="177.26">3000</text>
-                <text _x="7.68" _y="90.46">4000</text>
-                <text _x="7.68" _y="3.66">5000</text>
-                <text _x="38.70" _y="456.66">2026-04-01</text>
-                <text _x="176.13" _y="456.66">2026-04-03</text>
-              </g>
-            </g>
-        </div>
-        <div widgetname="自定义来店量"></div>
-        """
+        self.assertEqual(actual, "2026-08-31")
 
-        actual = parse_report2_daily_series(html, date(2026, 4, 1), date(2026, 4, 3))
+    def test_validate_export_date_range_requires_every_configured_day(self) -> None:
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet["C1"] = "日期"
+        worksheet["E1"] = "到店转化"
+        worksheet["E2"] = "新增到店量"
+        worksheet["C3"] = date(2026, 9, 1)
+        worksheet["E3"] = 10
+        worksheet["C4"] = date(2026, 9, 3)
+        worksheet["E4"] = 20
+        workbook.save(self.temp_path)
+        workbook.close()
 
-        self.assertEqual(
-            actual,
-            [
-                (date(2026, 4, 1), 1000),
-                (date(2026, 4, 2), 2000),
-                (date(2026, 4, 3), 3000),
-            ],
-        )
-
-    def test_extract_simplechart_meta_from_page_result_reads_chart_id_and_ec_name(self) -> None:
-        page_result = [
-            [
-                {
-                    "position": {"x": 0, "y": 1},
-                    "value": json_dumps(
-                        {
-                            "type": "simplechart",
-                            "items": [
-                                {
-                                    "url": "?op=chart&cmd=writer_out_html&sessionID=session-1&chartID=Cells__A2__A2__abc__index__0&sheetIndex=0&ecName=report2",
-                                    "simpleChartInShowID": "Cells__A2__A2__abc__index__0",
-                                }
-                            ],
-                        }
-                    ),
-                }
-            ]
-        ]
-
-        actual = extract_simplechart_meta_from_page_result(page_result)
-
-        self.assertEqual(actual.chart_id, "Cells__A2__A2__abc__index__0")
-        self.assertEqual(actual.ec_name, "REPORT2")
-
-    def test_extract_daily_rows_from_chart_payload_filters_target_range(self) -> None:
-        payload = {
-            "chartAttr": {
-                "series": [
-                    {
-                        "name": "来店量",
-                        "data": [
-                            {"originalCategory": "2026-03-31", "y": "99"},
-                            {"originalCategory": "2026-04-01", "y": "100"},
-                            {"originalCategory": "2026-04-02", "y": "250"},
-                            {"originalCategory": "2026-04-03", "y": "300"},
-                        ],
-                    }
-                ]
-            }
-        }
-
-        actual = extract_daily_rows_from_chart_payload(payload, date(2026, 4, 1), date(2026, 4, 3))
-
-        self.assertEqual(
-            actual,
-            [
-                (date(2026, 4, 1), 100),
-                (date(2026, 4, 2), 250),
-                (date(2026, 4, 3), 300),
-            ],
-        )
-
-    def test_build_chart_data_url_reuses_prepare_origin_and_session(self) -> None:
-        actual = build_chart_data_url(
-            "https://example.com/webroot/decision/view/fit/form/load/content?_=123",
-            "session-1",
-            "Cells__A2__A2__abc__index__0",
-            "REPORT2",
-        )
-
-        self.assertIn("/webroot/decision/view/fit/form/chart/data", actual)
-        self.assertIn("sessionID=session-1", actual)
-        self.assertIn("chartID=Cells__A2__A2__abc__index__0", actual)
-        self.assertIn("ecName=REPORT2", actual)
-
-    @patch("scripts.run_arrival_nev_exports.capture_custom_chart_series")
-    @patch("scripts.run_arrival_nev_exports.capture_custom_chart_series_via_api")
-    def test_capture_daily_rows_switches_to_slow_browser_query_after_missing_dates(
-        self,
-        capture_via_api: Mock,
-        capture_via_browser: Mock,
-    ) -> None:
-        expected = [(date(2026, 8, 23), 123)]
-        capture_via_api.side_effect = RuntimeError("chart.data 返回的自定义来店按日数据缺少日期：2026-08-23")
-        capture_via_browser.return_value = expected
-        module = types.SimpleNamespace(log=Mock())
-        datetest_module = object()
-        page = object()
-        export_context = object()
-        filter_config = object()
-        trace_dir = Path("trace")
-
-        actual, browser_query = capture_daily_rows(
-            module,
-            datetest_module,
-            page,
-            export_context,
-            filter_config,
-            trace_dir,
-            query_wait_ms=300_000,
-        )
-        repeated, repeated_browser_query = capture_daily_rows(
-            module,
-            datetest_module,
-            page,
-            export_context,
-            filter_config,
-            trace_dir,
-            query_wait_ms=300_000,
-            force_browser_query=browser_query,
-        )
-
-        self.assertEqual(actual, expected)
-        self.assertEqual(repeated, expected)
-        self.assertTrue(browser_query)
-        self.assertTrue(repeated_browser_query)
-        capture_via_api.assert_called_once_with(export_context, filter_config, trace_dir)
-        self.assertEqual(capture_via_browser.call_count, 2)
-        capture_via_browser.assert_called_with(
-            module,
-            datetest_module,
-            page,
-            filter_config,
-            trace_dir,
-            timeout_ms=300_000,
-        )
-
-
-def json_dumps(value: dict) -> str:
-    import json
-
-    return json.dumps(value, ensure_ascii=False)
+        with self.assertRaisesRegex(RuntimeError, UPSTREAM_DATE_NOT_READY_MARKER):
+            validate_export_date_range(
+                self.temp_path,
+                "2026-09-01",
+                "2026-09-03 23:59:59",
+            )
 
 
 if __name__ == "__main__":

@@ -882,6 +882,31 @@ class BuildDashboardValidationTests(unittest.TestCase):
 
         self.assertEqual(list(actual.values())[:2], [1187, 1006])
 
+    def test_load_arrival_daily_sheet_aggregates_national_daily_nev_rows(self) -> None:
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet["A1"] = "序号"
+        sheet["B1"] = "区域"
+        sheet["C1"] = "日期"
+        sheet["D1"] = "意向基准车系"
+        sheet["E1"] = "到店转化"
+        sheet["E2"] = "新增到店量"
+        sheet.append([None, None, None, "合计", 999])
+        sheet.append([1, "全国", date(2026, 9, 1), None, 0])
+        sheet.append([2, "全国", date(2026, 9, 1), "N6", 97])
+        sheet.append([3, "全国", date(2026, 9, 1), "N7", 77])
+        sheet.append([4, "全国", date(2026, 9, 2), "NX8", 319])
+
+        actual = load_arrival_daily_sheet(sheet)
+
+        self.assertEqual(
+            actual,
+            {
+                date(2026, 9, 1): 174,
+                date(2026, 9, 2): 319,
+            },
+        )
+
     def test_validate_workbook_structure_requires_expected_sheets(self) -> None:
         leads = Workbook()
         arrival = Workbook()

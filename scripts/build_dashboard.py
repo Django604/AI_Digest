@@ -1290,15 +1290,35 @@ def aligned_previous_year_date(current_date: date) -> date | None:
 
 
 def load_arrival_daily_sheet(ws) -> dict[date, int | float]:
+    date_column = value_column = None
+    header_row = 0
+    for row_index, row in enumerate(
+        ws.iter_rows(min_row=1, max_row=min(ws.max_row, 5), values_only=True),
+        start=1,
+    ):
+        for column_index, value in enumerate(row, start=1):
+            header = str(value).strip() if value not in (None, "") else ""
+            if header == "日期":
+                date_column = column_index
+                header_row = max(header_row, row_index)
+            elif header in {"来店量", "新增到店量"}:
+                value_column = column_index
+                header_row = max(header_row, row_index)
+
+    if date_column is None and value_column is None:
+        date_column, value_column = 1, 2
+    elif date_column is None or value_column is None:
+        raise ValueError(f"工作表 '{ws.title}' 未同时识别到日期和来店量列。")
+
     result: dict[date, int | float] = {}
-    for row in ws.iter_rows(min_row=1, values_only=True):
-        if len(row) < 2:
+    for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
+        if len(row) < max(date_column, value_column):
             continue
-        current_date = coerce_date(row[0])
-        current_value = num(row[1])
+        current_date = coerce_date(row[date_column - 1])
+        current_value = num(row[value_column - 1])
         if current_date is None or current_value is None:
             continue
-        result[current_date] = current_value
+        result[current_date] = (result.get(current_date) or 0) + current_value
     return result
 
 

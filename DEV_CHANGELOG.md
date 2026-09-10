@@ -1312,3 +1312,13 @@
 - 验证结果：AI_Digest 全量测试 `136/136` 通过，Python 编译、Node 语法、JSON 解析、UTF-8 BOM 与 `git diff --check` 均通过。
 - 涉及文件：`scripts/build_dashboard.py`、`docs/assets/app.js`、对应测试与文档、live / 2026-09 Dashboard 数据。
 - 关联提交（如有）：待补充
+
+## 2026-09-10 16:20 NEV 来店切换全国按日数据源
+- 需求 / 目标：将 `NEV+ICE_ldai.xlsm` 的 `NEV本期来店`、`NEV上期来店`、`NEV同期来店` 切换为与 `NEV+ICE_xsai.xlsm` 的 `全国按日NEV` 相同 FineReport 数据源。
+- 改动内容：NEV 来店导出改为复用全国按日 NEV 报表；筛选固定为时间统计方式“日”、区域显示“全国”、指标展示“自定义展示”、指标筛选“到店转化,新增到店量”，并取消“基准车系汇总”；清空默认营业状态筛选。本期日期保持月初至业务日，上期和同期保持完整自然月。
+- 兼容处理：保留新来源的双层表头、车型明细和 5 列导出结构；Dashboard 构建器按日期汇总全部车型的“新增到店量”，同时兼容原两列表；目标日期缺失时继续输出稳定的上游未发布标记，供现有整批日期回退流程识别。
+- 真实数据：以最新完整业务日 `2026-09-09` 回填源工作簿；本期 `2026-09-01 ~ 2026-09-09` 合计 `7,653`，上期完整 `2026-08-01 ~ 2026-08-31` 合计 `39,863`，同期完整 `2025-09-01 ~ 2025-09-30` 合计 `38,709`；重建后全国累计来店 `16,462`、当日 `1,551`，NEV 当日 `695`。
+- 数据保护：除三张目标 sheet 外，`NEV+ICE_ldai.xlsm` 其余 sheet 内容未变，VBA 内容哈希未变；ICE 数据及既有探陆停更逻辑未变。
+- 验证结果：新来源专项测试 `65/65`、AI_Digest 全量测试 `132/132` 通过；Python 编译、Node 语法、JSON 解析、工作簿 ZIP、UTF-8 BOM 与 `git diff --check` 均通过。
+- 涉及文件：`scripts/run_arrival_nev_exports.py`、`scripts/fetch_daily_data.py`、`scripts/build_dashboard.py`、对应测试与文档、`data/source/NEV+ICE_ldai.xlsm`、live / `2026-09` Dashboard 数据。
+- 关联提交（如有）：待补充

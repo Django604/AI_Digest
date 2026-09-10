@@ -90,7 +90,7 @@ ARRIVAL_FETCH_TASKS = (
         script_path=ARRIVAL_NEV_WRAPPER_SCRIPT,
         output_subdir="arrival-nev",
         report_keys=("store_current_period", "store_previous_period", "store_same_period"),
-        extra_args=("--safe-bootstrap", "--capture-wait-ms", "300000"),
+        extra_args=("--capture-wait-ms", "30000"),
     ),
     FetchTask(
         label="ICE 来店本期 + 上期 + 同期",

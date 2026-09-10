@@ -28,10 +28,10 @@
 - `requirements.txt`：Python 依赖清单（包含每日取数所需的 Playwright Python 包）
 - `scripts/build_dashboard.py`：从 Excel 抽取页面数据
 - `scripts/purge_jsdelivr_cache.py`：遗留 CDN 诊断工具，不接入正式发布流程
-- `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，默认抓取线索 + 来店共 10 张日报表并回填两本工作簿；`--leads-only` 只更新 `NEV+ICE_xsai.xlsm` 中 4 张全国按日线索表；NEV 线索参数上下文最多等待 `30s`，NEV 来店安全初始化最多等待 `300s`，缺日后的网页查询最多等待 `600s`；兼容 NEV / ICE 上期来店的不同导出日期后缀；十五代轩逸历史数据保留但不再更新或展示
+- `scripts/fetch_daily_data.py`：复用日报取数平台登录逻辑，默认抓取线索 + 来店共 10 张日报表并回填两本工作簿；`--leads-only` 只更新 `NEV+ICE_xsai.xlsm` 中 4 张全国按日线索表；NEV 线索和来店参数上下文最多等待 `30s`；兼容 NEV / ICE 上期来店的不同导出日期后缀；十五代轩逸历史数据保留但不再更新或展示
 - `scripts/run_leads_nev_exports.py`：NEV 线索全国按日导出包装器，运行时清空 FineReport 默认 `营业状态` 筛选，并抓取去年同期完整自然月
 - `scripts/run_leads_ice_exports.py`：ICE 线索全国按日导出包装器，运行时扩展日期规则并抓取去年同期完整自然月
-- `scripts/run_arrival_nev_exports.py`：NEV 来店导出包装器，优先通过 FineReport 后台 `chart.data` 抓取按日序列；本期截止业务日，上期与同期抓取完整自然月；接口缺少目标日期时自动切到网页 `自定义` tab 查询并等待完整图表
+- `scripts/run_arrival_nev_exports.py`：NEV 来店导出包装器，复用线索的“全国按日 NEV”报表；固定筛选为日、全国、自定义展示、到店转化 / 新增到店量且不勾选基准车系汇总，本期截止业务日，上期与同期抓取完整自然月
 - `scripts/run_arrival_ice_exports.py`：ICE 来店导出包装器，运行时把 Tableau 导出入口锁定到 `来店批次分车系汇总表_按天T`；本期截止业务日，上期与同期抓取完整自然月
 - `scripts/scheduled_update_runner.py`：定时自动更新执行入口，支持登录态弹窗执行与失败后的二次静默更新
 - `scripts/register_daily_update_task.ps1`：Windows 计划任务注册脚本，默认注册“登录态首轮更新 + 未成功时静默兜底”两条计划任务
@@ -56,7 +56,7 @@
    服务端会默认把页面/API 访问记录写到 `.runtime/access_logs/visits-YYYYMMDD.jsonl`，其中包含 `clientIp`、时间、路径、状态码和 `User-Agent`，不会显示在前端页面
 6. 手动兜底更新与“保存当前月为历史数据”已迁移到 `附魔工作台`，本页面只保留静态数据浏览、截图导出和月份切换能力
 7. 如需指定业务日期或保留运行痕迹排查问题，可直接执行 `python scripts/fetch_daily_data.py --business-date 2026-04-20 --keep-runtime`
-   其中两张线索同期表按去年同月周期抓取；`全国按日` 会通过内部包装器清空 FineReport 默认 `营业状态` 筛选；NEV 来店本期/上期/同期通过 FineReport 后台 `chart.data` 导出链；ICE 来店本期/上期/同期通过 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
+   其中两张线索同期表按去年同月周期抓取；`全国按日` 会通过内部包装器清空 FineReport 默认 `营业状态` 筛选；NEV 来店本期/上期/同期复用同一全国按日 NEV 报表并只导出新增到店量；ICE 来店本期/上期/同期通过 `来店批次分车系汇总表_按天T` 的 Tableau 交叉表缩略图入口
 8. 如需让这台电脑每天自动更新，可执行 `powershell -ExecutionPolicy Bypass -File scripts/register_daily_update_task.ps1`
    默认会注册两条每天自动运行的 Windows 计划任务：`09:00` 的登录态交互任务会弹出流程窗口；如果首轮失败，窗口会提示“已进入二次更新”，`09:20` 的静默兜底任务再以 `SYSTEM` 服务账号执行；首轮已经成功时，`09:20` 只记录“二次更新无需执行”，不会重复抓取数据
 9. 如果你在 `09:00` 左右已经登录 Windows，就会看到启动窗口；2 分钟内没有点击“开始更新”也没事，系统会自动继续执行，执行过程中窗口不会消失，而是显示完成进度条，最终在同一窗口展示更新结果后自动关闭

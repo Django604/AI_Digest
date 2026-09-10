@@ -43,7 +43,7 @@ class FetchDailyDataTests(unittest.TestCase):
         arrival_nev_task = next(task for task in FETCH_TASKS if task.label == "NEV 来店本期 + 上期 + 同期")
 
         self.assertEqual(nev_task.extra_args, ("--capture-wait-ms", "30000"))
-        self.assertEqual(arrival_nev_task.extra_args, ("--safe-bootstrap", "--capture-wait-ms", "300000"))
+        self.assertEqual(arrival_nev_task.extra_args, ("--capture-wait-ms", "30000"))
         self.assertEqual(
             ice_task.report_keys,
             ("ice_national_daily", "ice_national_daily_same_period"),

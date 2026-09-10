@@ -79,11 +79,11 @@
   - 脚本运行成功后会自动清理 `.runtime/daily_update/` 临时目录；若带 `--keep-runtime`，会保留导出文件与日志便于排查
   - NEV 线索中的 `全国按日` 会通过 `scripts/run_leads_nev_exports.py` 内部包装器复用 `日报线索NEV源`，并在运行时显式清空 FineReport 平台默认的 `营业状态` 筛选，避免只取 `营业店`
   - NEV 线索共享初始化的参数上下文等待上限为 `30000ms`；上下文稳定后会提前继续，用于兼容网络较慢时 `load/content` 晚于默认 `10000ms` 到达的情况
-  - NEV 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_nev_exports.py` 内部包装器复用 `日报来店NEV源` 的登录态与参数模板，并优先执行 `tab/execute -> REPORT2 -> chart.data` 抓取自定义按日序列；本期结束日保持业务日，上期和同期自动扩展到各自自然月月末；接口缺少目标日期时自动切换到真实网页查询，初始化等待上限为 `300000ms`，网页图表等待上限为 `600000ms`，适配实际查询需要 240 秒以上的慢加载场景；图表按目标日期数对应的折线点和刻度是否可解析判断完成，不再依赖首尾日期文本是否出现在 HTML；切换后其余来店报表继续沿用网页模式，避免混用旧接口会话
+  - NEV 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_nev_exports.py` 复用 `日报线索NEV源` 的“全国按日 NEV”报表，固定使用“时间统计方式=日、区域显示=全国、指标展示=自定义展示、指标筛选=到店转化 / 新增到店量、基准车系汇总=False”；本期结束日保持业务日，上期和同期自动扩展到各自自然月月末，参数上下文等待上限为 `30000ms`
   - ICE 来店中的 `本期/上期/同期` 会通过 `scripts/run_arrival_ice_exports.py` 内部包装器强制把 Tableau 交叉表缩略图入口锁定到 `来店批次分车系汇总表_按天T`；本期结束日保持业务日，上期和同期自动扩展到各自自然月月末
   - NEV / ICE 上期来店在汇总时兼容导出器的两种命名方式：可使用本次业务日后缀，也可使用上期实际结束日后缀；非上期报表仍严格匹配本次业务日
   - 每项抓取任务结束后会校验预期 Excel 数量；即使底层导出器跳过失败报表但返回成功退出码，仍会触发现有任务级重试
-  - 当 NEV 来店后台接口缺少目标结束日，且等待完整网页查询后 `REPORT2` 点位仍只到前一天时，会输出“上游 NEV 来店数据尚未发布目标日期”并停止当前日期的重复抓取；附魔工作台据此整批回退一天，避免两本工作簿混用不同业务日
+  - NEV 来店新导出保留“日期 × 意向基准车系”的 5 列明细结构；Dashboard 按“日期”汇总“新增到店量”，并继续兼容历史两列“日期 / 来店量”工作表
   - 该脚本只负责本地更新；静态部署到 `GitHub Pages` 后不会自动具备浏览器取数能力
 
 ## scripts/run_leads_nev_exports.py
@@ -112,15 +112,14 @@
 ## scripts/run_arrival_nev_exports.py
 
 - 路径：`./scripts/run_arrival_nev_exports.py`
-- 作用：作为 `日报来店NEV源/getdata.py` 的轻量包装器，对 `NEV本期/上期/同期来店` 切换到 `自定义` tab，并通过后台 `chart.data` 接口提取按日数据
+- 作用：作为 `日报线索NEV源/getdata.py` 的轻量包装器，基于“全国按日 NEV”生成 `NEV本期/上期/同期` 新增到店量明细
 - 使用方法：
   - 一般不单独调用，由 `python scripts/fetch_daily_data.py ...` 自动串联
-  - 需要单独验证时可执行：`python scripts/run_arrival_nev_exports.py --business-date 2026-04-21 --report-keys store_current_period,store_previous_period,store_same_period --safe-bootstrap --capture-wait-ms 300000`
+  - 需要单独验证时可执行：`python scripts/run_arrival_nev_exports.py --business-date 2026-09-10 --report-keys store_current_period,store_previous_period,store_same_period --capture-wait-ms 30000`
 - 备注：
-  - 该包装器不会改动兄弟项目源码，只在运行时修正目标报表 URL、参数模板和导出策略
-  - 默认更新时，本期仍取月初至业务日，上期与同期取各自完整自然月；显式传入 `--end-date` 时尊重人工结束日
-  - 若 `REPORT2 load/content` 直接返回的不是按日两列表，而是“合计值 + simplechart”，包装器会继续从 `simplechart` 里提取 `chartID` 与 `ecName`，再请求 `chart.data` 还原每日来店量
-  - 若 `chart.data` 尚未包含目标结束日期，包装器会复用已经完成初始化的当前报表页，改用页面日期控件和“查询”按钮，并最多等待 `600000ms` 取得可完整解析的 `REPORT2` 图表；“近一年 / 近一周 / 自定义”页签由 FineReport 绘制在 `TABPANE0` canvas 上，文本定位不可用时会按画布内第三个页签坐标点击“自定义”；后续报表保持网页查询模式，不会重新导航并丢失已建立的报表会话；超时时会在对应 `_trace` 目录保存页面 HTML 和截图
+  - 该包装器不会改动兄弟项目源码，只在运行时深拷贝 `national_daily` 配置并扩展日期 resolver
+  - 三份报表固定为“日 / 全国 / 自定义展示 / 到店转化·新增到店量 / 不勾选基准车系汇总”，并清空 FineReport 默认营业状态筛选
+  - 本期为当月首日至业务日，上期为上月完整自然月，同期为去年同月完整自然月；导出 Excel 保留平台原始 5 列车型明细结构
 
 ## scripts/run_arrival_ice_exports.py
 
