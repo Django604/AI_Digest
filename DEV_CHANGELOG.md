@@ -1365,3 +1365,10 @@
 - 验证结果：专项测试、Node 语法与 `git diff --check` 通过；Playwright 在 `1440px` 和 `425px` 视口验证目标说明完整可见，第二行 `scrollWidth` 与 `clientWidth` 一致。
 - 涉及文件：`docs/assets/styles.css`、`tests/test_public_entry.py`、`DEV_CHANGELOG.md`。
 - 关联提交（如有）：待补充
+
+## 2026-09-16 15:49 全车系简报达成率文案调整
+- 需求 / 目标：将每日简报“全车系有效线索”卡片中的“累计达成率”改为“月度目标达成率”。
+- 改动内容：仅调整全车系简报生成文案并重建 live 与 `2026-09` 归档；NEV 各车型的累计达成率、趋势摘要字段及所有计算口径保持不变。
+- 验证结果：生成器专项测试通过；Playwright 在 `1440px` 与 `425px` 视口确认新文案完整显示且无横向溢出。
+- 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`docs/data/dashboard.json`、`docs/data/monthly/2026-09/dashboard.json`、`DEV_CHANGELOG.md`。
+- 关联提交（如有）：待补充

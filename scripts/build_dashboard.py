@@ -1209,7 +1209,7 @@ def build_valid_leads_brief(
         "title": "全车系有效线索",
         "lines": [
             (
-                f"累计实绩 {fmt_count(cumulative_actual)}，累计达成率 {fmt_percent(achievement)}；"
+                f"累计实绩 {fmt_count(cumulative_actual)}，月度目标达成率 {fmt_percent(achievement)}；"
                 f"同比 {fmt_percent(yoy)}，环比 {fmt_percent(mom)}"
                 f"（目标取值为H2穿透目标{report_date.month}月值）"
             )
