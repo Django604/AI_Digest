@@ -1,3 +1,4 @@
+import json
 import unittest
 import xml.etree.ElementTree as element_tree
 from pathlib import Path
@@ -10,6 +11,7 @@ CLOUDFLARE_PAGES_WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "deploy-clo
 APP_SCRIPT = PROJECT_ROOT / "docs" / "assets" / "app.js"
 STYLESHEET = PROJECT_ROOT / "docs" / "assets" / "styles.css"
 FAVICON = PROJECT_ROOT / "docs" / "favicon.ico"
+MONTHLY_DATA_DIR = PROJECT_ROOT / "docs" / "data" / "monthly"
 
 
 class PublicEntryTests(unittest.TestCase):
@@ -110,6 +112,36 @@ class PublicEntryTests(unittest.TestCase):
             'requestMode === "current" ? (reportMonthKey || liveMonthKey)',
             source,
         )
+
+    def test_backfilled_archives_include_blank_model_valid_leads(self) -> None:
+        expected = {
+            "2026-07": (
+                713233,
+                "累计实绩 713,233，累计达成率 106.7%；同比 -18.6%，环比 -6.9%",
+            ),
+            "2026-08": (
+                746565,
+                "累计实绩 746,565，累计达成率 112.8%；同比 -20.0%，环比 7.8%（目标取值为H2穿透目标8月值）",
+            ),
+        }
+
+        for month, (cumulative_actual, brief_line) in expected.items():
+            payload = json.loads(
+                (MONTHLY_DATA_DIR / month / "dashboard.json").read_text(encoding="utf-8")
+            )
+            section = payload["dashboards"]["lead-control"]["sections"][0]
+            report_index = section["trend"]["chart"]["reportDayIndex"]
+            valid_leads_brief = next(
+                item
+                for item in payload["dashboards"]["brief"]["briefing"]["sections"]
+                if item["kind"] == "valid-leads"
+            )
+
+            self.assertEqual(
+                section["trend"]["chart"]["series"]["cumulativeActual"][report_index],
+                cumulative_actual,
+            )
+            self.assertEqual(valid_leads_brief["lines"], [brief_line])
 
 
 if __name__ == "__main__":
