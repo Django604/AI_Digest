@@ -565,9 +565,10 @@ def load_nev_daily(ws, start_date: date, end_date: date) -> dict[str, dict[date,
     for row in ws.iter_rows(min_row=4, values_only=True):
         current_date = coerce_date(row[2])
         model = row[3]
-        if current_date is None or not model or not (start_date <= current_date <= end_date):
+        if current_date is None or not (start_date <= current_date <= end_date):
             continue
-        result[str(model).strip()][current_date] = {
+        model_name = "" if model is None else str(model).strip()
+        result[model_name][current_date] = {
             "newLeads": num(row[headers["新增线索量"] - 1]),
             "validLeads": num(row[headers["有效线索量"] - 1]),
             "storeLeads": num(row[headers["门店线索总量"] - 1]),

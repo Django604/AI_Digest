@@ -37,6 +37,7 @@ from scripts.build_dashboard import (
     get_day_calendar_meta,
     load_preserved_input_modified_times,
     load_arrival_daily_sheet,
+    load_nev_daily,
     load_valid_leads_monthly_targets,
     resolve_new_pathfinder_targets,
     validate_report_date_cell,
@@ -74,6 +75,14 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         cls.synthetic_date = date(2026, 7, 10)
         cls.synthetic_report_date = date(2026, 7, 13)
         cls.synthetic_nev_daily = {
+            "": {
+                cls.synthetic_date: {
+                    "newLeads": 4,
+                    "validLeads": 3,
+                    "storeLeads": 4,
+                    "arrivals": 0,
+                }
+            },
             "NX8": {
                 cls.synthetic_date: {
                     "newLeads": 10,
@@ -278,6 +287,34 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         ]["actual"][report_index]
 
         self.assertEqual(actual_all_vehicle_valid - actual_without_new_pathfinder, 1)
+
+    def test_lead_control_includes_blank_model_valid_leads(self) -> None:
+        lead_control = self.synthetic_payload["dashboards"]["lead-control"]["sections"][0]
+        actual_all_vehicle_valid = lead_control["trend"]["chart"]["series"]["actual"][
+            self.synthetic_date.day - 1
+        ]
+
+        self.assertEqual(actual_all_vehicle_valid, 11)
+
+    def test_load_nev_daily_keeps_blank_model_rows(self) -> None:
+        workbook = Workbook()
+        worksheet = workbook.active
+        current_date = date(2026, 9, 15)
+        headers = ["新增线索量", "有效线索量", "门店线索总量", "新增到店量"]
+        for column, header in enumerate(headers, start=5):
+            worksheet.cell(2, column, header)
+        worksheet.cell(4, 3, current_date)
+        worksheet.cell(4, 5, 41)
+        worksheet.cell(4, 6, 37)
+        worksheet.cell(4, 7, 41)
+        worksheet.cell(4, 8, 0)
+
+        result = load_nev_daily(worksheet, current_date, current_date)
+
+        self.assertEqual(
+            result[""][current_date],
+            {"newLeads": 41, "validLeads": 37, "storeLeads": 41, "arrivals": 0},
+        )
 
     def test_daily_brief_excludes_new_pathfinder_section(self) -> None:
         sections = self.synthetic_payload["dashboards"]["brief"]["briefing"]["sections"]
