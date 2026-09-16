@@ -615,7 +615,7 @@ button,
 .brief-page-secondary-line {
   display: inline-block;
   max-width: 100%;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .brief-page-card.arrival-brief .brief-page-line {

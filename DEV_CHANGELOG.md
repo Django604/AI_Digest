@@ -1357,3 +1357,11 @@
 - 安全校验：7 月仅有 `343` 个、8 月仅有 `356` 个全车系看板 / 简报叶子值变化，其他 dashboard 与元数据零变化；新增冻结归档回归测试，AI_Digest 全量测试 `135/135`、Python 编译、Node 语法、15 份 JSON 解析及 `git diff --check` 均通过。
 - 涉及文件：`docs/data/monthly/2026-07/dashboard.json`、`docs/data/monthly/2026-08/dashboard.json`、`tests/test_public_entry.py`、`README.md`、`SCRIPTS.md` 及本日志。
 - 关联提交（如有）：待补充
+
+## 2026-09-16 9 月目标说明窄屏显示修复
+- 需求 / 目标：修复 9 月每日简报中“目标取值为 H2 穿透目标 9 月值”在卡片截图或窄屏上看似缺失的问题。
+- 根因：数据生成与 GitHub Pages、Cloudflare Pages 部署产物均包含该文案，但前端将同比起始的第二行强制设为不换行；实际文字宽度超过卡片内容区后，末尾目标说明被裁出可视范围。
+- 改动内容：保留“同比”起始换到第二行的规则，允许第二行在空间不足时自然换行；更新前端回归测试，防止再次启用强制不换行。
+- 验证结果：专项测试、Node 语法与 `git diff --check` 通过；Playwright 在 `1440px` 和 `425px` 视口验证目标说明完整可见，第二行 `scrollWidth` 与 `clientWidth` 一致。
+- 涉及文件：`docs/assets/styles.css`、`tests/test_public_entry.py`、`DEV_CHANGELOG.md`。
+- 关联提交（如有）：待补充
