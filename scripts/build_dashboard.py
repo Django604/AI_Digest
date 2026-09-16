@@ -588,23 +588,6 @@ def load_optional_nev_daily(
     return load_nev_daily(ws, start_date, end_date)
 
 
-def freeze_new_pathfinder_daily(
-    model_daily: dict[str, dict[date, dict[str, int | float | None]]],
-) -> dict[str, dict[date, dict[str, int | float | None]]]:
-    return {
-        model_name: (
-            {
-                current_date: values
-                for current_date, values in series.items()
-                if current_date <= NEW_PATHFINDER_FREEZE_DATE
-            }
-            if model_name == NEW_PATHFINDER_MODEL
-            else series
-        )
-        for model_name, series in model_daily.items()
-    }
-
-
 def load_ice_daily(ws, start_date: date, end_date: date) -> dict[date, dict[str, int | float | None]]:
     headers = header_map(ws, 1)
     result: dict[date, dict[str, int | float | None]] = {}
@@ -1595,15 +1578,11 @@ def build_payload(
             report_date,
             nev_targets.get(NEW_PATHFINDER_MODEL, {}),
         )
-        nev_daily_all = freeze_new_pathfinder_daily(
-            load_nev_daily(leads["全国按日NEV"], previous_start, current_end)
-        )
-        nev_same_period_all = freeze_new_pathfinder_daily(
-            load_optional_nev_daily(
-                leads["全国按日NEV-同期"],
-                same_period_start,
-                same_period_end,
-            )
+        nev_daily_all = load_nev_daily(leads["全国按日NEV"], previous_start, current_end)
+        nev_same_period_all = load_optional_nev_daily(
+            leads["全国按日NEV-同期"],
+            same_period_start,
+            same_period_end,
         )
         ice_daily_all = load_ice_daily(leads["全国按日ICE"], previous_start, current_end)
         ice_same_period_all = load_optional_ice_daily(
@@ -1681,10 +1660,16 @@ def build_payload(
             )
         ]
         for section_id, title, model_name in NEV_DETAIL_MODELS:
+            section_actuals = nev_current.get(model_name, {})
             if section_id == "new-pathfinder":
                 if report_date > month_end(NEW_PATHFINDER_FREEZE_DATE):
                     continue
                 section_report_date = min(report_date, NEW_PATHFINDER_FREEZE_DATE)
+                section_actuals = {
+                    current_date: values
+                    for current_date, values in section_actuals.items()
+                    if current_date <= section_report_date
+                }
             else:
                 section_report_date = report_date
             nev_sections.append(
@@ -1692,7 +1677,7 @@ def build_payload(
                     section_id,
                     title,
                     section_report_date,
-                    nev_current.get(model_name, {}),
+                    section_actuals,
                     nev_previous.get(model_name, {}),
                     nev_targets.get(model_name, {}),
                 )

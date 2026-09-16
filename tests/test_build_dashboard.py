@@ -303,7 +303,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertNotIn("2026款探陆", self.synthetic_payload["dashboards"]["brief"]["briefing"]["generatedText"])
         self.assertFalse(any("2026款探陆" in line for line in sections_by_kind["nev"]["lines"]))
 
-    def test_new_pathfinder_freezes_after_september_9(self) -> None:
+    def test_new_pathfinder_section_freezes_but_lead_control_keeps_later_data(self) -> None:
         after_freeze = NEW_PATHFINDER_FREEZE_DATE.replace(day=10)
         synthetic_nev_daily = {
             "2026款探陆": {
@@ -323,6 +323,9 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         }
         with (
             patch("scripts.build_dashboard.load_nev_daily", return_value=synthetic_nev_daily),
+            patch("scripts.build_dashboard.load_optional_nev_daily", return_value={}),
+            patch("scripts.build_dashboard.load_ice_daily", return_value={}),
+            patch("scripts.build_dashboard.load_optional_ice_daily", return_value={}),
             patch("scripts.build_dashboard.load_nev_targets", return_value={}),
             patch("scripts.build_dashboard.NEW_PATHFINDER_TARGET_OVERRIDES", {}),
         ):
@@ -342,6 +345,11 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertEqual(cards["当日新增线索"]["value"], 9)
         self.assertEqual(cards["当日新增线索"]["note"], "2026-09-09")
         self.assertEqual(section["trend"]["chart"]["reportDayIndex"], 8)
+
+        lead_control = payload["dashboards"]["lead-control"]["sections"][0]["trend"]
+        report_index = lead_control["chart"]["reportDayIndex"]
+        self.assertEqual(lead_control["chart"]["series"]["actual"][report_index], 50)
+        self.assertEqual(lead_control["chart"]["series"]["cumulativeActual"][report_index], 54)
 
     def test_new_pathfinder_section_is_hidden_after_september(self) -> None:
         with (
