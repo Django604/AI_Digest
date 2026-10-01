@@ -1,7 +1,7 @@
 {
   "generatedAt": "2026-10-01T09:05:22",
-  "reportDate": "2026-09-30",
-  "reportDateLabel": "2026-09-30",
+  "reportDate": "2026-10-01",
+  "reportDateLabel": "2026 年 10 月待更新",
   "inputs": {
     "workbook": "D:/WorkCode/AI_Digest/data/source/NEV+ICE_xsai.xlsm",
     "workbookName": "NEV+ICE_xsai.xlsm",
@@ -38,9 +38,7 @@
     "issueCount": 4
   },
   "warnings": [
-    "线索简报按底层数据重建，避免继续沿用历史模板文案。",
-    "全国来店简报与趋势基于本期、上期共 4 张来店底表聚合生成。",
-    "历史底表继续保留，页面与每日简报不再展示。",
-    "2026款探陆保留截至 2026-09-09 的历史趋势，后续数据停止更新且 2026-10 起不再展示板块。"
-  ]
+    "新月份数据尚未刷新，当前为占位空白面板。"
+  ],
+  "blankMonth": true
 }
