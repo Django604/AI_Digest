@@ -9,6 +9,8 @@
 
 每次将 `main` 分支推送到 GitHub 后，`Deploy Dashboard To Pages` 与 `Deploy Dashboard To Cloudflare Pages` 会分别完成测试、数据重建和站点部署，任一平台失败都不会关闭或替换另一平台。
 
+Git 推送成功仅表示提交已上传，网页是否更新取决于两条 workflow 的部署结果。附魔工作台分别显示 Git 推送与双站部署状态，按发布提交 SHA 查询对应 Actions；只有两站都部署成功才显示整体成功，查询不可用时明确显示结果待确认。
+
 ## 为什么不用 Django
 
 `GitHub Pages` 只能托管静态内容，不能运行 Django 服务端代码。这个项目改用：

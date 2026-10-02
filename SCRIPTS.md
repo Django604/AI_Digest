@@ -1,6 +1,6 @@
 # 脚本使用手册
 
-最后更新：2026-09-16
+最后更新：2026-10-02
 
 ## scripts/build_dashboard.py
 
@@ -226,6 +226,8 @@
   - `git push` 带 300 秒超时，若被中断会自动重试一次，并在失败时保留完整的阶段与命令信息
   - Python 调用方可传入 `push_if_no_changes=True`，在没有新的发布文件可提交时仍执行 `git push`；默认值为 `False`，原定时更新与更新后自动发布行为不变
   - `git push` 成功即视为本地发布完成；远端两条 workflow 继续并行完成 GitHub Pages 与 Cloudflare Pages 部署
+  - 返回 `publishCommitSha`、`publishPushAttempted` 与 `deploymentStatus`，用于区分 Git 推送结果和后续部署结果；推送成功时部署初始状态为 `pending`，不宣称网页部署成功
+  - 附魔工作台按发布提交 SHA 异步查询双站 Actions，分别展示等待 / 成功 / 失败及运行链接；网络失败或提交信息缺失时显示待确认，只有两条 workflow 都成功才显示整体成功
 
 ## scripts/serve_dashboard.py
 

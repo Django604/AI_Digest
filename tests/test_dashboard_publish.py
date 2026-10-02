@@ -52,6 +52,7 @@ class DashboardPublishTests(unittest.TestCase):
                 dashboard_publish.CommandResult(0, ""),
                 dashboard_publish.CommandResult(0, "docs/data/dashboard.json\n"),
                 dashboard_publish.CommandResult(0, "[main abc1234] Auto publish dashboard data 2026-05-11 (interactive)\n"),
+                dashboard_publish.CommandResult(0, "a" * 40 + "\n"),
             ],
         ), mock.patch(
             "scripts.dashboard_publish._run_command_with_timeout",
@@ -68,6 +69,8 @@ class DashboardPublishTests(unittest.TestCase):
             )
 
         self.assertEqual(actual["publishStatus"], "success")
+        self.assertEqual(actual["publishCommitSha"], "a" * 40)
+        self.assertEqual(actual["deploymentStatus"], "pending")
         self.assertEqual(actual["publishTarget"], "github_pages_and_cloudflare_pages")
         self.assertEqual(actual["publishPagesUrl"], dashboard_publish.PAGES_URL)
         self.assertEqual(actual["publishCloudflarePagesUrl"], dashboard_publish.CLOUDFLARE_PAGES_URL)
@@ -87,6 +90,7 @@ class DashboardPublishTests(unittest.TestCase):
                 dashboard_publish.CommandResult(0, "git@github.com:Django604/AI_Digest.git\n"),
                 dashboard_publish.CommandResult(0, ""),
                 dashboard_publish.CommandResult(0, ""),
+                dashboard_publish.CommandResult(0, "b" * 40 + "\n"),
             ],
         ), mock.patch(
             "scripts.dashboard_publish._run_command_with_timeout",
@@ -100,6 +104,8 @@ class DashboardPublishTests(unittest.TestCase):
 
         self.assertEqual(actual["publishStatus"], "no_changes")
         self.assertEqual(actual["publishPushAttempted"], "true")
+        self.assertEqual(actual["publishCommitSha"], "b" * 40)
+        self.assertEqual(actual["deploymentStatus"], "pending")
         self.assertEqual(actual["publishTarget"], "github_pages_and_cloudflare_pages")
         self.assertEqual(actual["publishPagesUrl"], dashboard_publish.PAGES_URL)
         self.assertEqual(actual["publishCloudflarePagesUrl"], dashboard_publish.CLOUDFLARE_PAGES_URL)

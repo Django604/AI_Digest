@@ -318,6 +318,11 @@ def publish_dashboard(
             "publishCurrentBranch": current_branch,
             "publishRemoteUrl": remote_url,
             "publishPushAttempted": str(push_if_no_changes).lower(),
+            "publishCommitSha": (
+                _run_git(["rev-parse", "HEAD"], cwd=repo_root).output.strip()
+                if push_if_no_changes else ""
+            ),
+            "deploymentStatus": "pending" if push_if_no_changes else "unchecked",
             "publishTarget": "github_pages_and_cloudflare_pages",
             "publishPagesUrl": PAGES_URL,
             "publishCloudflarePagesUrl": CLOUDFLARE_PAGES_URL,
@@ -330,7 +335,7 @@ def publish_dashboard(
     _push_to_remote(repo_root=repo_root, remote=remote, branch=branch, log=log)
 
     log("")
-    log("Dashboard publish completed successfully.")
+    log("Git push completed successfully; Pages deployment has not been verified.")
     log(f"GitHub Pages deployment will continue at: {PAGES_URL}")
     log(f"Cloudflare Pages deployment will continue at: {CLOUDFLARE_PAGES_URL}")
     log(f"Remote: {remote}")
@@ -348,6 +353,9 @@ def publish_dashboard(
         "publishCommitMessage": resolved_commit_message,
         "publishCurrentBranch": current_branch,
         "publishRemoteUrl": remote_url,
+        "publishPushAttempted": "true",
+        "publishCommitSha": _run_git(["rev-parse", "HEAD"], cwd=repo_root).output.strip(),
+        "deploymentStatus": "pending",
         "publishTarget": "github_pages_and_cloudflare_pages",
         "publishPagesUrl": PAGES_URL,
         "publishCloudflarePagesUrl": CLOUDFLARE_PAGES_URL,

@@ -105,7 +105,7 @@ def build_success_message(result: dict[str, object], started_at: datetime, finis
     publish_status = str(result.get("publishStatus") or "disabled")
     publish_summary = {
         "disabled": "未启用",
-        "success": "已推送，GitHub Pages 与 Cloudflare Pages 自动部署已触发",
+        "success": "Git 推送成功，GitHub Pages 与 Cloudflare Pages 部署结果待确认",
         "no_changes": "没有新的发布文件，双站保持当前版本",
     }.get(publish_status, publish_status)
     dashboard_changed = "是" if bool(result.get("dashboardChanged")) else "否"

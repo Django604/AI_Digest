@@ -160,7 +160,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertNotIn("sylphy15", brief_kinds)
 
     def test_new_pathfinder_section_follows_existing_nev_models(self) -> None:
-        sections = self.payload["dashboards"]["nev"]["sections"]
+        sections = self.synthetic_payload["dashboards"]["nev"]["sections"]
 
         self.assertEqual([section["title"] for section in sections][-2:], ["天籁·鸿蒙座舱", "2026款探陆"])
         self.assertEqual(sections[-1]["id"], "new-pathfinder")

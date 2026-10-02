@@ -78,7 +78,7 @@ class ScheduledUpdateRunnerTests(unittest.TestCase):
         self.assertIn("业务日期：2026-04-21", actual)
         self.assertIn("dashboard.json 有变更：是", actual)
         self.assertIn("dashboard.summary.json 有变更：否", actual)
-        self.assertIn("GitHub Pages 与 Cloudflare Pages 自动部署已触发", actual)
+        self.assertIn("Git 推送成功，GitHub Pages 与 Cloudflare Pages 部署结果待确认", actual)
         self.assertIn("耗时：185 秒", actual)
         self.assertIn(f"窗口会在 {FINISH_AUTO_CLOSE_SECONDS} 秒后自动关闭", actual)
 

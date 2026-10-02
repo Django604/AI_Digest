@@ -1372,3 +1372,24 @@
 - 验证结果：生成器专项测试通过；Playwright 在 `1440px` 与 `425px` 视口确认新文案完整显示且无横向溢出。
 - 涉及文件：`scripts/build_dashboard.py`、`tests/test_build_dashboard.py`、`docs/data/dashboard.json`、`docs/data/monthly/2026-09/dashboard.json`、`DEV_CHANGELOG.md`。
 - 关联提交（如有）：待补充
+
+
+## 2026-09-30
+- 需求 / 目标：进入 AI_Digest 项目，建立后续操作上下文。
+- 操作结果：已定位 D:\WorkCode\AI_Digest，并读取根目录 README.md、SCRIPTS.md 与 DEV_CHANGELOG.md。
+- 备注：后续具体任务待补充。
+
+## 2026-10-02 Git 推送与双站部署状态排查
+- 需求 / 目标：解释 GitHub 部署失败但附魔工作台仍显示成功的原因，修复跨月测试与工作台状态判断。
+- 排查结果：自动提交 `633fa9e` 与手动提交 `9bade6a` 均已成功上传；对应 GitHub Pages 与 Cloudflare Pages workflow 均在 `Run tests` 失败。源业务日期进入 10 月后按既定规则移除探陆独立板块，但一条旧测试仍要求最新工作簿必须包含该板块。
+- 改动内容：探陆排序测试改用固定 7 月的合成数据；发布结果增加提交 SHA、推送是否执行及待确认的部署状态；附魔工作台异步查询该提交的两条 Actions，分别展示 Git 推送 / 双站部署结果和链接，部署失败显示错误，无法查询显示待确认；同步修正文案与文档。
+- 涉及文件：`scripts/dashboard_publish.py`、`scripts/scheduled_update_runner.py`、对应测试、`README.md`、`SCRIPTS.md`、本日志；附魔工作台的 `scripts/pages_deployment_status.py`、`scripts/manual_fallback_service.py`、对应测试及 `tools/manual-fallback/app.js` / `index.html`。
+- 验证结果：AI_Digest 全量测试 `135/135`、附魔工作台全量测试 `71/71` 通过；Node 语法检查通过；真实查询提交 `9bade6a` 正确显示两站部署失败。受限 Windows 环境的 Python 3.14 临时目录权限问题通过仅测试进程的 mkdir 兼容处理避开，未修改产品逻辑。
+- 运行限制：现有工作台 Python 进程 `22100` 的停止操作被系统拒绝，未完成服务重启；需重启工作台才能加载新版后端。尚未提交、推送修复或触发重新部署。
+- 关联提交（如有）：待补充
+
+## 2026-10-02 发布部署失败修复
+- 需求 / 目标：按用户要求提交并推送 AI_Digest 修复，重新触发双站部署。
+- 发布内容：探陆跨月测试修正、Git 推送与部署状态字段及提示调整、对应回归测试和项目说明。
+- 验证结果：复核工作区差异与上一轮通过的 `135/135` 测试版本一致，远端 `main` 在推送前为 `9bade6a`，`git diff --check` 通过。
+- 发布结果：待补充。
