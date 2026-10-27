@@ -328,7 +328,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         self.assertEqual(sections_by_kind["nev"]["title"], "NEV新增线索")
         self.assertTrue(
             sections_by_kind["valid-leads"]["lines"][0].endswith(
-                "（目标取值为H2穿透目标7月值）"
+                "（目标取值为7月BSC指标）"
             )
         )
         self.assertNotIn("note", sections_by_kind["valid-leads"])
@@ -710,7 +710,7 @@ class BuildDashboardValidationTests(unittest.TestCase):
         self.assertEqual(items["环比"], "4.4%")
         self.assertEqual(
             brief["lines"],
-            ["累计实绩 334,131，月度目标达成率 50.0%；同比 11.4%，环比 4.4%（目标取值为H2穿透目标7月值）"],
+            ["累计实绩 334,131，月度目标达成率 50.0%；同比 11.4%，环比 4.4%（目标取值为7月BSC指标）"],
         )
 
     def test_valid_leads_brief_mom_matches_trend_for_month_to_date_period(self) -> None:
