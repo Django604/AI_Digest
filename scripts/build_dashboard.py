@@ -26,18 +26,19 @@ DASHBOARD_TARGETS_CONFIG = ROOT / "config" / "dashboard_targets.json"
 CHINA_STANDARD_TIME = timezone(timedelta(hours=8))
 
 NEV_CORE_MODELS = [
+    ("nx7", "NX7", "NX7"),
     ("nx8", "NX8", "NX8"),
     ("n7", "N7", "N7"),
     ("n6", "N6", "N6"),
     ("TEANA-harmony", "天籁·鸿蒙座舱", "天籁·鸿蒙座舱"),
 ]
+NX7_TREND_START_DATE = date(2026, 11, 13)
 NEW_PATHFINDER_MODEL = "2026款探陆"
 NEW_PATHFINDER_FREEZE_DATE = date(2026, 9, 9)
 NEV_DETAIL_MODELS = [
     *NEV_CORE_MODELS,
     ("new-pathfinder", NEW_PATHFINDER_MODEL, NEW_PATHFINDER_MODEL),
 ]
-NEV_BRIEF_ORDER = [model_name for _, _, model_name in NEV_CORE_MODELS]
 BRIEF_MARKERS = ["①", "②", "③", "④", "⑤", "⑥"]
 SYLPHY_FREEZE_DATE = date(2026, 7, 15)
 NEW_PATHFINDER_TARGET_OVERRIDES = {
@@ -148,6 +149,13 @@ def month_start(value: date) -> date:
 @lru_cache(maxsize=None)
 def month_end(value: date) -> date:
     return value.replace(day=calendar.monthrange(value.year, value.month)[1])
+
+
+def get_nev_core_models(report_date: date) -> list[tuple[str, str, str]]:
+    return [
+        item for item in NEV_CORE_MODELS
+        if item[2] != "NX7" or month_end(report_date) >= NX7_TREND_START_DATE
+    ]
 
 
 def month_key(value: date) -> str:
@@ -913,7 +921,7 @@ def build_monthly_trend(
     current_targets: dict[date, int | float | None] | None,
 ) -> dict[str, Any]:
     context = build_monthly_series_context(report_date, current_actuals, previous_actuals, actual_key, current_targets)
-    chart_title = build_monthly_chart_title(title, metric_label)
+    chart_title = build_monthly_chart_title(title, metric_label, report_date)
     dates = context["dates"]
     report_index = context["reportIndex"]
     prev_dates = context["prevDates"]
@@ -987,9 +995,9 @@ def make_card(label: str, value: int | float | None, kind: str = "count", note: 
     }
 
 
-def build_monthly_chart_title(title: str, metric_label: str) -> str:
+def build_monthly_chart_title(title: str, metric_label: str, report_date: date) -> str:
     special_titles = {
-        ("NEV 总盘", "新增线索"): "NEV 4车新增线索",
+        ("NEV 总盘", "新增线索"): f"NEV {len(get_nev_core_models(report_date))}车新增线索",
         ("ICE 总盘", "有效线索"): "ICE 有效线索",
     }
     return special_titles.get((title, metric_label), f"{title}{metric_label}")
@@ -1042,6 +1050,8 @@ def build_nev_section(section_id: str, title: str, report_date: date, current_ac
         display_start_date = NEW_PATHFINDER_TREND_START_DATES.get((report_date.year, report_date.month))
         if display_start_date is not None:
             trend = trim_monthly_trend_before(trend, display_start_date)
+    elif section_id == "nx7" and month_start(report_date) == month_start(NX7_TREND_START_DATE):
+        trend = trim_monthly_trend_before(trend, NX7_TREND_START_DATE)
     return {
         "id": section_id,
         "title": title,
@@ -1125,7 +1135,8 @@ def build_line_brief(
 ) -> dict[str, Any]:
     total_cum_actual = total_day_actual = total_cum_target = total_day_target = 0
     nev_lines: list[str] = []
-    for index, model_name in enumerate(NEV_BRIEF_ORDER):
+    core_models = get_nev_core_models(report_date)
+    for index, (_, _, model_name) in enumerate(core_models):
         actuals = nev_daily.get(model_name, {})
         targets = nev_targets.get(model_name, {})
         cum_actual = sum((item.get("newLeads") or 0) for item in actuals.values())
@@ -1138,7 +1149,8 @@ def build_line_brief(
         total_day_target += day_target or 0
         marker = BRIEF_MARKERS[index]
         nev_lines.append(f"{marker}{model_name}累计实绩{fmt_count(cum_actual)}，累计达成率{fmt_percent(ratio(cum_actual, cum_target))}；当日实绩{fmt_count(day_actual)}，当日达成率{fmt_percent(ratio(day_actual, day_target))}")
-    nev_summary = f"四车累计实绩{fmt_count(total_cum_actual)}，累计达成率{fmt_percent(ratio(total_cum_actual, total_cum_target))}；当日实绩{fmt_count(total_day_actual)}，当日达成率{fmt_percent(ratio(total_day_actual, total_day_target))}"
+    model_count_label = {4: "四车", 5: "五车"}[len(core_models)]
+    nev_summary = f"{model_count_label}累计实绩{fmt_count(total_cum_actual)}，累计达成率{fmt_percent(ratio(total_cum_actual, total_cum_target))}；当日实绩{fmt_count(total_day_actual)}，当日达成率{fmt_percent(ratio(total_day_actual, total_day_target))}"
     headline = f"请查收{report_date.strftime('%m.%d')}线索&来店日报"
     sections = [
         {"kind": "intro", "title": "开场", "lines": ["各位领导：", headline]},
@@ -1609,8 +1621,9 @@ def build_payload(
             for dt, value in ice_same_period_all.items()
             if same_period_start <= dt <= same_period_end
         }
-        nev_total_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
-        nev_total_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
+        core_models = get_nev_core_models(report_date)
+        nev_total_current = aggregate_daily_series(*(nev_current.get(model_name, {}) for _, _, model_name in core_models))
+        nev_total_previous = aggregate_daily_series(*(nev_previous.get(model_name, {}) for _, _, model_name in core_models))
         nev_all_current = aggregate_model_daily_series(nev_current)
         nev_all_previous = aggregate_model_daily_series(nev_previous)
         nev_all_same_period = aggregate_model_daily_series(nev_same_period)
@@ -1624,7 +1637,7 @@ def build_payload(
         arrival_brief = build_arrival_brief(report_date, arrival_maps)
         arrival_dashboard = build_arrival_dashboard(report_date, arrival_maps)
 
-        nev_total_targets = aggregate_targets(*(nev_targets.get(model_name, {}) for _, _, model_name in NEV_CORE_MODELS))
+        nev_total_targets = aggregate_targets(*(nev_targets.get(model_name, {}) for _, _, model_name in core_models))
         valid_leads_total_current = aggregate_daily_series(nev_all_current, ice_current)
         valid_leads_total_previous = aggregate_daily_series(nev_all_previous, ice_previous)
         valid_leads_total_same_period = aggregate_daily_series(nev_all_same_period, ice_same_period)
@@ -1661,6 +1674,8 @@ def build_payload(
             )
         ]
         for section_id, title, model_name in NEV_DETAIL_MODELS:
+            if model_name == "NX7" and month_end(report_date) < NX7_TREND_START_DATE:
+                continue
             section_actuals = nev_current.get(model_name, {})
             if section_id == "new-pathfinder":
                 if report_date > month_end(NEW_PATHFINDER_FREEZE_DATE):

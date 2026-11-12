@@ -137,7 +137,7 @@ class BuildDashboardPayloadTests(unittest.TestCase):
         core_model_names = [model_name for _, _, model_name in NEV_CORE_MODELS]
         detail_model_names = [model_name for _, _, model_name in NEV_DETAIL_MODELS]
 
-        self.assertEqual(core_model_names, ["NX8", "N7", "N6", "天籁·鸿蒙座舱"])
+        self.assertEqual(core_model_names, ["NX7", "NX8", "N7", "N6", "天籁·鸿蒙座舱"])
         self.assertEqual(detail_model_names, [*core_model_names, "2026款探陆"])
 
     def test_nev_total_chart_title_identifies_four_model_scope(self) -> None:
@@ -981,6 +981,103 @@ class BuildDashboardValidationTests(unittest.TestCase):
         with patch("scripts.build_dashboard.read_json_file", return_value=None):
             with self.assertRaisesRegex(ValueError, "参数!C2 未读取到有效日期"):
                 validate_report_date_cell(workbook)
+
+
+class NX7LaunchTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        daily = {
+            "NX8": {
+                date(2026, 10, 13): {"newLeads": 5},
+                date(2026, 11, 1): {"newLeads": 10},
+                date(2026, 11, 13): {"newLeads": 20},
+            },
+            "NX7": {
+                date(2026, 10, 13): {"newLeads": 2},
+                date(2026, 11, 1): {"newLeads": 7},
+                date(2026, 11, 12): {"newLeads": 11},
+                date(2026, 11, 13): {"newLeads": 13},
+                date(2026, 11, 14): {"newLeads": 17},
+            },
+        }
+        targets = {
+            "NX8": {date(2026, 11, 1): 20, date(2026, 11, 13): 30},
+            "NX7": {date(2026, 11, 1): 10, date(2026, 11, 13): 20, date(2026, 11, 14): 30},
+        }
+        cls.payloads = {}
+        with (
+            patch("scripts.build_dashboard.load_nev_daily", return_value=daily),
+            patch("scripts.build_dashboard.load_nev_targets", return_value=targets),
+        ):
+            for report_date in (date(2026, 10, 14), date(2026, 11, 11), date(2026, 11, 14)):
+                cls.payloads[report_date] = build_payload(LEADS_BOOK, ARRIVAL_BOOK, report_date)
+
+    def test_five_model_total_and_brief_include_nx7_actuals_and_targets(self) -> None:
+        payload = self.payloads[date(2026, 11, 14)]
+        total = payload["dashboards"]["nev"]["sections"][0]
+        cards = {card["label"]: card["value"] for card in total["summary"]["cards"]}
+        self.assertEqual(total["trend"]["chartTitle"], "11 月NEV 5车新增线索趋势")
+        self.assertEqual(cards["累计新增线索"], 78)
+        self.assertEqual(cards["累计目标"], 110)
+        self.assertEqual(total["trend"]["chart"]["series"]["actual"][12], 33)
+        briefing = next(
+            section for section in payload["dashboards"]["brief"]["briefing"]["sections"]
+            if section["kind"] == "nev"
+        )
+        self.assertTrue(briefing["lines"][0].startswith("五车累计实绩78，"))
+        self.assertEqual(len(briefing["lines"]), 6)
+        self.assertTrue(briefing["lines"][1].startswith("①NX7累计实绩48，"))
+
+    def test_nx7_november_trend_starts_on_13_with_aligned_cumulative_values(self) -> None:
+        sections = self.payloads[date(2026, 11, 14)]["dashboards"]["nev"]["sections"]
+        section = next(section for section in sections if section["id"] == "nx7")
+        trend = section["trend"]
+        chart = trend["chart"]
+        expected_labels = [f"11/{day}" for day in range(13, 31)]
+        self.assertEqual(chart["labels"], expected_labels)
+        self.assertEqual(trend["matrix"]["labels"], expected_labels)
+        self.assertEqual(chart["reportDayIndex"], 1)
+        self.assertEqual(chart["series"]["actual"][:2], [13, 17])
+        self.assertEqual(chart["series"]["cumulativeActual"][:2], [31, 48])
+        self.assertEqual(chart["series"]["cumulativeTarget"][:2], [30, 60])
+        for row in trend["matrix"]["rows"]:
+            self.assertEqual(len(row["displayValues"]), len(expected_labels))
+        for series in chart["series"].values():
+            self.assertEqual(len(series), len(expected_labels))
+
+    def test_prelaunch_report_has_no_future_actuals_or_report_marker_in_nx7_trend(self) -> None:
+        section = next(
+            section for section in self.payloads[date(2026, 11, 11)]["dashboards"]["nev"]["sections"]
+            if section["id"] == "nx7"
+        )
+        chart = section["trend"]["chart"]
+        self.assertEqual(chart["labels"][0], "11/13")
+        self.assertEqual(chart["reportDayIndex"], -1)
+        self.assertTrue(all(value is None for value in chart["series"]["cumulativeActual"]))
+        actual_row = next(row for row in section["trend"]["matrix"]["rows"] if row["key"] == "actual")
+        self.assertTrue(all(value == "-" for value in actual_row["displayValues"]))
+
+    def test_historical_month_keeps_four_model_scope(self) -> None:
+        payload = self.payloads[date(2026, 10, 14)]
+        sections = payload["dashboards"]["nev"]["sections"]
+        self.assertNotIn("nx7", [section["id"] for section in sections])
+        self.assertEqual(sections[0]["trend"]["chartTitle"], "10 月NEV 4车新增线索趋势")
+        self.assertEqual(sections[0]["summary"]["cards"][0]["value"], 5)
+        briefing = next(
+            section for section in payload["dashboards"]["brief"]["briefing"]["sections"]
+            if section["kind"] == "nev"
+        )
+        self.assertTrue(briefing["lines"][0].startswith("四车累计实绩5，"))
+        self.assertEqual(len(briefing["lines"]), 5)
+
+    def test_nx7_later_month_starts_on_first_day(self) -> None:
+        section = build_nev_section(
+            "nx7", "NX7", date(2026, 12, 1),
+            {date(2026, 12, 1): {"newLeads": 10}}, {}, {},
+        )
+        self.assertEqual(section["trend"]["chart"]["labels"][0], "12/1")
+        self.assertEqual(section["trend"]["chart"]["reportDayIndex"], 0)
+        self.assertEqual(section["trend"]["chart"]["series"]["cumulativeActual"][0], 10)
 
 
 if __name__ == "__main__":
